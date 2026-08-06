@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('career_paths', function (Blueprint $table) {
+        Schema::createIfNotExists('career_paths', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->cascadeOnDelete();
             $table->string('name');
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('student_career_interests', function (Blueprint $table) {
+        Schema::createIfNotExists('student_career_interests', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->cascadeOnDelete();
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();
@@ -36,7 +36,7 @@ return new class extends Migration
             $table->unique(['student_id']);
         });
 
-        Schema::create('career_guidance_assessments', function (Blueprint $table) {
+        Schema::createIfNotExists('career_guidance_assessments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->cascadeOnDelete();
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();

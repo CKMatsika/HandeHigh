@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('schemes_of_work', function (Blueprint $table) {
+        Schema::createIfNotExists('schemes_of_work', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->onDelete('cascade');
             $table->foreignId('teacher_id')->constrained()->onDelete('cascade');
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->index(['school_id', 'academic_year', 'term']);
         });
 
-        Schema::create('scheme_of_work_items', function (Blueprint $table) {
+        Schema::createIfNotExists('scheme_of_work_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('scheme_of_work_id')->constrained()->onDelete('cascade');
             $table->integer('week_number');

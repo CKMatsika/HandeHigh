@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('flash_card_sets', function (Blueprint $table) {
+        Schema::createIfNotExists('flash_card_sets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->cascadeOnDelete();
             $table->foreignId('teacher_id')->constrained('teachers')->cascadeOnDelete();
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('flash_card_items', function (Blueprint $table) {
+        Schema::createIfNotExists('flash_card_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('flash_card_set_id')->constrained()->cascadeOnDelete();
             $table->text('front_text');
@@ -31,7 +31,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('flash_card_study_sessions', function (Blueprint $table) {
+        Schema::createIfNotExists('flash_card_study_sessions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('flash_card_set_id')->constrained()->cascadeOnDelete();
@@ -42,7 +42,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('flash_card_item_results', function (Blueprint $table) {
+        Schema::createIfNotExists('flash_card_item_results', function (Blueprint $table) {
             $table->id();
             $table->foreignId('study_session_id')->constrained('flash_card_study_sessions')->cascadeOnDelete();
             $table->foreignId('flash_card_item_id')->constrained()->cascadeOnDelete();

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sda_roles', function (Blueprint $table) {
+        Schema::createIfNotExists('sda_roles', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // Chairman, Secretary, Committee Member, etc.
             $table->string('slug')->unique(); // chairman, secretary, committee-member

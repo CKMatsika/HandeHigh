@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('sda_meetings', function (Blueprint $table) {
+        Schema::createIfNotExists('sda_meetings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sda_committee_id')->constrained()->onDelete('cascade');
             $table->string('title');

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('student_library_access', function (Blueprint $table) {
+        Schema::createIfNotExists('student_library_access', function (Blueprint $table) {
             $table->id();
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();
             $table->boolean('is_member')->default(true);

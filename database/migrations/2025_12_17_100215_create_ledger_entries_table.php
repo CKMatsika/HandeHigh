@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('ledger_entries', function (Blueprint $table) {
+        Schema::createIfNotExists('ledger_entries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
             $table->foreignId('student_id')->nullable()->constrained('students')->nullOnDelete();

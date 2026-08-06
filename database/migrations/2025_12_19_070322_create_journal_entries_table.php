@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('journal_entries', function (Blueprint $table) {
+        Schema::createIfNotExists('journal_entries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('journal_batch_id')->constrained()->onDelete('cascade');
             $table->foreignId('account_id')->constrained('accounts')->onDelete('restrict');

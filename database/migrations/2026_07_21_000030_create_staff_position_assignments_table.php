@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('staff_position_assignments', function (Blueprint $table) {
+        Schema::createIfNotExists('staff_position_assignments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->cascadeOnDelete();
             $table->foreignId('staff_position_id')->constrained()->cascadeOnDelete();

@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('sda_tasks', function (Blueprint $table) {
+        Schema::createIfNotExists('sda_tasks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sda_committee_id')->constrained()->onDelete('cascade');
             $table->foreignId('assigned_to')->constrained('users')->onDelete('cascade');

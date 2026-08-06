@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('bank_statement_lines', function (Blueprint $table) {
+        Schema::createIfNotExists('bank_statement_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bank_statement_import_id')->constrained()->onDelete('cascade');
             $table->date('transaction_date');

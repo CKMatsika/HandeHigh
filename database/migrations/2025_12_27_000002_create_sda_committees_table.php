@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sda_committees', function (Blueprint $table) {
+        Schema::createIfNotExists('sda_committees', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // Budget Committee, Finance Committee, Procurement Committee, etc.
             $table->string('slug')->unique(); // budget-committee, finance-committee, procurement-committee
