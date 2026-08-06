@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::createIfNotExists('timetable_slots', function (Blueprint $table) {
+        Schema::create('timetable_slots', function (Blueprint $table) {
             $table->id();
             $table->foreignId('timetable_id')->constrained()->onDelete('cascade');
             $table->foreignId('school_class_id')->constrained()->onDelete('cascade');

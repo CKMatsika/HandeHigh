@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::createIfNotExists('sda_resolutions', function (Blueprint $table) {
+        Schema::create('sda_resolutions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sda_meeting_id')->constrained()->onDelete('cascade');
             $table->foreignId('proposed_by')->constrained('users')->onDelete('cascade');

@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::createIfNotExists('student_positions', function (Blueprint $table) {
+        Schema::create('student_positions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('student_id')->constrained('users')->onDelete('cascade');
             $table->string('position_type'); // prefect, head_boy, head_girl, class_rep, etc.

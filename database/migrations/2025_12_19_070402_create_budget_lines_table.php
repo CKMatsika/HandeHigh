@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::createIfNotExists('budget_lines', function (Blueprint $table) {
+        Schema::create('budget_lines', function (Blueprint $table) {
             $table->id();
             $table->foreignId('budget_id')->constrained()->onDelete('cascade');
             $table->foreignId('account_id')->constrained('accounts')->onDelete('restrict');

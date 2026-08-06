@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::createIfNotExists('bill_items', function (Blueprint $table) {
+        Schema::create('bill_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bill_id')->constrained('bills')->onDelete('cascade');
             $table->text('description');

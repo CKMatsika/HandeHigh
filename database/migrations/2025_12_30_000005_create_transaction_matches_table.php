@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::createIfNotExists('transaction_matches', function (Blueprint $table) {
+        Schema::create('transaction_matches', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bank_transaction_id')->constrained()->onDelete('cascade');
             $table->foreignId('cashbook_transaction_id')->constrained()->onDelete('cascade');
