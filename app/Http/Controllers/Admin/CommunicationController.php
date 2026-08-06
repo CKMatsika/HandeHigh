@@ -8,13 +8,10 @@ use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CommunicationController extends Controller
 {
-    /**
-     * Display the communication dashboard with chat, SMS, and Email options.
-     */
     public function index()
     {
         $user = Auth::user();
@@ -24,44 +21,38 @@ class CommunicationController extends Controller
             abort(403);
         }
 
-        // Get user's conversations
         $conversations = Conversation::where('school_id', $school->id)
             ->whereHas('participants', function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             })
-            ->with(['participants', 'messages' => function ($query) {
-                $query->latest()->first();
+            ->with(['participants.user', 'creator'])
+            ->withCount(['messages as unread_count' => function ($query) use ($user) {
+                $query->where('sender_id', '!=', $user->id)
+                    ->whereDoesntHave('readReceipts', function ($q) use ($user) {
+                        $q->where('user_id', $user->id);
+                    });
             }])
             ->latest()
             ->get();
 
-        // Get unread message count
-        $unreadCount = Message::where('school_id', $school->id)
-            ->whereHas('conversation.participants', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->where('sender_id', '!=', $user->id)
-            ->whereDoesntHave('readReceipts', function ($query) use ($user) {
-                $query->where('user_id', $user->id);
-            })
-            ->count();
+        foreach ($conversations as $conv) {
+            $conv->latest_message = $conv->messages()->with('sender')->latest()->first();
+        }
+
+        $unreadCount = $conversations->sum('unread_count');
 
         return view('admin.communication.index', compact('conversations', 'unreadCount'));
     }
 
-    /**
-     * Display a specific conversation.
-     */
     public function showConversation(Conversation $conversation)
     {
         $user = Auth::user();
-        
-        if ($conversation->school_id !== $user->school_id || 
+
+        if ($conversation->school_id !== $user->school_id ||
             !$conversation->participants()->where('user_id', $user->id)->exists()) {
             abort(403);
         }
 
-        // Mark messages as read
         $conversation->messages()
             ->where('sender_id', '!=', $user->id)
             ->whereDoesntHave('readReceipts', function ($query) use ($user) {
@@ -72,42 +63,61 @@ class CommunicationController extends Controller
                 $message->markAsRead($user->id);
             });
 
-        // Update participant's last read time
         $conversation->participants()->updateExistingPivot($user->id, [
             'last_read_at' => now(),
         ]);
 
-        $messages = $conversation->messages()->with('sender')->latest()->paginate(50);
+        $messages = $conversation->messages()
+            ->with('sender')
+            ->orderBy('created_at', 'asc')
+            ->paginate(50);
 
-        return view('admin.communication.chat', compact('conversation', 'messages'));
+        $otherParticipant = $conversation->type === 'direct'
+            ? $conversation->participants->where('id', '!=', $user->id)->first()
+            : null;
+
+        return view('admin.communication.chat', compact('conversation', 'messages', 'otherParticipant'));
     }
 
-    /**
-     * Store a new message in a conversation.
-     */
     public function sendMessage(Request $request, Conversation $conversation)
     {
         $user = Auth::user();
-        
-        if ($conversation->school_id !== $user->school_id || 
+
+        if ($conversation->school_id !== $user->school_id ||
             !$conversation->participants()->where('user_id', $user->id)->exists()) {
-            abort(403);
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
         $request->validate([
-            'content' => 'required|string|max:1000',
+            'content' => 'required_without:file|string|max:2000',
             'type' => 'sometimes|in:text,file,image',
+            'file' => 'required_if:type,file|sometimes|file|max:10240',
         ]);
 
-        $message = Message::create([
+        $data = [
             'school_id' => $conversation->school_id,
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
-            'content' => $request->content,
+            'content' => $request->content ?? '',
             'type' => $request->type ?? 'text',
-        ]);
+        ];
 
-        // Mark as read for sender
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('public/chat-files', $filename);
+            $data['file_path'] = 'chat-files/' . $filename;
+            $data['content'] = $data['content'] ?: $filename;
+            $ext = strtolower($file->getClientOriginalExtension());
+            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                $data['type'] = 'image';
+            } else {
+                $data['type'] = 'file';
+            }
+        }
+
+        $message = Message::create($data);
+
         $message->readReceipts()->create([
             'user_id' => $user->id,
             'read_at' => now(),
@@ -119,9 +129,84 @@ class CommunicationController extends Controller
         ]);
     }
 
-    /**
-     * Create a new conversation.
-     */
+    public function pollMessages(Request $request, Conversation $conversation)
+    {
+        $user = Auth::user();
+
+        if ($conversation->school_id !== $user->school_id ||
+            !$conversation->participants()->where('user_id', $user->id)->exists()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $afterId = (int) $request->get('after', 0);
+
+        $messages = $conversation->messages()
+            ->with('sender')
+            ->where('id', '>', $afterId)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $conversation->messages()
+            ->where('sender_id', '!=', $user->id)
+            ->whereDoesntHave('readReceipts', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->where('id', '>', $afterId)
+            ->get()
+            ->each(function ($message) use ($user) {
+                $message->markAsRead($user->id);
+            });
+
+        return response()->json([
+            'success' => true,
+            'messages' => $messages,
+        ]);
+    }
+
+    public function unreadCount(Request $request)
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (!$school) {
+            return response()->json(['count' => 0]);
+        }
+
+        $count = Message::where('school_id', $school->id)
+            ->whereHas('conversation.participants', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->where('sender_id', '!=', $user->id)
+            ->whereDoesntHave('readReceipts', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->count();
+
+        $perConversation = [];
+        $userConversations = Conversation::where('school_id', $school->id)
+            ->whereHas('participants', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->pluck('id');
+
+        foreach ($userConversations as $convId) {
+            $unread = Message::where('conversation_id', $convId)
+                ->where('sender_id', '!=', $user->id)
+                ->whereDoesntHave('readReceipts', function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                })
+                ->count();
+            if ($unread > 0) {
+                $perConversation[$convId] = $unread;
+            }
+        }
+
+        return response()->json([
+            'count' => $count,
+            'per_conversation' => $perConversation,
+        ]);
+    }
+
     public function createConversation(Request $request)
     {
         $user = Auth::user();
@@ -130,22 +215,23 @@ class CommunicationController extends Controller
         $request->validate([
             'name' => 'required_if:type,group|string|max:255',
             'type' => 'required|in:direct,group',
-            'participants' => 'required|array|min:1',
-            'participants.*' => 'exists:users,id',
+            'participants' => 'required|string',
         ]);
 
-        $participants = $request->participants;
-        
-        // For direct messages, ensure only 2 participants
+        $participants = array_filter(array_map('intval', explode(',', $request->participants)));
+
+        if (empty($participants)) {
+            return back()->withErrors(['participants' => 'Please select at least one participant.']);
+        }
+
         if ($request->type === 'direct' && count($participants) !== 1) {
             return back()->withErrors(['participants' => 'Direct conversations can only have one other participant.']);
         }
 
-        // Check if direct conversation already exists
         if ($request->type === 'direct') {
             $existingConversation = Conversation::where('school_id', $school->id)
                 ->where('type', 'direct')
-                ->whereHas('participants', function ($query) use ($user, $participants) {
+                ->whereHas('participants', function ($query) use ($user) {
                     $query->where('user_id', $user->id);
                 })
                 ->whereHas('participants', function ($query) use ($participants) {
@@ -158,7 +244,6 @@ class CommunicationController extends Controller
             }
         }
 
-        // Create conversation
         $conversation = Conversation::create([
             'school_id' => $school->id,
             'name' => $request->name,
@@ -166,7 +251,6 @@ class CommunicationController extends Controller
             'created_by' => $user->id,
         ]);
 
-        // Add participants
         $allParticipants = array_merge([$user->id], $participants);
         foreach ($allParticipants as $participantId) {
             $conversation->participants()->attach($participantId, [
@@ -179,15 +263,11 @@ class CommunicationController extends Controller
             ->with('success', 'Conversation created successfully.');
     }
 
-    /**
-     * Show SMS composer.
-     */
     public function showSMS()
     {
         $user = Auth::user();
         $school = $user->school;
 
-        // Get recipients (students, staff, guardians)
         $students = $school->students()->get();
         $staff = $school->staff()->get();
         $guardians = $school->guardians()->get();
@@ -195,9 +275,6 @@ class CommunicationController extends Controller
         return view('admin.communication.sms', compact('students', 'staff', 'guardians'));
     }
 
-    /**
-     * Send SMS messages.
-     */
     public function sendSMS(Request $request)
     {
         $request->validate([
@@ -206,21 +283,14 @@ class CommunicationController extends Controller
             'recipients.*' => 'string',
         ]);
 
-        // SMS sending logic would go here
-        // For now, we'll just log it
-
         return back()->with('success', 'SMS sent successfully.');
     }
 
-    /**
-     * Show Email composer.
-     */
     public function showEmail()
     {
         $user = Auth::user();
         $school = $user->school;
 
-        // Get recipients
         $students = $school->students()->get();
         $staff = $school->staff()->get();
         $guardians = $school->guardians()->get();
@@ -228,9 +298,6 @@ class CommunicationController extends Controller
         return view('admin.communication.email', compact('students', 'staff', 'guardians'));
     }
 
-    /**
-     * Send Email messages.
-     */
     public function sendEmail(Request $request)
     {
         $request->validate([
@@ -240,31 +307,24 @@ class CommunicationController extends Controller
             'recipients.*' => 'string',
         ]);
 
-        // Email sending logic would go here
-        // For now, we'll just log it
-
         return back()->with('success', 'Email sent successfully.');
     }
 
-    /**
-     * Search for users to add to conversations.
-     */
     public function searchUsers(Request $request)
     {
         $user = Auth::user();
         $school = $user->school;
 
         $query = $request->get('q');
-        
+
         $users = User::where('school_id', $school->id)
             ->where(function ($q) use ($query) {
-                $q->where('first_name', 'like', "%{$query}%")
-                  ->orWhere('last_name', 'like', "%{$query}%")
+                $q->where('name', 'like', "%{$query}%")
                   ->orWhere('email', 'like', "%{$query}%");
             })
             ->where('id', '!=', $user->id)
             ->limit(10)
-            ->get(['id', 'first_name', 'last_name', 'email']);
+            ->get(['id', 'name', 'email']);
 
         return response()->json($users);
     }

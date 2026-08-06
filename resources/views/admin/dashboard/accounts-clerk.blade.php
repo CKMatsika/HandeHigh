@@ -80,6 +80,24 @@
         </div>
     </div>
 
+    <!-- AI Finance Advisor -->
+    <a href="{{ route('admin.ai-finance.dashboard') }}" class="block rounded-2xl border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 p-6 hover:from-violet-500/20 hover:to-indigo-500/20 transition">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                <svg class="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-violet-300">AI Finance Advisor</h3>
+                <p class="text-xs text-slate-400 mt-1">Get intelligent insights, anomaly detection, cash flow forecasting, and budget recommendations powered by AI.</p>
+            </div>
+            <svg class="w-5 h-5 text-violet-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+    </a>
+
     <!-- Fee Collection Status -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">

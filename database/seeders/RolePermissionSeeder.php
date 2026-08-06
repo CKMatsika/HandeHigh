@@ -118,6 +118,13 @@ class RolePermissionSeeder extends Seeder
             'users.delete',
             'roles.view',
             'roles.assign',
+
+            // Schemes of Work permissions
+            'schemes-of-work.view',
+            'schemes-of-work.create',
+            'schemes-of-work.edit',
+            'schemes-of-work.approve',
+            'schemes-of-work.reject',
         ];
 
         foreach ($permissions as $permission) {
@@ -171,6 +178,7 @@ class RolePermissionSeeder extends Seeder
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
             'reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance',
             'users.view', 'users.create', 'users.edit',
+            'schemes-of-work.view', 'schemes-of-work.approve', 'schemes-of-work.reject',
         ]);
 
         $deputyHeadmaster = Role::findByName('deputy-headmaster');
@@ -190,6 +198,7 @@ class RolePermissionSeeder extends Seeder
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
             'reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance',
             'users.view', 'users.create', 'users.edit',
+            'schemes-of-work.view', 'schemes-of-work.approve', 'schemes-of-work.reject',
         ]);
 
         $accountsClerk = Role::findByName('accounts-clerk');
@@ -247,6 +256,7 @@ class RolePermissionSeeder extends Seeder
             'attendance.view', 'attendance.create', 'attendance.edit',
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
             'reports.view', 'reports.academic', 'reports.attendance',
+            'schemes-of-work.view', 'schemes-of-work.create', 'schemes-of-work.edit',
         ]);
 
         $accountant = Role::findByName('accountant');

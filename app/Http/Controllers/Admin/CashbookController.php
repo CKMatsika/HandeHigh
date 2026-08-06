@@ -118,6 +118,13 @@ class CashbookController extends Controller
             'created_by' => auth()->id(),
         ]);
 
+        // Post manually created transaction to general ledger
+        try {
+            app(\App\Services\AccountingService::class)->postManualCashbookTransaction($transaction);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to post manual cashbook entry to accounting: ' . $e->getMessage());
+        }
+
         return redirect()->route('admin.cashbook.index')
             ->with('success', 'Transaction recorded successfully.');
     }

@@ -50,6 +50,10 @@
                                 </svg>
                             </button>
                             <div id="academic-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.students.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.students.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span>Students</span>
+                                </a>
                                 <a href="{{ route('admin.enrollments.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.enrollments.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                                     <span>Enrollments</span>
@@ -66,10 +70,6 @@
                                     <span class="h-2 w-2 rounded-full bg-rose-400"></span>
                                     <span>Curricula</span>
                                 </a>
-                                <a href="{{ route('admin.teachers.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.teachers.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-                                    <span>Teachers</span>
-                                </a>
                                 <a href="{{ route('admin.timetables.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.timetables.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-pink-400"></span>
                                     <span>Timetable</span>
@@ -77,6 +77,76 @@
                                 <a href="{{ route('admin.attendance.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.attendance.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-lime-400"></span>
                                     <span>Attendance</span>
+                                </a>
+                                <a href="{{ route('admin.schemes-of-work.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.schemes-of-work.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Schemes of Work</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Career Guidance -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('career')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span class="text-[10px] font-medium">CAREER GUIDANCE</span>
+                                </div>
+                                <svg id="career-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="career-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.career-guidance.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.career-guidance.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Assessments</span>
+                                </a>
+                                <a href="{{ route('admin.career-guidance.paths') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.career-guidance.paths*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span>Career Paths</span>
+                                </a>
+                                <a href="{{ route('admin.career-guidance.interests') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.career-guidance.interests*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Student Interests</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- HR Management -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('hr')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span class="text-[10px] font-medium">HR MANAGEMENT</span>
+                                </div>
+                                <svg id="hr-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="hr-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.employees.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.employees.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span>Employees</span>
+                                </a>
+                                <a href="{{ route('admin.teachers.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.teachers.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span>Teachers</span>
+                                </a>
+                                <a href="{{ route('admin.departments.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.departments.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Departments</span>
+                                </a>
+                                <a href="{{ route('admin.leaves.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.leaves.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-rose-400"></span>
+                                    <span>Leave Management</span>
+                                </a>
+                                <a href="{{ route('admin.payrolls.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.payrolls.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Payroll</span>
+                                </a>
+                                <a href="{{ route('admin.loans.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.loans.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Loans</span>
                                 </a>
                             </div>
                         </div>
@@ -101,9 +171,29 @@
                                     <span class="h-2 w-2 rounded-full bg-sky-400"></span>
                                     <span>Invoices & Payments</span>
                                 </a>
+                                <a href="{{ route('admin.credit-notes.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.credit-notes.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-red-400"></span>
+                                    <span>Credit Notes</span>
+                                </a>
                                 <a href="{{ route('admin.receipts.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.receipts.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                                     <span>Receipts</span>
+                                </a>
+                                <a href="{{ route('admin.accounts.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.accounts.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-lime-400"></span>
+                                    <span>Chart of Accounts</span>
+                                </a>
+                                <a href="{{ route('admin.journals.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.journals.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Journal Entries</span>
+                                </a>
+                                <a href="{{ route('admin.bank-reconciliations.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.bank-reconciliations.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-orange-400"></span>
+                                    <span>Bank Reconciliation</span>
+                                </a>
+                                <a href="{{ route('admin.interbank-transfers.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.interbank-transfers.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-rose-400"></span>
+                                    <span>Interbank Transfers</span>
                                 </a>
                                 <a href="{{ route('admin.cash-transfers.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.cash-transfers.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-purple-400"></span>
@@ -121,36 +211,9 @@
                                     <span class="h-2 w-2 rounded-full bg-pink-400"></span>
                                     <span>Budgets</span>
                                 </a>
-                            </div>
-                        </div>
-
-                        <!-- Accounting -->
-                        <div class="space-y-1">
-                            <button onclick="toggleMenu('accounting')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
-                                <div class="flex items-center gap-2">
-                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
-                                    <span class="text-[10px] font-medium">ACCOUNTING</span>
-                                </div>
-                                <svg id="accounting-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div id="accounting-menu" class="hidden space-y-1 pl-6">
-                                <a href="{{ route('admin.accounts.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.accounts.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-lime-400"></span>
-                                    <span>Chart of Accounts</span>
-                                </a>
-                                <a href="{{ route('admin.journals.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.journals.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
-                                    <span>Journal Entries</span>
-                                </a>
-                                <a href="{{ route('admin.bank-reconciliations.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.bank-reconciliations.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-orange-400"></span>
-                                    <span>Bank Reconciliation</span>
-                                </a>
-                                <a href="{{ route('admin.interbank-transfers.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.interbank-transfers.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-rose-400"></span>
-                                    <span>Interbank Transfers</span>
+                                <a href="{{ route('admin.ai-finance.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.ai-finance.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                    <span>AI Finance Advisor</span>
                                 </a>
                             </div>
                         </div>
@@ -161,6 +224,7 @@
                                 <div class="flex items-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-purple-400"></span>
                                     <span class="text-[10px] font-medium">COMMUNICATION</span>
+                                    <span id="sidebarUnreadBadge" class="hidden ml-1 inline-flex items-center justify-center rounded-full bg-red-500 min-w-[16px] h-4 px-1 text-[9px] font-bold text-white">0</span>
                                 </div>
                                 <svg id="communication-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -315,6 +379,31 @@
                             </div>
                         </div>
                         
+                        @if($user && $user->hasRole(['teacher', 'super-admin']))
+                            <!-- Teacher Portal -->
+                            <div class="space-y-1">
+                                <button onclick="toggleMenu('teacher-portal')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                        <span class="text-[10px] font-medium">TEACHING</span>
+                                    </div>
+                                    <svg id="teacher-portal-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div id="teacher-portal-menu" class="hidden space-y-1 pl-6">
+                                    <a href="{{ route('teacher.schemes-of-work.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.schemes-of-work.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                        <span>Schemes of Work</span>
+                                    </a>
+                                    <a href="{{ route('teacher.flash-cards.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.flash-cards.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                        <span>Flash Cards</span>
+                                    </a>
+                                </div>
+                            </div>
+                        @endif
+                        
                         @if($user && $user->hasRole('super-admin'))
                             <!-- Portal Testing -->
                             <div class="space-y-1">
@@ -355,6 +444,10 @@
                                     <a href="{{ route('student.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('student.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                         <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
                                         <span>Student Portal</span>
+                                    </a>
+                                    <a href="{{ route('student.flash-cards.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('student.flash-cards.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                        <span>Student Flash Cards</span>
                                     </a>
                                     <a href="{{ route('parent.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('parent.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                         <span class="h-2 w-2 rounded-full bg-orange-400"></span>
@@ -484,16 +577,23 @@
                 // Check which menu should be open based on current route
                 if (currentRoute.includes('/enrollments') || currentRoute.includes('/classes') || 
                     currentRoute.includes('/subjects') || currentRoute.includes('/curricula') || 
-                    currentRoute.includes('/teachers') || currentRoute.includes('/timetables') || 
-                    currentRoute.includes('/attendance')) {
+                    currentRoute.includes('/timetables') || 
+                    currentRoute.includes('/attendance') || currentRoute.includes('/schemes-of-work') ||
+                    currentRoute.includes('/students')) {
                     toggleMenu('academic');
+                } else if (currentRoute.includes('/career-guidance')) {
+                    toggleMenu('career');
+                } else if (currentRoute.includes('/employees') || currentRoute.includes('/departments') || 
+                    currentRoute.includes('/leaves') || currentRoute.includes('/payroll') || 
+                    currentRoute.includes('/loans') || currentRoute.includes('/teachers')) {
+                    toggleMenu('hr');
                 } else if (currentRoute.includes('/fees') || currentRoute.includes('/invoices') || 
-                      currentRoute.includes('/receipts') || currentRoute.includes('/customers') || 
-                      currentRoute.includes('/vendors') || currentRoute.includes('/budgets')) {
+                       currentRoute.includes('/receipts') || currentRoute.includes('/customers') || 
+                       currentRoute.includes('/vendors') || currentRoute.includes('/budgets') ||
+                       currentRoute.includes('/accounts') || currentRoute.includes('/journals') || 
+                       currentRoute.includes('/bank-reconciliations') || currentRoute.includes('/interbank-transfers') ||
+                       currentRoute.includes('/credit-notes') || currentRoute.includes('/ai-finance')) {
                     toggleMenu('finance');
-                } else if (currentRoute.includes('/accounts') || currentRoute.includes('/journals') || 
-                      currentRoute.includes('/bank-reconciliations') || currentRoute.includes('/interbank-transfers')) {
-                    toggleMenu('accounting');
                 } else if (currentRoute.includes('/communication')) {
                     toggleMenu('communication');
                 } else if (currentRoute.includes('/dashboard/headmaster') || currentRoute.includes('/dashboard/deputy-headmaster') || 
@@ -504,8 +604,37 @@
                     toggleMenu('reports');
                 } else if (currentRoute.includes('/schools')) {
                     toggleMenu('system');
+                } else if (currentRoute.includes('/teacher/schemes-of-work') || currentRoute.includes('/teacher/flash-cards')) {
+                    toggleMenu('teacher-portal');
                 }
             });
+        </script>
+
+        <script>
+            // Sidebar unread badge polling
+            (function() {
+                function pollUnread() {
+                    fetch('/admin/communication/unread-count', {
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var badge = document.getElementById('sidebarUnreadBadge');
+                        if (!badge) return;
+                        if (data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.classList.remove('hidden');
+                            document.title = '(' + data.count + ') ' + document.title.replace(/^\(\d+\)\s*/, '');
+                        } else {
+                            badge.classList.add('hidden');
+                            document.title = document.title.replace(/^\(\d+\)\s*/, '');
+                        }
+                    })
+                    .catch(function() {});
+                }
+                pollUnread();
+                setInterval(pollUnread, 8000);
+            })();
         </script>
     </body>
 </html>

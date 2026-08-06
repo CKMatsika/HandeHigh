@@ -1,0 +1,110 @@
+{
+  "primary": {
+    "grade_1": {
+      "subjects": {
+        "english": ["primary english grade 1 Zimbabwe", "learning to read Zimbabwe"],
+        "mathematics": ["counting numbers grade 1", "basic maths Zimbabwe primary"],
+        "environmental_science": ["environmental awareness grade 1"]
+      }
+    },
+    "grade_2": {
+      "subjects": {
+        "english": ["primary english grade 2 Zimbabwe", "phonics grade 2"],
+        "mathematics": ["addition subtraction grade 2", "basic arithmetic Zimbabwe"],
+        "environmental_science": ["our environment grade 2"]
+      }
+    },
+    "grade_3": {
+      "subjects": {
+        "english": ["primary english grade 3 Zimbabwe", "reading comprehension grade 3"],
+        "mathematics": ["multiplication grade 3", "times tables Zimbabwe"],
+        "social_science": ["community studies Zimbabwe"],
+        "science": ["natural science grade 3"]
+      }
+    },
+    "grade_4": {
+      "subjects": {
+        "english": ["primary english grade 4 Zimbabwe", "essay writing grade 4"],
+        "mathematics": ["long division grade 4", "fractions introduction"],
+        "social_science": ["Zimbabwe social studies grade 4"],
+        "science": ["basic science grade 4"]
+      }
+    },
+    "grade_5": {
+      "subjects": {
+        "english": ["primary english grade 5 Zimbabwe", "grammar grade 5"],
+        "mathematics": ["decimals grade 5", "percentage grade 5"],
+        "social_science": ["Zimbabwe history geography grade 5"],
+        "science": ["science processes grade 5"]
+      }
+    },
+    "grade_6": {
+      "subjects": {
+        "english": ["primary english grade 6 Zimbabwe", "comprehension skills grade 6"],
+        "mathematics": ["geometry grade 6", "data handling grade 6"],
+        "social_science": ["Zimbabwe heritage grade 6"],
+        "science": ["scientific method grade 6"]
+      }
+    },
+    "grade_7": {
+      "subjects": {
+        "english": ["ZIMSEC grade 7 English", "primary school leaving exam Zimbabwe"],
+        "mathematics": ["ZIMSEC grade 7 mathematics", "primary school maths exam"],
+        "social_science": ["ZIMSEC grade 7 social science"],
+        "science": ["ZIMSEC grade 7 science", "primary school science exam"]
+      }
+    }
+  },
+  "secondary": {
+    "form_1": {
+      "subjects": {
+        "english": ["ZIMSEC O Level English form 1", "secondary English Zimbabwe"],
+        "mathematics": ["ZIMSEC O Level maths form 1", "secondary maths Zimbabwe"],
+        "science": ["ZIMSEC O Level science form 1", "integrated science Zimbabwe"],
+        "history": ["Zimbabwe history O Level", "African history form 1"],
+        "geography": ["Zimbabwe geography O Level", "physical geography form 1"],
+        "shona": ["ZIMSEC ChiShona O Level", "Shona language form 1"],
+        "ndebele": ["ZIMSEC isiNdebele O Level", "Ndebele language form 1"]
+      }
+    },
+    "form_2": {
+      "subjects": {
+        "english": ["ZIMSEC O Level English form 2", "English literature form 2"],
+        "mathematics": ["ZIMSEC O Level maths form 2", "algebra form 2"],
+        "science": ["ZIMSEC O Level science form 2", "biology form 2"],
+        "history": ["Zimbabwe history form 2", "colonial history Zimbabwe"],
+        "geography": ["Zimbabwe geography form 2", "map work form 2"],
+        "shona": ["ZIMSEC ChiShona form 2", "Shona literature form 2"],
+        "ndebele": ["ZIMSEC isiNdebele form 2", "Ndebele literature form 2"]
+      }
+    },
+    "form_3": {
+      "subjects": {
+        "english": ["ZIMSEC O Level English form 3", "English poetry form 3"],
+        "mathematics": ["ZIMSEC O Level maths form 3", "trigonometry form 3"],
+        "science": ["ZIMSEC O Level science form 3", "physics chemistry biology form 3"],
+        "history": ["Zimbabwe history form 3", "liberation struggle form 3"],
+        "geography": ["Zimbabwe geography form 3", "climate systems form 3"],
+        "shona": ["ZIMSEC ChiShona form 3", "Shona novels form 3"],
+        "ndebele": ["ZIMSEC isiNdebele form 3", "Ndebele novels form 3"]
+      }
+    },
+    "form_4": {
+      "subjects": {
+        "english": ["ZIMSEC O Level English past papers", "O Level English revision Zimbabwe"],
+        "mathematics": ["ZIMSEC O Level maths past papers", "O Level maths revision Zimbabwe"],
+        "science": ["ZIMSEC O Level science past papers", "O Level science revision Zimbabwe"],
+        "history": ["ZIMSEC O Level history past papers", "O Level history revision Zimbabwe"],
+        "geography": ["ZIMSEC O Level geography past papers", "O Level geography revision Zimbabwe"],
+        "shona": ["ZIMSEC O Level ChiShona past papers", "O Level Shona revision Zimbabwe"],
+        "ndebele": ["ZIMSEC O Level isiNdebele past papers", "O Level Ndebele revision Zimbabwe"]
+      }
+    }
+  },
+  "common_search_terms": {
+    "revision": ["revision notes Zimbabwe", "study guide Zimbabwe", "exam preparation Zimbabwe"],
+    "past_papers": ["ZIMSEC past papers", "O Level past papers Zimbabwe", "Grade 7 past papers Zimbabwe"],
+    "videos": ["educational videos Zimbabwe", "ZIMSEC revision videos", "Zimbabwe school lessons online"],
+    "free_resources": ["free study materials Zimbabwe", "Zimbabwe school resources free", "educational resources Africa"]
+  }
+}

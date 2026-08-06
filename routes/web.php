@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\BillController;
 use App\Http\Controllers\Admin\ReceiptController;
 use App\Http\Controllers\Admin\DebtorCreditorReportController;
+use App\Http\Controllers\Admin\CreditNoteController;
 use App\Http\Controllers\Admin\SchoolClassController;
 use App\Http\Controllers\Admin\StatementController;
 use App\Http\Controllers\Admin\SubjectController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Portal\ParentController;
 use App\Http\Controllers\Portal\StudentController;
 use App\Http\Controllers\Admin\TeacherController as AdminTeacherController;
 use App\Http\Controllers\Admin\CurrencyController;
+use App\Http\Controllers\Admin\StudentController as AdminStudentController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -113,10 +115,52 @@ Route::middleware(['auth'])->group(function () {
             Route::get('students/{student}/statement/download', [StatementController::class, 'download'])->name('students.statement.download');
             Route::post('students/{student}/statement/email', [StatementController::class, 'email'])->name('students.statement.email');
 
+            // Student Lifecycle Management
+            Route::get('students/get-beds', [AdminStudentController::class, 'getBeds'])->name('students.get-beds');
+            Route::post('students/{student}/assign-house', [AdminStudentController::class, 'assignHouse'])->name('students.assign-house');
+            Route::get('students/{student}/manage-subjects', [AdminStudentController::class, 'manageSubjects'])->name('students.manage-subjects');
+            Route::post('students/{student}/add-subject', [AdminStudentController::class, 'addSubject'])->name('students.add-subject');
+            Route::delete('students/{student}/remove-subject/{subject}', [AdminStudentController::class, 'removeSubject'])->name('students.remove-subject');
+            Route::post('students/{student}/move-class', [AdminStudentController::class, 'moveClass'])->name('students.move-class');
+            Route::post('students/{student}/promote', [AdminStudentController::class, 'promote'])->name('students.promote');
+            Route::post('students/{student}/demote', [AdminStudentController::class, 'demote'])->name('students.demote');
+            Route::get('students/{student}/transfer', [AdminStudentController::class, 'transferForm'])->name('students.transfer-form');
+            Route::post('students/{student}/transfer', [AdminStudentController::class, 'transfer'])->name('students.transfer');
+            Route::get('students/{student}/exit', [AdminStudentController::class, 'exitForm'])->name('students.exit-form');
+            Route::post('students/{student}/exit', [AdminStudentController::class, 'exitStudent'])->name('students.exit');
+            Route::get('students/{student}/manage-boarding', [AdminStudentController::class, 'manageBoarding'])->name('students.manage-boarding');
+            Route::post('students/{student}/assign-bed', [AdminStudentController::class, 'assignBed'])->name('students.assign-bed');
+            Route::delete('students/{student}/release-bed', [AdminStudentController::class, 'releaseBed'])->name('students.release-bed');
+            Route::get('students/{student}/manage-clubs', [AdminStudentController::class, 'manageClubs'])->name('students.manage-clubs');
+            Route::post('students/{student}/add-club', [AdminStudentController::class, 'addClub'])->name('students.add-club');
+            Route::delete('students/{student}/remove-club/{club}', [AdminStudentController::class, 'removeClub'])->name('students.remove-club');
+            Route::get('students/{student}/manage-sports', [AdminStudentController::class, 'manageSports'])->name('students.manage-sports');
+            Route::post('students/{student}/add-sport', [AdminStudentController::class, 'addSport'])->name('students.add-sport');
+            Route::delete('students/{student}/remove-sport/{sport}', [AdminStudentController::class, 'removeSport'])->name('students.remove-sport');
+            Route::get('students/{student}/manage-positions', [AdminStudentController::class, 'managePositions'])->name('students.manage-positions');
+            Route::post('students/{student}/add-position', [AdminStudentController::class, 'addPosition'])->name('students.add-position');
+            Route::delete('students/{student}/remove-position/{position}', [AdminStudentController::class, 'removePosition'])->name('students.remove-position');
+            Route::get('students/{student}/manage-assets', [AdminStudentController::class, 'manageAssets'])->name('students.manage-assets');
+            Route::post('students/{student}/allocate-asset', [AdminStudentController::class, 'allocateAsset'])->name('students.allocate-asset');
+            Route::delete('students/{student}/return-asset/{asset}', [AdminStudentController::class, 'returnAsset'])->name('students.return-asset');
+            Route::get('students/{student}/manage-library', [AdminStudentController::class, 'manageLibrary'])->name('students.manage-library');
+            Route::post('students/{student}/update-library', [AdminStudentController::class, 'updateLibrary'])->name('students.update-library');
+            Route::resource('students', AdminStudentController::class)->except(['show']);
+            Route::get('students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
+
             Route::resource('classes', SchoolClassController::class);
             Route::resource('subjects', SubjectController::class);
             Route::resource('curricula', CurriculumController::class);
-            Route::resource('teachers', AdminTeacherController::class);
+            Route::resource('teachers', \App\Http\Controllers\Admin\TeacherController::class);
+            Route::post('/teachers/{teacher}/qualifications', [\App\Http\Controllers\Admin\TeacherController::class, 'addQualification'])->name('teachers.qualifications.store');
+            Route::delete('/teachers/{teacher}/qualifications/{qualification}', [\App\Http\Controllers\Admin\TeacherController::class, 'deleteQualification'])->name('teachers.qualifications.destroy');
+            Route::post('/teachers/{teacher}/subjects', [\App\Http\Controllers\Admin\TeacherController::class, 'assignSubjects'])->name('teachers.subjects.assign');
+            Route::post('/teachers/{teacher}/roles', [\App\Http\Controllers\Admin\TeacherController::class, 'addRole'])->name('teachers.roles.store');
+            Route::post('/teachers/{teacher}/roles/{assignment}/remove', [\App\Http\Controllers\Admin\TeacherController::class, 'removeRole'])->name('teachers.roles.destroy');
+            Route::post('/teachers/{teacher}/class-teacher', [\App\Http\Controllers\Admin\TeacherController::class, 'assignClassTeacher'])->name('teachers.class-teacher.assign');
+            Route::post('/teachers/{teacher}/class-teacher/{class}/remove', [\App\Http\Controllers\Admin\TeacherController::class, 'removeClassTeacher'])->name('teachers.class-teacher.remove');
+            Route::post('/teachers/{teacher}/teaching-assignments', [\App\Http\Controllers\Admin\TeacherController::class, 'addTeachingAssignment'])->name('teachers.teaching-assignments.store');
+            Route::delete('/teachers/{teacher}/teaching-assignments/{curriculum}', [\App\Http\Controllers\Admin\TeacherController::class, 'removeTeachingAssignment'])->name('teachers.teaching-assignments.destroy');
             Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
             Route::post('attendance/student', [AttendanceController::class, 'storeStudent'])->name('attendance.student.store');
             Route::post('attendance/staff', [AttendanceController::class, 'storeStaff'])->name('attendance.staff.store');
@@ -139,6 +183,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('communication/email', [CommunicationController::class, 'showEmail'])->name('communication.email');
             Route::post('communication/email/send', [CommunicationController::class, 'sendEmail'])->name('communication.email.send');
             Route::get('communication/search-users', [CommunicationController::class, 'searchUsers'])->name('communication.search-users');
+            Route::get('communication/messages/{conversation}/poll', [CommunicationController::class, 'pollMessages'])->name('communication.poll');
+            Route::get('communication/unread-count', [CommunicationController::class, 'unreadCount'])->name('communication.unread-count');
 
             // Accounting - Chart of Accounts
             Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');
@@ -212,11 +258,24 @@ Route::middleware(['auth'])->group(function () {
 
             // Debtor/Creditor summary
             Route::get('reports/debtor-creditor', [DebtorCreditorReportController::class, 'index'])->name('reports.debtor-creditor');
+
+            // Credit Notes
+            Route::resource('credit-notes', CreditNoteController::class)->only(['index','create','store','show','edit','update']);
+            Route::post('credit-notes/{creditNote}/issue', [CreditNoteController::class, 'issue'])->name('credit-notes.issue');
+            Route::post('credit-notes/{creditNote}/cancel', [CreditNoteController::class, 'cancel'])->name('credit-notes.cancel');
+            Route::post('credit-notes/{creditNote}/apply', [CreditNoteController::class, 'applyToInvoice'])->name('credit-notes.apply');
             
             // Analytics & Reports
             Route::get('/analytics', [App\Http\Controllers\Admin\AnalyticsController::class, 'dashboard'])->name('analytics.dashboard');
             Route::get('/analytics/academic', [App\Http\Controllers\Admin\AnalyticsController::class, 'academicPerformance'])->name('analytics.academic');
             Route::get('/analytics/financial', [App\Http\Controllers\Admin\AnalyticsController::class, 'financialAnalytics'])->name('analytics.financial');
+
+            // AI Finance
+            Route::get('/ai-finance', [App\Http\Controllers\Admin\AIFinanceController::class, 'dashboard'])->name('ai-finance.dashboard');
+            Route::get('/ai-finance/health-score', [App\Http\Controllers\Admin\AIFinanceController::class, 'healthScore'])->name('ai-finance.health-score');
+            Route::get('/ai-finance/anomalies', [App\Http\Controllers\Admin\AIFinanceController::class, 'anomalies'])->name('ai-finance.anomalies');
+            Route::get('/ai-finance/forecast', [App\Http\Controllers\Admin\AIFinanceController::class, 'forecast'])->name('ai-finance.forecast');
+            Route::get('/ai-finance/insights', [App\Http\Controllers\Admin\AIFinanceController::class, 'insights'])->name('ai-finance.insights');
             
             // Currency Management
             Route::get('/currency', [CurrencyController::class, 'index'])->name('currency.index');
@@ -354,6 +413,8 @@ Route::middleware(['auth'])->group(function () {
             Route::put('/employees/{employee}', [App\Http\Controllers\Admin\EmployeeController::class, 'update'])->name('employees.update');
             Route::delete('/employees/{employee}', [App\Http\Controllers\Admin\EmployeeController::class, 'destroy'])->name('employees.destroy');
             Route::put('/employees/{employee}/terminate', [App\Http\Controllers\Admin\EmployeeController::class, 'terminate'])->name('employees.terminate');
+            Route::post('/employees/{employee}/qualifications', [App\Http\Controllers\Admin\EmployeeController::class, 'addQualification'])->name('employees.qualifications.store');
+            Route::delete('/employees/{employee}/qualifications/{qualification}', [App\Http\Controllers\Admin\EmployeeController::class, 'deleteQualification'])->name('employees.qualifications.destroy');
             
             // Department Management
             Route::get('/departments', [App\Http\Controllers\Admin\DepartmentController::class, 'index'])->name('departments.index');
@@ -364,6 +425,44 @@ Route::middleware(['auth'])->group(function () {
             Route::put('/departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'update'])->name('departments.update');
             Route::delete('/departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'destroy'])->name('departments.destroy');
             
+            // Leave Management
+            Route::get('/leaves', [App\Http\Controllers\Admin\LeaveController::class, 'index'])->name('leaves.index');
+            Route::get('/leaves/create', [App\Http\Controllers\Admin\LeaveController::class, 'create'])->name('leaves.create');
+            Route::post('/leaves', [App\Http\Controllers\Admin\LeaveController::class, 'store'])->name('leaves.store');
+            Route::get('/leaves/{leave}', [App\Http\Controllers\Admin\LeaveController::class, 'show'])->name('leaves.show');
+            Route::post('/leaves/{leave}/approve', [App\Http\Controllers\Admin\LeaveController::class, 'approve'])->name('leaves.approve');
+            Route::post('/leaves/{leave}/reject', [App\Http\Controllers\Admin\LeaveController::class, 'reject'])->name('leaves.reject');
+            Route::post('/leaves/{leave}/cancel', [App\Http\Controllers\Admin\LeaveController::class, 'cancel'])->name('leaves.cancel');
+            Route::delete('/leaves/{leave}', [App\Http\Controllers\Admin\LeaveController::class, 'destroy'])->name('leaves.destroy');
+
+            // Payroll Management
+            Route::get('/payroll', [App\Http\Controllers\Admin\PayrollController::class, 'index'])->name('payrolls.index');
+            Route::get('/payroll/create', [App\Http\Controllers\Admin\PayrollController::class, 'create'])->name('payrolls.create');
+            Route::post('/payroll/process', [App\Http\Controllers\Admin\PayrollController::class, 'process'])->name('payrolls.process');
+            Route::get('/payroll/{payroll}', [App\Http\Controllers\Admin\PayrollController::class, 'show'])->name('payrolls.show');
+            Route::post('/payroll/{payroll}/approve', [App\Http\Controllers\Admin\PayrollController::class, 'approve'])->name('payrolls.approve');
+            Route::post('/payroll/{payroll}/mark-paid', [App\Http\Controllers\Admin\PayrollController::class, 'markPaid'])->name('payrolls.mark-paid');
+            Route::delete('/payroll/{payroll}', [App\Http\Controllers\Admin\PayrollController::class, 'destroy'])->name('payrolls.destroy');
+
+            // Loan Management
+            Route::get('/loans', [App\Http\Controllers\Admin\LoanController::class, 'index'])->name('loans.index');
+            Route::get('/loans/create', [App\Http\Controllers\Admin\LoanController::class, 'create'])->name('loans.create');
+            Route::post('/loans', [App\Http\Controllers\Admin\LoanController::class, 'store'])->name('loans.store');
+            Route::get('/loans/{loan}', [App\Http\Controllers\Admin\LoanController::class, 'show'])->name('loans.show');
+            Route::post('/loans/{loan}/settle', [App\Http\Controllers\Admin\LoanController::class, 'settle'])->name('loans.settle');
+            Route::post('/loans/{loan}/repayments', [App\Http\Controllers\Admin\LoanController::class, 'recordRepayment'])->name('loans.repayments.store');
+
+            // Career Guidance
+            Route::get('/career-guidance', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'index'])->name('career-guidance.index');
+            Route::post('/career-guidance/assess', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'assess'])->name('career-guidance.assess');
+            Route::get('/career-guidance/assessments/{assessment}', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'show'])->name('career-guidance.show');
+            Route::get('/career-guidance/paths', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'paths'])->name('career-guidance.paths');
+            Route::post('/career-guidance/paths', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'storePath'])->name('career-guidance.paths.store');
+            Route::put('/career-guidance/paths/{path}', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'updatePath'])->name('career-guidance.paths.update');
+            Route::delete('/career-guidance/paths/{path}', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'destroyPath'])->name('career-guidance.paths.destroy');
+            Route::get('/career-guidance/interests', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'interests'])->name('career-guidance.interests');
+            Route::get('/career-guidance/students', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'students'])->name('career-guidance.students');
+
             // Timetable Management
             Route::get('/timetables', [App\Http\Controllers\Admin\TimetableController::class, 'index'])->name('timetables.index');
             Route::get('/timetables/create', [App\Http\Controllers\Admin\TimetableController::class, 'create'])->name('timetables.create');
@@ -383,6 +482,12 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/timetables/{timetable}/publish', [App\Http\Controllers\Admin\TimetableController::class, 'publish'])->name('timetables.publish');
             Route::get('/timetables/{timetable}/conflicts', [App\Http\Controllers\Admin\TimetableController::class, 'conflicts'])->name('timetables.conflicts');
             Route::post('/timetables/{timetable}/resolve-conflicts', [App\Http\Controllers\Admin\TimetableController::class, 'resolveConflicts'])->name('timetables.resolve-conflicts');
+
+            Route::get('/schemes-of-work', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'index'])->name('schemes-of-work.index');
+            Route::get('/schemes-of-work/teacher/{teacher}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'teacherSchemes'])->name('schemes-of-work.teacher');
+            Route::get('/schemes-of-work/{schemeOfWork}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'show'])->name('schemes-of-work.show');
+            Route::post('/schemes-of-work/{schemeOfWork}/approve', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'approve'])->name('schemes-of-work.approve');
+            Route::post('/schemes-of-work/{schemeOfWork}/reject', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'reject'])->name('schemes-of-work.reject');
         });
 
         Route::middleware(['role:teacher|super-admin'])
@@ -391,6 +496,36 @@ Route::middleware(['auth'])->group(function () {
             ->group(function () {
                 Route::get('/dashboard', [\App\Http\Controllers\Portal\TeacherController::class, 'dashboard'])->name('dashboard');
                 Route::get('/profile', [\App\Http\Controllers\Portal\TeacherController::class, 'profile'])->name('profile');
+
+                Route::get('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'index'])->name('schemes-of-work.index');
+                Route::get('/schemes-of-work/create', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'create'])->name('schemes-of-work.create');
+                Route::post('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'store'])->name('schemes-of-work.store');
+                Route::get('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'show'])->name('schemes-of-work.show');
+                Route::get('/schemes-of-work/{schemeOfWork}/edit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'edit'])->name('schemes-of-work.edit');
+                Route::put('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'update'])->name('schemes-of-work.update');
+                Route::get('/schemes-of-work/{schemeOfWork}/preview', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'preview'])->name('schemes-of-work.preview');
+                Route::post('/schemes-of-work/{schemeOfWork}/submit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'submit'])->name('schemes-of-work.submit');
+                Route::delete('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'destroy'])->name('schemes-of-work.destroy');
+                
+                // AI Resource Finder Routes
+                Route::post('/ai-resources/search', [\App\Http\Controllers\Portal\AIResourceController::class, 'search'])->name('ai-resources.search');
+                Route::get('/ai-resources/curriculum', [\App\Http\Controllers\Portal\AIResourceController::class, 'curriculum'])->name('ai-resources.curriculum');
+                Route::get('/ai-resources/metadata', [\App\Http\Controllers\Portal\AIResourceController::class, 'metadata'])->name('ai-resources.metadata');
+
+                // Career Guidance
+                Route::get('/career-guidance', [\App\Http\Controllers\Portal\CareerGuidanceController::class, 'index'])->name('career-guidance.index');
+                Route::get('/career-guidance/assessments/{assessment}', [\App\Http\Controllers\Portal\CareerGuidanceController::class, 'show'])->name('career-guidance.show');
+
+                // Flash Cards
+                Route::get('/flash-cards', [\App\Http\Controllers\Portal\FlashCardController::class, 'index'])->name('flash-cards.index');
+                Route::get('/flash-cards/create', [\App\Http\Controllers\Portal\FlashCardController::class, 'create'])->name('flash-cards.create');
+                Route::post('/flash-cards', [\App\Http\Controllers\Portal\FlashCardController::class, 'store'])->name('flash-cards.store');
+                Route::get('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'show'])->name('flash-cards.show');
+                Route::get('/flash-cards/{flashCardSet}/edit', [\App\Http\Controllers\Portal\FlashCardController::class, 'edit'])->name('flash-cards.edit');
+                Route::put('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'update'])->name('flash-cards.update');
+                Route::post('/flash-cards/{flashCardSet}/publish', [\App\Http\Controllers\Portal\FlashCardController::class, 'publish'])->name('flash-cards.publish');
+                Route::delete('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'destroy'])->name('flash-cards.destroy');
+                Route::post('/flash-cards/generate', [\App\Http\Controllers\Portal\FlashCardController::class, 'generate'])->name('flash-cards.generate');
             });
 
         Route::middleware(['role:student|super-admin'])
@@ -401,6 +536,16 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/profile', [StudentController::class, 'profile'])->name('profile');
                 Route::get('/fees', [StudentController::class, 'fees'])->name('fees');
                 Route::get('/results', [StudentController::class, 'results'])->name('results');
+                Route::get('/career-counsellor', [StudentController::class, 'careerCounsellor'])->name('counsellor');
+                Route::get('/career-counsellor/welcome', [StudentController::class, 'counsellorWelcome'])->name('counsellor.welcome');
+                Route::post('/career-counsellor/chat', [StudentController::class, 'counsellorChat'])->name('counsellor.chat');
+
+                // Flash Cards
+                Route::get('/flash-cards', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'index'])->name('flash-cards.index');
+                Route::get('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'study'])->name('flash-cards.study');
+                Route::post('/flash-cards/{flashCardSet}/start', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'startSession'])->name('flash-cards.start-session');
+                Route::post('/flash-cards/result', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'submitResult'])->name('flash-cards.submit-result');
+                Route::post('/flash-cards/session/{session}/complete', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'completeSession'])->name('flash-cards.complete-session');
             });
 
         Route::middleware(['role:parent|super-admin'])

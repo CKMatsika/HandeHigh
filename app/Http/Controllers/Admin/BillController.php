@@ -85,6 +85,12 @@ class BillController extends Controller
             'created_by' => $user->id,
         ]);
 
+        try {
+            app(\App\Services\AccountingService::class)->postBill($bill);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to post bill to accounting: ' . $e->getMessage());
+        }
+
         return redirect()
             ->route('admin.bills.index')
             ->with('status', 'Bill created successfully');

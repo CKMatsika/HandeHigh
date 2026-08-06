@@ -1,0 +1,253 @@
+{
+  "primary": {
+    "grade_1": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 1 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe primary English grade 1", "ZIMSEC English primary"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 1 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe primary mathematics grade 1"]
+      },
+      "environmental_science": {
+        "textbooks": ["Environmental Science Grade 1 (College Press)"],
+        "keywords": ["Zimbabwe environmental science primary"]
+      }
+    },
+    "grade_2": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 2 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe primary English grade 2"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 2 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe primary mathematics grade 2"]
+      },
+      "environmental_science": {
+        "textbooks": ["Environmental Science Grade 2 (College Press)"],
+        "keywords": ["Zimbabwe environmental science grade 2"]
+      }
+    },
+    "grade_3": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 3 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe primary English grade 3"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 3 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe primary mathematics grade 3"]
+      },
+      "social_science": {
+        "textbooks": ["Social Sciences Grade 3 (College Press)"],
+        "keywords": ["Zimbabwe social science primary"]
+      },
+      "science": {
+        "textbooks": ["Science Grade 3 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe science primary"]
+      }
+    },
+    "grade_4": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 4 (Zimbabwe Textbook Publishing)", "Primary English Learners Book 4"],
+        "keywords": ["Zimbabwe primary English grade 4"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 4 (Longman Zimbabwe)", "Primary Mathematics Learners Book 4"],
+        "keywords": ["Zimbabwe primary mathematics grade 4"]
+      },
+      "social_science": {
+        "textbooks": ["Social Sciences for Primary Schools Grade 4 (College Press)"],
+        "keywords": ["Zimbabwe social science grade 4"]
+      },
+      "science": {
+        "textbooks": ["Science for Primary Schools Grade 4 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe science grade 4"]
+      }
+    },
+    "grade_5": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 5 (Zimbabwe Textbook Publishing)", "Primary English Learners Book 5"],
+        "keywords": ["Zimbabwe primary English grade 5"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 5 (Longman Zimbabwe)", "Primary Mathematics Learners Book 5"],
+        "keywords": ["Zimbabwe primary mathematics grade 5"]
+      },
+      "social_science": {
+        "textbooks": ["Social Sciences for Primary Schools Grade 5 (College Press)"],
+        "keywords": ["Zimbabwe social science grade 5"]
+      },
+      "science": {
+        "textbooks": ["Science for Primary Schools Grade 5 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe science grade 5"]
+      }
+    },
+    "grade_6": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 6 (Zimbabwe Textbook Publishing)", "Primary English Learners Book 6"],
+        "keywords": ["Zimbabwe primary English grade 6"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 6 (Longman Zimbabwe)", "Primary Mathematics Learners Book 6"],
+        "keywords": ["Zimbabwe primary mathematics grade 6"]
+      },
+      "social_science": {
+        "textbooks": ["Social Sciences for Primary Schools Grade 6 (College Press)"],
+        "keywords": ["Zimbabwe social science grade 6"]
+      },
+      "science": {
+        "textbooks": ["Science for Primary Schools Grade 6 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe science grade 6"]
+      }
+    },
+    "grade_7": {
+      "english": {
+        "textbooks": ["English for Primary Schools Grade 7 (Zimbabwe Textbook Publishing)", "Primary English Learners Book 7"],
+        "keywords": ["Zimbabwe primary English grade 7", "ZIMSEC grade 7 English", "Zimbabwe final primary exams"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Primary Schools Grade 7 (Longman Zimbabwe)", "Primary Mathematics Learners Book 7"],
+        "keywords": ["Zimbabwe primary mathematics grade 7", "ZIMSEC grade 7 maths"]
+      },
+      "social_science": {
+        "textbooks": ["Social Sciences for Primary Schools Grade 7 (College Press)"],
+        "keywords": ["Zimbabwe social science grade 7", "ZIMSEC grade 7 social science"]
+      },
+      "science": {
+        "textbooks": ["Science for Primary Schools Grade 7 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe science grade 7", "ZIMSEC grade 7 science"]
+      },
+      "combined_maths_science": {
+        "textbooks": ["Combined Mathematics and Science Grade 7"],
+        "keywords": ["Zimbabwe combined maths science grade 7"]
+      }
+    }
+  },
+  "secondary": {
+    "form_1": {
+      "english": {
+        "textbooks": ["English for Form 1 (Zimbabwe Textbook Publishing)", "Silent River by Chenjerai Hove", "The House of Stone by Tsitsi Jere"],
+        "keywords": ["Zimbabwe secondary English form 1", "ZIMSEC O Level English"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Form 1 (Longman Zimbabwe)", "New Era Mathematics Form 1 by Mhute"],
+        "keywords": ["Zimbabwe secondary mathematics form 1", "ZIMSEC maths"]
+      },
+      "science": {
+        "textbooks": ["Integrated Science Form 1 (Longman Zimbabwe)", "Science Alive Form 1"],
+        "keywords": ["Zimbabwe science form 1", "ZIMSEC O Level science"]
+      },
+      "history": {
+        "textbooks": ["History for Form 1 (Longman Zimbabwe)", "Zimbabwean History by Brian Raftopoulos"],
+        "keywords": ["Zimbabwe history form 1", "ZIMSEC history O Level"]
+      },
+      "geography": {
+        "textbooks": ["Geography for Form 1 (College Press)", "Geography in Action Form 1"],
+        "keywords": ["Zimbabwe geography form 1"]
+      },
+      "shona": {
+        "textbooks": ["ChiShona for Form 1 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe Shona form 1", "ZIMSEC ChiShona O Level"]
+      },
+      "ndebele": {
+        "textbooks": ["isiNdebele for Form 1 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe Ndebele form 1", "ZIMSEC isiNdebele O Level"]
+      }
+    },
+    "form_2": {
+      "english": {
+        "textbooks": ["English for Form 2 (Zimbabwe Textbook Publishing)", "Waiting for the Rain by Sharon", "Proud to be African by Various"],
+        "keywords": ["Zimbabwe secondary English form 2"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Form 2 (Longman Zimbabwe)", "New Era Mathematics Form 2 by Mhute"],
+        "keywords": ["Zimbabwe secondary mathematics form 2"]
+      },
+      "science": {
+        "textbooks": ["Integrated Science Form 2 (Longman Zimbabwe)", "Science Alive Form 2"],
+        "keywords": ["Zimbabwe science form 2"]
+      },
+      "history": {
+        "textbooks": ["History for Form 2 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe history form 2"]
+      },
+      "geography": {
+        "textbooks": ["Geography for Form 2 (College Press)"],
+        "keywords": ["Zimbabwe geography form 2"]
+      },
+      "shona": {
+        "textbooks": ["ChiShona for Form 2 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe Shona form 2"]
+      },
+      "ndebele": {
+        "textbooks": ["isiNdebele for Form 2 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe Ndebele form 2"]
+      }
+    },
+    "form_3": {
+      "english": {
+        "textbooks": ["English for Form 3 (Zimbabwe Textbook Publishing)", "African Poetry and Drama Anthology"],
+        "keywords": ["Zimbabwe English form 3", "ZIMSEC O Level English literature"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Form 3 (Longman Zimbabwe)", "New Era Mathematics Form 3 by Mhute", "Additional Mathematics Form 3"],
+        "keywords": ["Zimbabwe mathematics form 3", "ZIMSEC maths O Level"]
+      },
+      "science": {
+        "textbooks": ["Integrated Science Form 3 (Longman Zimbabwe)", "Physics Form 3 (Longman Zimbabwe)", "Chemistry Form 3 (Longman Zimbabwe)", "Biology Form 3 (Longman Zimbabwe)"],
+        "keywords": ["Zimbabwe science form 3", "ZIMSEC O Level science"]
+      },
+      "history": {
+        "textbooks": ["History for Form 3 (Longman Zimbabwe)", "The Zimbabwean Struggle for Equality by Brian Raftopoulos"],
+        "keywords": ["Zimbabwe history form 3", "ZIMSEC O Level history"]
+      },
+      "geography": {
+        "textbooks": ["Geography for Form 3 (College Press)", "Advanced Geography Form 3"],
+        "keywords": ["Zimbabwe geography form 3", "ZIMSEC O Level geography"]
+      },
+      "shona": {
+        "textbooks": ["ChiShona for Form 3 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe Shona form 3"]
+      },
+      "ndebele": {
+        "textbooks": ["isiNdebele for Form 3 (Zimbabwe Textbook Publishing)"],
+        "keywords": ["Zimbabwe Ndebele form 3"]
+      }
+    },
+    "form_4": {
+      "english": {
+        "textbooks": ["English for Form 4 (Zimbabwe Textbook Publishing)", "ZIMSEC O Level English Revision Guide"],
+        "keywords": ["Zimbabwe English form 4", "ZIMSEC O Level English past papers"]
+      },
+      "mathematics": {
+        "textbooks": ["Mathematics for Form 4 (Longman Zimbabwe)", "New Era Mathematics Form 4 by Mhute", "ZIMSEC O Level Maths Revision Guide"],
+        "keywords": ["Zimbabwe mathematics form 4", "ZIMSEC O Level maths past papers"]
+      },
+      "science": {
+        "textbooks": ["Integrated Science Form 4 (Longman Zimbabwe)", "Physics Form 4 (Longman Zimbabwe)", "Chemistry Form 4 (Longman Zimbabwe)", "Biology Form 4 (Longman Zimbabwe)", "ZIMSEC O Level Science Revision Guide"],
+        "keywords": ["Zimbabwe science form 4", "ZIMSEC O Level science past papers"]
+      },
+      "history": {
+        "textbooks": ["History for Form 4 (Longman Zimbabwe)", "ZIMSEC O Level History Revision Guide"],
+        "keywords": ["Zimbabwe history form 4", "ZIMSEC O Level history past papers"]
+      },
+      "geography": {
+        "textbooks": ["Geography for Form 4 (College Press)", "ZIMSEC O Level Geography Revision Guide"],
+        "keywords": ["Zimbabwe geography form 4", "ZIMSEC O Level geography past papers"]
+      },
+      "shona": {
+        "textbooks": ["ChiShona for Form 4 (Zimbabwe Textbook Publishing)", "ZIMSEC O Level ChiShona Revision Guide"],
+        "keywords": ["Zimbabwe Shona form 4", "ZIMSEC O Level Shona past papers"]
+      },
+      "ndebele": {
+        "textbooks": ["isiNdebele for Form 4 (Zimbabwe Textbook Publishing)", "ZIMSEC O Level isiNdebele Revision Guide"],
+        "keywords": ["Zimbabwe Ndebele form 4", "ZIMSEC O Level Ndebele past papers"]
+      }
+    }
+  },
+  "zimsec_resources": {
+    "website": "https://www.zimsec.co.zw",
+    "exam_papers": "https://www.zimsec.co.zw/OLevelPapers",
+    "syllabus": "https://www.zimsec.co.zw/syllabus"
+  }
+}

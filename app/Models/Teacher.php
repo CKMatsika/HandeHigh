@@ -47,19 +47,44 @@ class Teacher extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function classes()
-    {
-        return $this->hasMany(SchoolClass::class, 'teacher_id');
-    }
-
     public function subjects()
     {
         return $this->belongsToMany(Subject::class, 'teacher_subjects');
     }
 
+    public function qualifications()
+    {
+        return $this->morphMany(Qualification::class, 'qualifiable');
+    }
+
+    public function positionAssignments()
+    {
+        return $this->morphMany(StaffPositionAssignment::class, 'assignable');
+    }
+
+    public function activePositionAssignments()
+    {
+        return $this->positionAssignments()->where('is_active', true);
+    }
+
+    public function classes()
+    {
+        return $this->hasMany(SchoolClass::class, 'teacher_id', 'user_id');
+    }
+
+    public function subjectCurricula()
+    {
+        return Curriculum::where('teacher_id', $this->user_id);
+    }
+
+    public function schemesOfWork()
+    {
+        return $this->hasMany(SchemeOfWork::class, 'teacher_id', 'user_id');
+    }
+
     public function assessments()
     {
-        return $this->hasMany(Assessment::class);
+        return $this->hasMany(Assessment::class, 'teacher_id', 'user_id');
     }
 
     public function getFullNameAttribute()
@@ -77,5 +102,17 @@ class Teacher extends Model
         return $query->whereHas('subjects', function ($q) use ($subjectId) {
             $q->where('subject_id', $subjectId);
         });
+    }
+
+    public function getActivePositionsAttribute()
+    {
+        return $this->activePositionAssignments->map(function ($assignment) {
+            return $assignment->position->name;
+        })->unique()->values();
+    }
+
+    public function getClassTeacherClassAttribute()
+    {
+        return $this->classes()->first();
     }
 }

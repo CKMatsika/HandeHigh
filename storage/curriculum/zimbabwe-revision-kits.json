@@ -1,0 +1,101 @@
+{
+  "zimsec_official": {
+    "name": "ZIMSEC Official Resources",
+    "website": "https://www.zimsec.co.zw",
+    "resources": [
+      {
+        "title": "ZIMSEC Past Examination Papers",
+        "url": "https://www.zimsec.co.zw",
+        "type": "past_papers",
+        "subjects": ["all"],
+        "description": "Official ZIMSEC past examination papers for O Level and A Level"
+      },
+      {
+        "title": "ZIMSEC Syllabus Documents",
+        "url": "https://www.zimsec.co.zw/syllabus",
+        "type": "syllabus",
+        "subjects": ["all"],
+        "description": "Official syllabus documents for all subjects"
+      }
+    ]
+  },
+  "free_online_platforms": [
+    {
+      "name": "Khan Academy",
+      "url": "https://www.khanacademy.org",
+      "type": "video",
+      "subjects": ["mathematics", "science", "english"],
+      "description": "Free world-class education for anyone anywhere"
+    },
+    {
+      "name": "BBC Bitesize",
+      "url": "https://www.bbc.co.uk/bitesize",
+      "type": "revision",
+      "subjects": ["mathematics", "science", "english", "history", "geography"],
+      "description": "Free revision resources for primary and secondary students"
+    },
+    {
+      "name": "YouTube Educational Channels",
+      "url": "https://www.youtube.com",
+      "type": "video",
+      "subjects": ["all"],
+      "description": "Free educational video content from teachers worldwide"
+    },
+    {
+      "name": "Wikipedia",
+      "url": "https://en.wikipedia.org",
+      "type": "reference",
+      "subjects": ["all"],
+      "description": "Free online encyclopedia with comprehensive articles"
+    }
+  ],
+  "zimbabwe_specific": [
+    {
+      "name": "Zimbabwe Schools Examination Council",
+      "url": "https://www.zimsec.co.zw",
+      "type": "official",
+      "description": "Official examination body for Zimbabwe"
+    },
+    {
+      "name": "Ministry of Primary and Secondary Education Zimbabwe",
+      "url": "https://www.moe.gov.zw",
+      "type": "official",
+      "description": "Official ministry website with curriculum information"
+    },
+    {
+      "name": "Zimbabwe Open University",
+      "url": "https://www.zou.ac.zw",
+      "type": "university",
+      "description": "Open university with free educational resources"
+    }
+  ],
+  "revision_guides": {
+    "english": [
+      "Grammar and Writing Skills Guide",
+      "Literature Study Guides for Set Books",
+      "Comprehension and Summary Writing Tips"
+    ],
+    "mathematics": [
+      "Number Concepts Revision Guide",
+      "Algebra and Equations Handbook",
+      "Geometry and Trigonometry Guide",
+      "Statistics and Probability Review"
+    ],
+    "science": [
+      "Physics Formula Sheet",
+      "Chemistry Revision Notes",
+      "Biology Study Guide",
+      "Scientific Method Review"
+    ],
+    "history": [
+      "Zimbabwe History Timeline",
+      "Key Events in African History",
+      "Colonial and Post-Colonial Period Guide"
+    ],
+    "geography": [
+      "Map Skills and Atlas Work Guide",
+      "Climate and Weather Systems",
+      "Zimbabwe Physical Geography"
+    ]
+  }
+}

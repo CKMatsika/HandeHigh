@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RoleSeeder::class,
             SchoolSeeder::class,
+            StaffPositionSeeder::class,
         ]);
 
         $school = School::first();

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\Department;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -134,9 +135,55 @@ class EmployeeController extends Controller
     public function show(Employee $employee)
     {
         $this->authorizeSchoolAccess($employee);
-        $employee->load('department', 'user');
+        $employee->load([
+            'department',
+            'user',
+            'qualifications',
+            'leaves',
+            'payrollItems.payroll',
+            'activeLoans',
+            'positionAssignments.position',
+        ]);
 
-        return view('admin.employees.show', compact('employee'));
+        $tab = request()->query('tab', 'overview');
+
+        $school = auth()->user()->school;
+
+        return view('admin.employees.show', compact('employee', 'tab', 'school'));
+    }
+
+    public function addQualification(Request $request, Employee $employee)
+    {
+        $this->authorizeSchoolAccess($employee);
+        $school = auth()->user()->school;
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'institution' => 'required|string|max:255',
+            'grade' => 'nullable|string|max:50',
+            'year_start' => 'nullable|integer|min:1900|max:2099',
+            'year_end' => 'nullable|integer|min:1900|max:2099',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        \App\Models\Qualification::create([
+            'school_id' => $school->id,
+            'qualifiable_id' => $employee->id,
+            'qualifiable_type' => \App\Models\Employee::class,
+            ...$validated,
+        ]);
+
+        return back()->with('success', 'Qualification added.');
+    }
+
+    public function deleteQualification(Request $request, Employee $employee, \App\Models\Qualification $qualification)
+    {
+        $this->authorizeSchoolAccess($employee);
+        if ($qualification->qualifiable_id !== $employee->id || $qualification->qualifiable_type !== \App\Models\Employee::class) {
+            abort(403);
+        }
+        $qualification->delete();
+        return back()->with('success', 'Qualification deleted.');
     }
 
     public function edit(Employee $employee)

@@ -201,6 +201,58 @@
         </div>
     </div>
 
+    <!-- Career Guidance Widget -->
+    <div class="mt-6">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                <h2 class="text-sm font-medium text-slate-50">Career Guidance</h2>
+                <a href="{{ route('student.counsellor') }}" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Talk to Career Counsellor</a>
+            </div>
+            <div class="p-4">
+                @if($hasCareerAssessment && $careerAssessment)
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div class="p-3 rounded-lg border border-slate-700 bg-slate-800/50">
+                            <p class="text-[10px] text-slate-400 mb-1">Top Strengths</p>
+                            @forelse($careerTopStrengths as $strength)
+                                <span class="inline-flex items-center text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 mr-1 mb-1">{{ $strength }}</span>
+                            @empty
+                                <p class="text-xs text-slate-500">No data</p>
+                            @endforelse
+                        </div>
+                        <div class="p-3 rounded-lg border border-slate-700 bg-slate-800/50">
+                            <p class="text-[10px] text-slate-400 mb-1">Top Career Matches</p>
+                            @forelse($careerTopMatches as $match)
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-xs text-slate-300">{{ $match['name'] }}</span>
+                                    <span class="text-[10px] text-indigo-400">{{ $match['match'] }}%</span>
+                                </div>
+                            @empty
+                                <p class="text-xs text-slate-500">No matches yet</p>
+                            @endforelse
+                        </div>
+                        <div class="p-3 rounded-lg border border-slate-700 bg-slate-800/50 flex flex-col items-center justify-center">
+                            <p class="text-xs text-slate-400 mb-2">Want personalized advice?</p>
+                            <a href="{{ route('student.counsellor') }}" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
+                                Chat with AI Counsellor
+                            </a>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-500">
+                        <span>Assessment: {{ $careerAssessment->created_at->format('M j, Y') }}</span>
+                        <span>{{ count($careerAssessment->suggested_careers ?? []) }} careers matched</span>
+                    </div>
+                @else
+                    <div class="text-center py-6">
+                        <p class="text-xs text-slate-400 mb-3">No career assessment yet. Talk to our AI Career Counsellor to explore your options!</p>
+                        <a href="{{ route('student.counsellor') }}" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
+                            Start Career Exploration 🚀
+                        </a>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
     <!-- Timetable Section -->
     <div class="mt-6">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">

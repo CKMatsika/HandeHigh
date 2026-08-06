@@ -71,6 +71,32 @@
                 </span>
             </div>
         </div>
+
+        <a href="{{ route('teacher.schemes-of-work.index') }}" class="rounded-2xl border border-slate-800 bg-gradient-to-br from-cyan-500/20 via-slate-900 to-slate-950 px-4 py-4 block transition-all duration-200 hover:border-cyan-500 hover:bg-slate-800 hover:shadow-lg hover:shadow-cyan-500/10 group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">Schemes of Work</p>
+                    <p class="text-lg font-semibold text-slate-50">{{ $schemesCount }}</p>
+                    <div class="flex gap-2 mt-1">
+                        @if($draftSchemesCount > 0)
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-500/20 text-slate-400">{{ $draftSchemesCount }} draft</span>
+                        @endif
+                        @if($submittedSchemesCount > 0)
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">{{ $submittedSchemesCount }} submitted</span>
+                        @endif
+                        @if($approvedSchemesCount > 0)
+                            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">{{ $approvedSchemesCount }} approved</span>
+                        @endif
+                    </div>
+                </div>
+                <span class="h-8 w-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                </span>
+            </div>
+            <div class="mt-2 text-xs text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                View all schemes &rarr;
+            </div>
+        </a>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -99,31 +125,34 @@
             </div>
         </div>
 
-        <!-- Recent Assignments -->
+        <!-- Career Guidance -->
         <div class="lg:col-span-1">
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                    <h2 class="text-sm font-medium text-slate-50">Recent Assignments</h2>
-                    <a href="#" class="text-xs text-indigo-400 hover:text-indigo-300 transition">View All</a>
+                    <h2 class="text-sm font-medium text-slate-50">Career Guidance</h2>
+                    <a href="{{ route('teacher.career-guidance.index') }}" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Manage</a>
                 </div>
-                <div class="p-4 space-y-3">
-                    @forelse($assignments as $assignment)
-                        <div class="p-3 rounded-lg border border-slate-700 bg-slate-800/50">
-                            <div class="flex items-start justify-between">
-                                <div class="flex-1">
-                                    <p class="text-xs font-medium text-slate-50">{{ $assignment->title }}</p>
-                                    <p class="text-[10px] text-slate-400 mt-1">{{ $assignment->class }} • {{ $assignment->subject }}</p>
-                                    <p class="text-[10px] text-slate-500 mt-2">Due: {{ $assignment->due_date->format('M j, Y') }}</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-xs font-medium text-slate-50">{{ $assignment->submissions }}/{{ $assignment->total }}</p>
-                                    <p class="text-[10px] text-slate-400">submitted</p>
-                                </div>
-                            </div>
+                <div class="p-4">
+                    <div class="text-center mb-4">
+                        <p class="text-2xl font-bold {{ $careerAssessmentsCount > 0 ? 'text-emerald-400' : 'text-slate-500' }}">{{ $careerAssessmentsCount }}</p>
+                        <p class="text-[10px] text-slate-400">students assessed</p>
+                    </div>
+                    @if($careerStudentTotal > 0)
+                        <div class="w-full bg-slate-800 rounded-full h-2 mb-3">
+                            <div class="bg-indigo-500 h-2 rounded-full transition-all" style="width: {{ min(100, round(($careerAssessedStudents / $careerStudentTotal) * 100)) }}%"></div>
                         </div>
-                    @empty
-                        <p class="text-xs text-slate-500 text-center py-4">No assignments</p>
-                    @endforelse
+                        <p class="text-[10px] text-slate-500 text-center">{{ $careerAssessedStudents }}/{{ $careerStudentTotal }} students</p>
+                    @endif
+                    <div class="mt-3 space-y-2">
+                        <a href="{{ route('teacher.career-guidance.index') }}" class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition">
+                            <span class="text-[10px] text-slate-400">View Student Assessments</span>
+                            <span class="text-xs text-indigo-400">&rarr;</span>
+                        </a>
+                        <a href="{{ route('teacher.career-guidance.index') }}" class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition">
+                            <span class="text-[10px] text-slate-400">Generate New Assessments</span>
+                            <span class="text-xs text-indigo-400">&rarr;</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -203,6 +232,36 @@
                     </div>
                 @empty
                     <p class="text-xs text-slate-500 text-center py-4">No students found</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Schemes of Work -->
+    <div class="mt-6">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                <h2 class="text-sm font-medium text-slate-50">Recent Schemes of Work</h2>
+                <a href="{{ route('teacher.schemes-of-work.index') }}" class="text-xs text-indigo-400 hover:text-indigo-300 transition">View All</a>
+            </div>
+            <div class="p-4">
+                @forelse($recentSchemes as $scheme)
+                    <a href="{{ route('teacher.schemes-of-work.show', $scheme) }}" class="flex items-center justify-between py-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/40 -mx-4 px-4 transition">
+                        <div>
+                            <p class="text-xs font-medium text-slate-50">{{ $scheme->title }}</p>
+                            <p class="text-[10px] text-slate-400 mt-1">{{ $scheme->subject->name ?? '' }} - {{ $scheme->schoolClass->name ?? '' }}</p>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ $scheme->status_color }}-500/20 text-{{ $scheme->status_color }}-400 capitalize">
+                            {{ $scheme->status }}
+                        </span>
+                    </a>
+                @empty
+                    <div class="text-center py-6">
+                        <p class="text-xs text-slate-500">No schemes of work yet</p>
+                        <a href="{{ route('teacher.schemes-of-work.create') }}" class="mt-2 inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
+                            Create your first scheme
+                        </a>
+                    </div>
                 @endforelse
             </div>
         </div>

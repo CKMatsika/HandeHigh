@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 
 class DepartmentController extends Controller

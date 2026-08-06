@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Employee extends Model
 {
@@ -56,6 +57,46 @@ class Employee extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function allowances(): HasMany
+    {
+        return $this->hasMany(EmployeeAllowance::class);
+    }
+
+    public function activeAllowances(): HasMany
+    {
+        return $this->allowances()->where('is_active', true);
+    }
+
+    public function loans(): HasMany
+    {
+        return $this->hasMany(Loan::class);
+    }
+
+    public function activeLoans(): HasMany
+    {
+        return $this->loans()->where('status', 'active');
+    }
+
+    public function payrollItems(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
+    }
+
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(Leave::class);
+    }
+
+    public function qualifications()
+    {
+        return $this->morphMany(Qualification::class, 'qualifiable');
+    }
+
+    public function positionAssignments()
+    {
+        return $this->morphMany(StaffPositionAssignment::class, 'assignable');
     }
 
     public function getFullNameAttribute(): string

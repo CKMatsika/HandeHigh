@@ -294,19 +294,80 @@ class BankReconciliationService
             'amount' => $data['amount'],
             'transaction_type' => 'debit',
             'category' => 'bank_charge',
-            'status' => 'unmatched',
-            'notes' => $data['notes'] ?? null,
-            'created_by' => auth()->id(),
         ]);
 
-        // Auto-match the two transactions
-        $this->createMatch($bankTransaction, $cashbookTransaction, $data['amount'], 'manual');
+        return $cashbookTransaction;
+    }
 
-        return [
-            'bank_transaction' => $bankTransaction,
-            'cashbook_transaction' => $cashbookTransaction,
-            'message' => 'Bank charge added and matched successfully.'
-        ];
+    /**
+     * Post a reconciliation CashbookTransaction to the general ledger
+     */
+    public function postCashbookTransactionToLedger(CashbookTransaction $tx): ?int
+    {
+        try {
+            $school = $tx->school;
+            $cashAccount = $tx->account;
+            
+            // Determine offsetting account
+            $code = match($tx->category) {
+                'bank_charge' => '7100', // Bank Charges Expense
+                'interest' => '5800',    // Fallback Interest/Other Revenue
+                'fees' => '5100',        // Student Fee Revenue
+                'salaries' => '6100',    // Salaries Expense
+                'supplies' => '6500',    // Supplies Expense
+                default => $tx->transaction_type === 'debit' ? '7200' : '5800',
+            };
+            
+            $offsetAccount = Account::where('school_id', $tx->school_id)
+                ->where('code', $code)
+                ->first();
+                
+            if (!$offsetAccount) {
+                $offsetAccount = Account::where('school_id', $tx->school_id)
+                    ->where('type', $tx->transaction_type === 'debit' ? 'expense' : 'revenue')
+                    ->first();
+            }
+            
+            if (!$cashAccount || !$offsetAccount) {
+                return null;
+            }
+            
+            $isDebit = $tx->transaction_type === 'debit';
+            
+            $debitAccountId = $isDebit ? $offsetAccount->id : $cashAccount->id;
+            $creditAccountId = $isDebit ? $cashAccount->id : $offsetAccount->id;
+            
+            $accountingService = app(\App\Services\AccountingService::class);
+            $batch = $accountingService->createJournalBatch([
+                'school_id' => $tx->school_id,
+                'transaction_date' => $tx->transaction_date,
+                'reference_number' => $tx->reference_number ?? 'REC-' . $tx->id,
+                'description' => $tx->description,
+                'source_type' => 'reconciliation',
+                'source_id' => $tx->id,
+                'status' => 'posted',
+                'created_by' => $tx->created_by ?? auth()->id(),
+                'entries' => [
+                    [
+                        'account_id' => $debitAccountId,
+                        'entry_type' => 'debit',
+                        'amount' => $tx->amount,
+                        'memo' => $tx->description,
+                    ],
+                    [
+                        'account_id' => $creditAccountId,
+                        'entry_type' => 'credit',
+                        'amount' => $tx->amount,
+                        'memo' => $tx->description,
+                    ],
+                ],
+            ]);
+            
+            return $batch->entries->first()?->id;
+        } catch (\Exception $e) {
+            Log::error('Failed to post reconciliation cashbook transaction to ledger: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**

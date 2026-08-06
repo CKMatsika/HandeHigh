@@ -29,6 +29,7 @@
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('student.fees') }}" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">View Fees</a>
             <a href="{{ route('student.results') }}" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 transition">View Results</a>
+            <a href="{{ route('student.counsellor') }}" class="inline-flex items-center rounded-full bg-purple-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-purple-600 transition">AI Career Counsellor</a>
         </div>
     </div>
 @endsection

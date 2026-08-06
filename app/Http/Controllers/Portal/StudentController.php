@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Models\CareerGuidanceAssessment;
 use App\Models\Student;
+use App\Services\CareerCounselorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -92,6 +94,24 @@ class StudentController extends Controller
             $timetable = collect();
         }
 
+        // Career assessment data
+        $careerAssessment = null;
+        $hasCareerAssessment = false;
+        $careerTopStrengths = [];
+        $careerTopMatches = [];
+        if ($student) {
+            $careerAssessment = CareerGuidanceAssessment::where('student_id', $student->id)
+                ->where('status', 'published')
+                ->latest()->first();
+            if ($careerAssessment) {
+                $hasCareerAssessment = true;
+                $strengths = $careerAssessment->strengths ?? [];
+                $careers = $careerAssessment->suggested_careers ?? [];
+                $careerTopStrengths = array_map(fn($s) => $s['subject'], array_slice($strengths, 0, 3));
+                $careerTopMatches = array_map(fn($c) => ['name' => $c['name'], 'match' => $c['match_percentage']], array_slice($careers, 0, 3));
+            }
+        }
+
         return view('portal.student.dashboard', [
             'school' => $school,
             'user' => $user,
@@ -103,6 +123,10 @@ class StudentController extends Controller
             'attendance' => $attendance,
             'announcements' => $announcements,
             'timetable' => $timetable,
+            'careerAssessment' => $careerAssessment,
+            'hasCareerAssessment' => $hasCareerAssessment,
+            'careerTopStrengths' => $careerTopStrengths,
+            'careerTopMatches' => $careerTopMatches,
         ]);
     }
 
@@ -197,5 +221,76 @@ class StudentController extends Controller
             'student' => $student,
             'results' => $results,
         ]);
+    }
+
+    public function careerCounsellor()
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (! $school || ! $user->hasRole(['student', 'super-admin'])) {
+            abort(403);
+        }
+
+        return view('portal.student.career-counsellor', [
+            'school' => $school,
+            'user' => $user,
+        ]);
+    }
+
+    public function counsellorWelcome()
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (! $school || ! $user->hasRole(['student', 'super-admin'])) {
+            abort(403);
+        }
+
+        $student = null;
+        if ($user->hasRole('student')) {
+            $student = $school->students()->where('user_id', $user->id)->first();
+        }
+
+        $counselor = app(CareerCounselorService::class);
+        $response = $student ? $counselor->getWelcomeMessage($student) : [
+            'role' => 'counsellor',
+            'message' => 'Welcome! I can help you explore careers that match academic strengths. Please log in as a student to get started.',
+            'type' => 'welcome',
+            'actions' => [],
+        ];
+
+        return response()->json($response);
+    }
+
+    public function counsellorChat(Request $request)
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (! $school || ! $user->hasRole(['student', 'super-admin'])) {
+            abort(403);
+        }
+
+        $request->validate(['message' => 'required|string|max:500']);
+
+        $student = null;
+        if ($user->hasRole('student')) {
+            $student = $school->students()->where('user_id', $user->id)->first();
+        }
+
+        if (!$student) {
+            return response()->json([
+                'role' => 'counsellor',
+                'message' => 'Please log in as a student to use the Career Counsellor.',
+                'type' => 'error',
+                'actions' => [],
+            ]);
+        }
+
+        $counselor = app(CareerCounselorService::class);
+        $response = $counselor->processMessage($student, $request->message);
+
+        return response()->json($response);
     }
 }

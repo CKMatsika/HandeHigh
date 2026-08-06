@@ -126,7 +126,29 @@
     </div>
 
     <!-- Management Sections -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Schemes of Work -->
+        <div class="rounded-2xl border border-slate-800 bg-gradient-to-br from-cyan-500/20 via-slate-900 to-slate-950 p-6">
+            <h3 class="text-lg font-semibold text-slate-50 mb-4">Schemes of Work</h3>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-300">Total Schemes</span>
+                    <span class="bg-slate-500/20 text-slate-400 px-2 py-1 rounded-full text-xs font-medium">{{ $schemesStats['total'] }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-300">Pending Review</span>
+                    <span class="bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full text-xs font-medium">{{ $schemesStats['submitted'] }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-300">Approved</span>
+                    <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-xs font-medium">{{ $schemesStats['approved'] }}</span>
+                </div>
+                <a href="{{ route('admin.schemes-of-work.index') }}" class="w-full bg-cyan-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-cyan-600 transition">
+                    Review Schemes
+                </a>
+            </div>
+        </div>
+
         <!-- Teacher Performance -->
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
             <h3 class="text-lg font-semibold text-slate-50 mb-4">Teacher Performance</h3>
@@ -182,6 +204,30 @@
             </div>
         </div>
     </div>
+
+    <!-- Recent Submitted Schemes of Work -->
+    @if($recentSubmittedSchemes->count() > 0)
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-slate-50">Schemes Pending Review</h3>
+            <a href="{{ route('admin.schemes-of-work.index') }}" class="text-xs text-cyan-400 hover:text-cyan-300 transition">View All &rarr;</a>
+        </div>
+        <div class="space-y-3">
+            @foreach($recentSubmittedSchemes as $scheme)
+                <a href="{{ route('admin.schemes-of-work.show', $scheme) }}" class="flex items-center justify-between py-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/40 -mx-6 px-6 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="w-2 h-2 bg-amber-400 rounded-full"></div>
+                        <div>
+                            <p class="text-sm text-slate-200">{{ $scheme->teacher->full_name ?? 'Unknown' }}</p>
+                            <p class="text-xs text-slate-400">{{ $scheme->title }} - {{ $scheme->subject->name ?? '' }} ({{ $scheme->schoolClass->name ?? '' }})</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-slate-500">{{ $scheme->submitted_at?->diffForHumans() }}</span>
+                </a>
+            @endforeach
+        </div>
+    </div>
+    @endif
 
     <!-- Quick Actions -->
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">

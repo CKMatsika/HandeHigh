@@ -184,6 +184,16 @@ class AccountingService
     {
         $school = $invoice->school;
         
+        // Prevent duplicate journal batch postings for the same invoice
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'invoice')
+            ->where('source_id', $invoice->id)
+            ->first();
+            
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+        
         // Get or create accounts
         $feesReceivableAccount = Account::where('school_id', $school->id)
             ->whereIn('code', ['1201', '1200']) // Student Fees AR fallback to AR
@@ -573,6 +583,253 @@ class AccountingService
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Post a manually recorded Cashbook transaction to the general ledger
+     */
+    public function postManualCashbookTransaction($cashbook): JournalBatch
+    {
+        $school = $cashbook->school;
+        
+        // Cash/Bank account is the cashbook's account
+        $cashAccount = $cashbook->account;
+        
+        // Find offsetting account based on category or type
+        $offsetAccount = $this->determineOffsetAccount($school->id, $cashbook->category, $cashbook->transaction_type);
+        
+        if (!$cashAccount || !$offsetAccount) {
+            throw new \Exception('Required account setup not found for posting cashbook transaction.');
+        }
+        
+        $isExpense = $cashbook->transaction_type === 'expense';
+        
+        // Double entry:
+        // If expense: Debit Offset Account (Expense), Credit Cash/Bank (Asset)
+        // If income: Debit Cash/Bank (Asset), Credit Offset Account (Revenue)
+        $debitAccountId = $isExpense ? $offsetAccount->id : $cashAccount->id;
+        $creditAccountId = $isExpense ? $cashAccount->id : $offsetAccount->id;
+        
+        return $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $cashbook->transaction_date,
+            'reference_number' => $cashbook->reference_number ?? 'CSH-' . $cashbook->id,
+            'description' => $cashbook->description,
+            'source_type' => 'cashbook',
+            'source_id' => $cashbook->id,
+            'status' => 'posted',
+            'created_by' => $cashbook->created_by ?? auth()->id(),
+            'entries' => [
+                [
+                    'account_id' => $debitAccountId,
+                    'entry_type' => 'debit',
+                    'amount' => $cashbook->amount,
+                    'memo' => $cashbook->description,
+                ],
+                [
+                    'account_id' => $creditAccountId,
+                    'entry_type' => 'credit',
+                    'amount' => $cashbook->amount,
+                    'memo' => $cashbook->description,
+                ],
+            ],
+        ]);
+    }
+    
+    /**
+     * Post a vendor bill to the general ledger
+     * Debit: Expense/Asset account, Credit: Accounts Payable
+     */
+    public function postBill($bill): JournalBatch
+    {
+        $school = $bill->school;
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'bill')
+            ->where('source_id', $bill->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
+        $accountsPayable = Account::where('school_id', $school->id)
+            ->whereIn('code', ['2100', '2101'])
+            ->first();
+
+        $expenseAccount = Account::where('school_id', $school->id)
+            ->where('type', 'expense')
+            ->orderBy('code')
+            ->first();
+
+        if (!$accountsPayable || !$expenseAccount) {
+            throw new \Exception('Required accounts not found. Please ensure Chart of Accounts has Accounts Payable and Expense accounts.');
+        }
+
+        return $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $bill->bill_date,
+            'reference_number' => $bill->bill_number,
+            'description' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->vendor->name ?? 'Vendor'),
+            'source_type' => 'bill',
+            'source_id' => $bill->id,
+            'status' => 'posted',
+            'created_by' => $bill->created_by ?? auth()->id(),
+            'entries' => [
+                [
+                    'account_id' => $expenseAccount->id,
+                    'entry_type' => 'debit',
+                    'amount' => $bill->total_amount,
+                    'memo' => 'Bill ' . $bill->bill_number,
+                ],
+                [
+                    'account_id' => $accountsPayable->id,
+                    'entry_type' => 'credit',
+                    'amount' => $bill->total_amount,
+                    'memo' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->vendor->name ?? 'Vendor'),
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Post a bill payment to the general ledger
+     * Debit: Accounts Payable, Credit: Cash/Bank
+     */
+    public function postBillPayment($payment): JournalBatch
+    {
+        $school = $payment->school;
+        $bill = $payment->bill;
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'bill_payment')
+            ->where('source_id', $payment->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
+        $cashAccountCode = match($payment->payment_method) {
+            'cash' => '1102',
+            'bank_transfer' => '1301',
+            'check' => '1301',
+            'mobile_money' => '1303',
+            default => '1102',
+        };
+
+        $cashAccount = Account::where('school_id', $school->id)
+            ->where('code', $cashAccountCode)
+            ->first();
+
+        $accountsPayable = Account::where('school_id', $school->id)
+            ->whereIn('code', ['2100', '2101'])
+            ->first();
+
+        if (!$cashAccount || !$accountsPayable) {
+            throw new \Exception('Required accounts not found for bill payment posting.');
+        }
+
+        return $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $payment->payment_date,
+            'reference_number' => $payment->reference ?? 'BPAY-' . $payment->id,
+            'description' => 'Payment for bill ' . $bill->bill_number,
+            'source_type' => 'bill_payment',
+            'source_id' => $payment->id,
+            'status' => 'posted',
+            'created_by' => $payment->created_by ?? auth()->id(),
+            'entries' => [
+                [
+                    'account_id' => $accountsPayable->id,
+                    'entry_type' => 'debit',
+                    'amount' => $payment->amount,
+                    'memo' => 'Payment for bill ' . $bill->bill_number,
+                ],
+                [
+                    'account_id' => $cashAccount->id,
+                    'entry_type' => 'credit',
+                    'amount' => $payment->amount,
+                    'memo' => 'Payment for bill ' . $bill->bill_number,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Post a credit note to the general ledger
+     * Debit: Revenue/Accounts Receivable, Credit: Credit Notes (contra-revenue)
+     */
+    public function postCreditNote($creditNote): JournalBatch
+    {
+        $school = $creditNote->school;
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'credit_note')
+            ->where('source_id', $creditNote->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
+        $feesReceivable = Account::where('school_id', $school->id)
+            ->whereIn('code', ['1201', '1200'])
+            ->first();
+
+        $revenueAccount = Account::where('school_id', $school->id)
+            ->whereIn('code', ['5100', '4100'])
+            ->first();
+
+        if (!$feesReceivable || !$revenueAccount) {
+            throw new \Exception('Required accounts not found for credit note posting.');
+        }
+
+        return $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $creditNote->credit_note_date,
+            'reference_number' => $creditNote->credit_note_number,
+            'description' => 'Credit Note ' . $creditNote->credit_note_number . ' - ' . ($creditNote->reason ?? 'Adjustment'),
+            'source_type' => 'credit_note',
+            'source_id' => $creditNote->id,
+            'status' => 'posted',
+            'created_by' => $creditNote->created_by ?? auth()->id(),
+            'entries' => [
+                [
+                    'account_id' => $revenueAccount->id,
+                    'entry_type' => 'debit',
+                    'amount' => $creditNote->total_amount,
+                    'memo' => 'Credit Note ' . $creditNote->credit_note_number . ' - Revenue reversal',
+                ],
+                [
+                    'account_id' => $feesReceivable->id,
+                    'entry_type' => 'credit',
+                    'amount' => $creditNote->total_amount,
+                    'memo' => 'Credit Note ' . $creditNote->credit_note_number . ' - AR reduction',
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Determine the offsite ledger account based on cashbook category and type
+     */
+    protected function determineOffsetAccount(int $schoolId, string $category, string $type): ?Account
+    {
+        $code = match($category) {
+            'salaries' => '6100',       // Salaries Expense
+            'supplies' => '6500',       // Supplies Expense
+            'maintenance' => '6400',    // Maintenance Expense
+            'utilities' => '6300',      // Utilities Expense
+            'rent' => '6600',           // Rent Expense
+            'bank_charge' => '7100',    // Bank Charges Expense
+            'fees' => '5100',           // Fees revenue
+            default => $type === 'expense' ? '7200' : '5800', // Misc Expense vs Other Revenue
+        };
+        
+        return Account::where('school_id', $schoolId)
+            ->where('code', $code)
+            ->first() ?? Account::where('school_id', $schoolId)->where('type', $type === 'expense' ? 'expense' : 'revenue')->first();
     }
 }
 

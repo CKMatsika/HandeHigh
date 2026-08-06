@@ -9,6 +9,8 @@ use App\Models\Bill;
 use App\Models\Cashbook;
 use App\Models\Account;
 use App\Models\Project;
+use App\Models\SchemeOfWork;
+use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -32,10 +34,24 @@ class DashboardController extends Controller
             'pending_enrollments' => $school->enrollments()->where('status', 'pending')->count(),
             'today_attendance' => $school->attendances()->whereDate('attendance_date', now()->toDateString())->count(),
             'total_fees_collected' => $school->payments()->sum('amount'),
-            'pending_procurement' => 0, // Will implement later
+            'pending_procurement' => 0,
         ];
 
-        return view('admin.dashboard.headmaster', compact('stats'));
+        // Schemes of work stats
+        $schemesStats = [
+            'total' => SchemeOfWork::where('school_id', $school->id)->count(),
+            'submitted' => SchemeOfWork::where('school_id', $school->id)->where('status', 'submitted')->count(),
+            'approved' => SchemeOfWork::where('school_id', $school->id)->where('status', 'approved')->count(),
+        ];
+
+        $recentSubmittedSchemes = SchemeOfWork::with(['teacher', 'subject', 'schoolClass'])
+            ->where('school_id', $school->id)
+            ->where('status', 'submitted')
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        return view('admin.dashboard.headmaster', compact('stats', 'schemesStats', 'recentSubmittedSchemes'));
     }
 
     public function deputyHeadmaster()
@@ -71,7 +87,21 @@ class DashboardController extends Controller
             ],
         ];
 
-        return view('admin.dashboard.deputy-headmaster', compact('stats'));
+        // Schemes of work stats
+        $schemesStats = [
+            'total' => SchemeOfWork::where('school_id', $school->id)->count(),
+            'submitted' => SchemeOfWork::where('school_id', $school->id)->where('status', 'submitted')->count(),
+            'approved' => SchemeOfWork::where('school_id', $school->id)->where('status', 'approved')->count(),
+        ];
+
+        $recentSubmittedSchemes = SchemeOfWork::with(['teacher', 'subject', 'schoolClass'])
+            ->where('school_id', $school->id)
+            ->where('status', 'submitted')
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        return view('admin.dashboard.deputy-headmaster', compact('stats', 'schemesStats', 'recentSubmittedSchemes'));
     }
 
     public function accountsClerk()

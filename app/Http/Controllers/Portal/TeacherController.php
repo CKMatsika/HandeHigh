@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Models\CareerGuidanceAssessment;
 use App\Models\Project;
+use App\Models\SchemeOfWork;
+use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -26,6 +29,9 @@ class TeacherController extends Controller
         $announcements = collect();
         $schedule = collect();
         $teacherProjects = collect();
+        $careerAssessmentsCount = 0;
+        $careerAssessedStudents = 0;
+        $careerStudentTotal = 0;
         
         if ($user->hasRole('teacher')) {
             $teacherClasses = $school->classes()->where('teacher_id', $user->id)->get();
@@ -34,6 +40,28 @@ class TeacherController extends Controller
             // Get students from assigned classes
             $classIds = $teacherClasses->pluck('id');
             $students = $school->students()->whereIn('class_id', $classIds)->limit(10)->get();
+            
+            // Get teacher record and schemes of work
+            $teacher = Teacher::where('school_id', $school->id)->where('user_id', $user->id)->first();
+            $schemesCount = 0;
+            $draftSchemesCount = 0;
+            $submittedSchemesCount = 0;
+            $approvedSchemesCount = 0;
+            $recentSchemes = collect();
+            
+            if ($teacher) {
+                $schemesQuery = SchemeOfWork::where('school_id', $school->id)->where('teacher_id', $teacher->id);
+                $schemesCount = $schemesQuery->count();
+                $draftSchemesCount = (clone $schemesQuery)->where('status', 'draft')->count();
+                $submittedSchemesCount = (clone $schemesQuery)->where('status', 'submitted')->count();
+                $approvedSchemesCount = (clone $schemesQuery)->where('status', 'approved')->count();
+                $recentSchemes = SchemeOfWork::with(['subject', 'schoolClass'])
+                    ->where('school_id', $school->id)
+                    ->where('teacher_id', $teacher->id)
+                    ->latest()
+                    ->limit(5)
+                    ->get();
+            }
             
             // Get projects where teacher is involved
             $teacherProjects = Project::where('school_id', $school->id)
@@ -62,6 +90,13 @@ class TeacherController extends Controller
                 (object)['title' => 'New Curriculum Update', 'message' => 'Updated curriculum guidelines are now available', 'date' => now()->subDays(1), 'priority' => 'medium'],
             ]);
             
+            // Career guidance stats for teacher's students
+            $allClassStudents = $school->students()->whereIn('class_id', $classIds)->pluck('id');
+            $careerStudentTotal = $allClassStudents->count();
+            $careerAssessmentsCount = CareerGuidanceAssessment::whereIn('student_id', $allClassStudents)
+                ->where('status', 'published')->count();
+            $careerAssessedStudents = $careerAssessmentsCount;
+            
             // Sample daily schedule
             $schedule = collect([
                 (object)['time' => '8:00-9:00', 'class' => 'Form 1A', 'subject' => 'Mathematics', 'room' => 'Room 101'],
@@ -75,6 +110,16 @@ class TeacherController extends Controller
             $curricula = $school->curricula()->with(['class', 'subject'])->limit(5)->get();
             $students = $school->students()->limit(5)->get();
             $teacherProjects = Project::where('school_id', $school->id)->limit(5)->get();
+            
+            $schemesCount = SchemeOfWork::where('school_id', $school->id)->count();
+            $draftSchemesCount = SchemeOfWork::where('school_id', $school->id)->where('status', 'draft')->count();
+            $submittedSchemesCount = SchemeOfWork::where('school_id', $school->id)->where('status', 'submitted')->count();
+            $approvedSchemesCount = SchemeOfWork::where('school_id', $school->id)->where('status', 'approved')->count();
+            $recentSchemes = SchemeOfWork::with(['subject', 'schoolClass'])
+                ->where('school_id', $school->id)
+                ->latest()
+                ->limit(5)
+                ->get();
             
             $assignments = collect([
                 (object)['title' => 'Sample Assignment', 'class' => 'Sample Class', 'subject' => 'Sample Subject', 'due_date' => now()->addDays(3), 'submissions' => 5, 'total' => 10],
@@ -104,6 +149,14 @@ class TeacherController extends Controller
             'announcements' => $announcements,
             'schedule' => $schedule,
             'teacherProjects' => $teacherProjects,
+            'schemesCount' => $schemesCount,
+            'draftSchemesCount' => $draftSchemesCount,
+            'submittedSchemesCount' => $submittedSchemesCount,
+            'approvedSchemesCount' => $approvedSchemesCount,
+            'recentSchemes' => $recentSchemes,
+            'careerAssessmentsCount' => $careerAssessmentsCount,
+            'careerAssessedStudents' => $careerAssessedStudents,
+            'careerStudentTotal' => $careerStudentTotal,
         ]);
     }
 
