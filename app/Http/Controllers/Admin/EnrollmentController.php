@@ -391,8 +391,9 @@ class EnrollmentController extends Controller
             $file = $request->file('file');
             $schoolId = $school->id;
 
-            // Import the file
-            Excel::import(new EnrollmentsImport($schoolId), $file);
+            DB::transaction(function () use ($file, $schoolId) {
+                Excel::import(new EnrollmentsImport($schoolId), $file);
+            });
 
             return redirect()
                 ->route('admin.enrollments.index')
@@ -427,42 +428,39 @@ class EnrollmentController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
-        $template = storage_path('app/templates/bulk-enrollment-template.xlsx');
-        
-        if (!file_exists($template)) {
-            // Create the directory if it doesn't exist
-            if (!is_dir(dirname($template))) {
-                mkdir(dirname($template), 0755, true);
-            }
-            
-            // Create a sample template
+        $template = tempnam(storage_path('app'), 'bulk-enrollment-template-');
+
+        if ($template === false) {
+            abort(500, 'Unable to create enrollment template.');
+        }
+
+        try {
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
-            
-            // Set headers
             $headers = [
                 'student_name', 'email', 'phone', 'address', 'date_of_birth', 'gender',
                 'class_name', 'academic_year', 'term', 'grade', 'is_boarding', 'has_transport', 'status'
             ];
-            
+
             $sheet->fromArray([$headers]);
-            
-            // Set some example data
             $examples = [
                 'John Doe', 'john@example.com', '1234567890', '123 Main St', '2010-05-15', 'male',
                 'Grade 1', '2023-2024', 'First Term', '1', 'no', 'yes', 'active'
             ];
             $sheet->fromArray([$examples], null, 'A2');
-            
-            // Auto size columns
+
             foreach (range('A', 'M') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
-            
-            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-            $writer->save($template);
+
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($template);
+
+            return response()
+                ->download($template, 'bulk-enrollment-template.xlsx')
+                ->deleteFileAfterSend(true);
+        } catch (\Throwable $e) {
+            @unlink($template);
+            throw $e;
         }
-        
-        return response()->download($template, 'bulk-enrollment-template.xlsx');
     }
 }
