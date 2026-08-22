@@ -8,6 +8,7 @@ use App\Models\Cashbook;
 use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 
 class CashbookController extends Controller
@@ -82,8 +83,13 @@ class CashbookController extends Controller
 
     public function store(Request $request)
     {
+        $school = auth()->user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
         $request->validate([
-            'account_id' => 'required|exists:accounts,id',
+            'account_id' => ['required', TenantExists::make('accounts')],
             'transaction_type' => 'required|in:income,expense,transfer',
             'category' => 'required|string',
             'description' => 'required|string|max:255',
@@ -94,8 +100,7 @@ class CashbookController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $school = auth()->user()->school;
-        $account = Account::find($request->account_id);
+        $account = Account::where('school_id', $school->id)->findOrFail($request->account_id);
         
         // Calculate balance after transaction
         $currentBalance = $account->current_balance ?? 0;
@@ -105,7 +110,7 @@ class CashbookController extends Controller
 
         $transaction = Cashbook::create([
             'school_id' => $school->id,
-            'account_id' => $request->account_id,
+            'account_id' => $account->id,
             'transaction_type' => $request->transaction_type,
             'category' => $request->category,
             'description' => $request->description,
@@ -150,9 +155,10 @@ class CashbookController extends Controller
     public function update(Request $request, Cashbook $cashbook)
     {
         $this->authorizeSchoolAccess($cashbook);
+        $school = auth()->user()?->school;
         
         $request->validate([
-            'bank_account_id' => 'required|exists:bank_accounts,id',
+            'bank_account_id' => ['required', TenantExists::make('bank_accounts')],
             'transaction_type' => 'required|in:income,expense,transfer',
             'category' => 'required|string',
             'description' => 'required|string|max:255',
@@ -163,22 +169,24 @@ class CashbookController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $oldBankAccount = BankAccount::find($cashbook->bank_account_id);
-        $newBankAccount = BankAccount::find($request->bank_account_id);
+        $oldBankAccount = $cashbook->bank_account_id ? BankAccount::where('school_id', $school->id)->find($cashbook->bank_account_id) : null;
+        $newBankAccount = BankAccount::where('school_id', $school->id)->findOrFail($request->bank_account_id);
         
-        // Reverse old balance change
-        $oldBalanceAfter = $cashbook->transaction_type === 'expense' 
-            ? $oldBankAccount->current_balance + $cashbook->amount 
-            : $oldBankAccount->current_balance - $cashbook->amount;
-        $oldBankAccount->update(['current_balance' => $oldBalanceAfter]);
+        // Reverse old balance change if applicable
+        if ($oldBankAccount) {
+            $oldBalanceAfter = $cashbook->transaction_type === 'expense'
+                ? $oldBankAccount->current_balance + $cashbook->amount
+                : $oldBankAccount->current_balance - $cashbook->amount;
+            $oldBankAccount->update(['current_balance' => $oldBalanceAfter]);
+        }
 
         // Calculate new balance after transaction
-        $newBalanceAfter = $request->transaction_type === 'expense' 
-            ? $newBankAccount->current_balance - $request->amount 
+        $newBalanceAfter = $request->transaction_type === 'expense'
+            ? $newBankAccount->current_balance - $request->amount
             : $newBankAccount->current_balance + $request->amount;
 
         $cashbook->update([
-            'bank_account_id' => $request->bank_account_id,
+            'bank_account_id' => $newBankAccount->id,
             'transaction_type' => $request->transaction_type,
             'category' => $request->category,
             'description' => $request->description,
@@ -200,11 +208,13 @@ class CashbookController extends Controller
     public function destroy(Cashbook $cashbook)
     {
         $this->authorizeSchoolAccess($cashbook);
+        $school = auth()->user()?->school;
         
-        $account = Account::find($cashbook->account_id);
+        $account = $cashbook->account_id ? Account::where('school_id', $school->id)->find($cashbook->account_id) : null;
         
         // Get current balance from cashbook entries (not journal entries)
-        $currentBalance = \App\Models\Cashbook::where('account_id', $cashbook->account_id)
+        $currentBalance = \App\Models\Cashbook::where('school_id', $school->id)
+            ->where('account_id', $cashbook->account_id)
             ->where('id', '!=', $cashbook->id) // Exclude current entry
             ->orderBy('transaction_date', 'desc')
             ->orderBy('created_at', 'desc')
@@ -223,7 +233,7 @@ class CashbookController extends Controller
 
     protected function authorizeSchoolAccess(Cashbook $cashbook)
     {
-        if ($cashbook->school_id !== auth()->user()->school_id) {
+        if ($cashbook->school_id !== auth()->user()?->school_id) {
             abort(403);
         }
     }

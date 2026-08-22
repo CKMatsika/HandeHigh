@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
+use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -55,10 +56,10 @@ class ReceiptController extends Controller
         $validated = $request->validate([
             'receipt_date' => ['required', 'date'],
             'type' => ['required', 'in:sale,service,other'],
-            'customer_id' => ['nullable', 'exists:customers,id'],
+            'customer_id' => ['nullable', TenantExists::make('customers')],
             'customer_name' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['required', 'in:cash,bank_transfer,check,credit_card,mobile_money'],
-            'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
+            'bank_account_id' => ['nullable', TenantExists::make('bank_accounts')],
             'reference' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -159,10 +160,10 @@ class ReceiptController extends Controller
         $validated = $request->validate([
             'receipt_date' => ['required', 'date'],
             'type' => ['required', 'in:sale,service,other'],
-            'customer_id' => ['nullable', 'exists:customers,id'],
+            'customer_id' => ['nullable', TenantExists::make('customers')],
             'customer_name' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['required', 'in:cash,bank_transfer,check,credit_card,mobile_money'],
-            'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
+            'bank_account_id' => ['nullable', TenantExists::make('bank_accounts')],
             'reference' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],

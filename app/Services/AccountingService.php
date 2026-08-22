@@ -551,13 +551,13 @@ class AccountingService
     {
         $school = $transfer->school;
 
-        // Use main bank account code for now
         $fromAccount = Account::where('school_id', $school->id)
-            ->where('code', '1301')
-            ->firstOrFail();
+            ->where('id', $transfer->from_bank_account_id)
+            ->first() ?? Account::where('school_id', $school->id)->where('code', '1301')->firstOrFail();
+
         $toAccount = Account::where('school_id', $school->id)
-            ->where('code', '1301')
-            ->firstOrFail();
+            ->where('id', $transfer->to_bank_account_id)
+            ->first() ?? Account::where('school_id', $school->id)->where('code', '1301')->firstOrFail();
 
         return $this->createJournalBatch([
             'school_id' => $school->id,

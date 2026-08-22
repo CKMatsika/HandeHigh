@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Bill;
 use App\Models\Vendor;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 
 class BillController extends Controller
@@ -59,7 +60,7 @@ class BillController extends Controller
         }
 
         $validated = $request->validate([
-            'vendor_id' => ['required', 'exists:vendors,id'],
+            'vendor_id' => ['required', TenantExists::make('vendors')],
             'bill_number' => ['required', 'string', 'max:255'],
             'vendor_bill_number' => ['nullable', 'string', 'max:255'],
             'bill_date' => ['required', 'date'],
@@ -73,15 +74,15 @@ class BillController extends Controller
             'school_id' => $school->id,
             'vendor_id' => $validated['vendor_id'],
             'bill_number' => $validated['bill_number'],
-            'vendor_bill_number' => $validated['vendor_bill_number'],
+            'vendor_bill_number' => $validated['vendor_bill_number'] ?? null,
             'bill_date' => $validated['bill_date'],
             'due_date' => $validated['due_date'],
             'total_amount' => $validated['total_amount'],
             'paid_amount' => 0,
             'balance' => $validated['total_amount'],
             'status' => 'pending',
-            'description' => $validated['description'],
-            'notes' => $validated['notes'],
+            'description' => $validated['description'] ?? null,
+            'notes' => $validated['notes'] ?? null,
             'created_by' => $user->id,
         ]);
 
@@ -120,7 +121,7 @@ class BillController extends Controller
         $this->authorizeSchoolAccess($bill);
 
         $validated = $request->validate([
-            'vendor_id' => ['required', 'exists:vendors,id'],
+            'vendor_id' => ['required', TenantExists::make('vendors')],
             'bill_number' => ['required', 'string', 'max:255'],
             'vendor_bill_number' => ['nullable', 'string', 'max:255'],
             'bill_date' => ['required', 'date'],

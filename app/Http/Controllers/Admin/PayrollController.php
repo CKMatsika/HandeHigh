@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\AllowanceType;
 use App\Models\EmployeeAllowance;
 use App\Models\Loan;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -75,7 +76,7 @@ class PayrollController extends Controller
             'processed_date' => 'required|date',
             'notes' => 'nullable|string',
             'employees' => 'required|array|min:1',
-            'employees.*.id' => 'required|exists:employees,id',
+            'employees.*.id' => ['required', TenantExists::make('employees')],
             'employees.*.basic_salary' => 'required|numeric|min:0',
             'employees.*.housing_allowance' => 'nullable|numeric|min:0',
             'employees.*.transport_allowance' => 'nullable|numeric|min:0',

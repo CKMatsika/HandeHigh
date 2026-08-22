@@ -37,7 +37,7 @@ class CustomerController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('customers', 'code')],
+            'code' => ['required', 'string', 'max:50', Rule::unique('customers', 'code')->where('school_id', $school->id)],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -73,7 +73,7 @@ class CustomerController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('customers', 'code')->ignore($customer->id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('customers', 'code')->where('school_id', $school->id)->ignore($customer->id)],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
             'phone' => ['nullable', 'string', 'max:50'],

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\JournalBatch;
+use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -64,7 +65,7 @@ class JournalBatchController extends Controller
             'reference_number' => ['nullable', 'string', 'max:100'],
             'description' => ['required', 'string', 'max:500'],
             'entries' => ['required', 'array', 'min:2'],
-            'entries.*.account_id' => ['required', 'exists:accounts,id'],
+            'entries.*.account_id' => ['required', TenantExists::make('accounts')],
             'entries.*.entry_type' => ['required', 'in:debit,credit'],
             'entries.*.amount' => ['required', 'numeric', 'min:0.01'],
             'entries.*.memo' => ['nullable', 'string', 'max:255'],

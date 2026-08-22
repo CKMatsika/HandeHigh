@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\BudgetLine;
 use App\Models\Account;
 use App\Models\Department;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -216,9 +217,9 @@ class BudgetController extends Controller
         }
 
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
-            'cost_center_id' => ['nullable', 'exists:departments,id'],
-            'project_id' => ['nullable', 'exists:projects,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
+            'cost_center_id' => ['nullable', TenantExists::make('departments')],
+            'project_id' => ['nullable', TenantExists::make('projects')],
             'period' => ['nullable', 'integer', 'min:1', 'max:12'],
             'budgeted_amount' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
@@ -233,6 +234,10 @@ class BudgetController extends Controller
     public function editLine(Budget $budget, BudgetLine $line)
     {
         $this->authorizeBudgetAccess($budget);
+
+        if ($line->budget_id !== $budget->id) {
+            abort(404);
+        }
         
         if (!$budget->canBeEdited()) {
             abort(403, 'Budget lines can only be edited in draft budgets.');
@@ -247,15 +252,19 @@ class BudgetController extends Controller
     public function updateLine(Request $request, Budget $budget, BudgetLine $line)
     {
         $this->authorizeBudgetAccess($budget);
+
+        if ($line->budget_id !== $budget->id) {
+            abort(404);
+        }
         
         if (!$budget->canBeEdited()) {
             abort(403, 'Budget lines can only be edited in draft budgets.');
         }
 
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
-            'cost_center_id' => ['nullable', 'exists:departments,id'],
-            'project_id' => ['nullable', 'exists:projects,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
+            'cost_center_id' => ['nullable', TenantExists::make('departments')],
+            'project_id' => ['nullable', TenantExists::make('projects')],
             'period' => ['nullable', 'integer', 'min:1', 'max:12'],
             'budgeted_amount' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
@@ -270,6 +279,10 @@ class BudgetController extends Controller
     public function destroyLine(Budget $budget, BudgetLine $line)
     {
         $this->authorizeBudgetAccess($budget);
+
+        if ($line->budget_id !== $budget->id) {
+            abort(404);
+        }
         
         if (!$budget->canBeEdited()) {
             abort(403, 'Budget lines can only be deleted from draft budgets.');

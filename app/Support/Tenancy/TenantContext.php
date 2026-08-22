@@ -72,4 +72,9 @@ class TenantContext
             ->where((new $modelClass)->getRouteKeyName(), $value)
             ->firstOrFail();
     }
+
+    public function existsRule(string $table, string $column = 'id', string $tenantColumn = 'school_id'): \App\Rules\TenantExists
+    {
+        return new \App\Rules\TenantExists($table, $column, $tenantColumn);
+    }
 }

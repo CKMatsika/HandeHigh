@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Loan;
 use App\Models\LoanRepayment;
 use App\Models\Employee;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -50,7 +51,7 @@ class LoanController extends Controller
         if (!$school) abort(403);
 
         $validated = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
+            'employee_id' => ['required', TenantExists::make('employees')],
             'loan_type' => 'required|in:school,bank,sacco,other',
             'loan_provider' => 'nullable|string|max:255',
             'loan_amount' => 'required|numeric|min:0',

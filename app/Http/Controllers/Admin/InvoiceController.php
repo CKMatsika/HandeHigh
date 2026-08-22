@@ -9,6 +9,7 @@ use App\Models\Enrollment;
 use App\Models\FeeStructure;
 use App\Models\Student;
 use App\Models\LedgerEntry;
+use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -62,7 +63,7 @@ class InvoiceController extends Controller
         }
 
         $validated = $request->validate([
-            'student_id' => ['required', 'integer', 'exists:students,id'],
+            'student_id' => ['required', 'integer', TenantExists::make('students')],
             'academic_year' => ['required', 'string'],
             'term' => ['required', 'string'],
             'issued_at' => ['required', 'date'],
@@ -306,7 +307,7 @@ class InvoiceController extends Controller
             'academic_year' => ['required', 'string'],
             'term' => ['required', 'string'],
             'enrollment_ids' => ['required', 'array', 'min:1'],
-            'enrollment_ids.*' => ['integer', 'exists:enrollments,id'],
+            'enrollment_ids.*' => ['integer', TenantExists::make('enrollments')],
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
             'fee_items' => ['required', 'array', 'min:1'],

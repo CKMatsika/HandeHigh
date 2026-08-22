@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -54,11 +55,11 @@ class AccountController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('accounts', 'code')],
+            'code' => ['required', 'string', 'max:50', Rule::unique('accounts', 'code')->where('school_id', $school->id)],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(['asset', 'liability', 'equity', 'revenue', 'expense'])],
             'category' => ['required', 'string', 'max:100'],
-            'parent_id' => ['nullable', 'exists:accounts,id'],
+            'parent_id' => ['nullable', TenantExists::make('accounts')],
             'description' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer'],
         ]);
@@ -96,11 +97,11 @@ class AccountController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('accounts', 'code')->ignore($account->id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('accounts', 'code')->where('school_id', $school->id)->ignore($account->id)],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(['asset', 'liability', 'equity', 'revenue', 'expense'])],
             'category' => ['required', 'string', 'max:100'],
-            'parent_id' => ['nullable', 'exists:accounts,id'],
+            'parent_id' => ['nullable', TenantExists::make('accounts')],
             'description' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer'],
             'is_active' => ['boolean'],

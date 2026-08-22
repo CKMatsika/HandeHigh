@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\BankReconciliation;
 use App\Models\BankTransaction;
 use App\Models\CashbookTransaction;
+use App\Rules\TenantExists;
 use App\Services\BankReconciliationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -61,7 +62,7 @@ class BankReconciliationController extends Controller
         }
 
         $validated = $request->validate([
-            'bank_account_id' => ['required', 'exists:accounts,id'],
+            'bank_account_id' => ['required', TenantExists::make('accounts')],
             'reconciliation_date' => ['required', 'date'],
             'book_balance' => ['required', 'numeric'],
             'bank_balance' => ['required', 'numeric'],
@@ -138,7 +139,7 @@ class BankReconciliationController extends Controller
     public function importStatement(Request $request)
     {
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
             'statement_file' => ['required', 'file', 'mimes:csv,xlsx,xls', 'max:10240'],
             'skip_header' => ['boolean'],
             'date_format' => ['string'],
@@ -175,7 +176,7 @@ class BankReconciliationController extends Controller
     public function autoMatch(Request $request)
     {
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
             'confidence_threshold' => ['numeric', 'min:0.5', 'max:1.0'],
         ]);
 
@@ -190,7 +191,7 @@ class BankReconciliationController extends Controller
     public function addBankCharge(Request $request)
     {
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -205,14 +206,23 @@ class BankReconciliationController extends Controller
 
     public function manualMatch(Request $request)
     {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
         $validated = $request->validate([
-            'bank_transaction_id' => ['required', 'exists:bank_transactions,id'],
-            'cashbook_transaction_id' => ['required', 'exists:cashbook_transactions,id'],
+            'bank_transaction_id' => ['required', TenantExists::make('bank_transactions')],
+            'cashbook_transaction_id' => ['required', TenantExists::make('cashbook_transactions')],
             'match_amount' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $bankTransaction = BankTransaction::findOrFail($validated['bank_transaction_id']);
-        $cashbookTransaction = CashbookTransaction::findOrFail($validated['cashbook_transaction_id']);
+        $bankTransaction = BankTransaction::where('school_id', $school->id)->findOrFail($validated['bank_transaction_id']);
+        $cashbookTransaction = CashbookTransaction::where('school_id', $school->id)->findOrFail($validated['cashbook_transaction_id']);
+
+        if ($bankTransaction->account_id !== $cashbookTransaction->account_id) {
+            return back()->with('error', 'Transactions must belong to the same bank account.');
+        }
 
         try {
             $this->reconciliationService->createMatch(
@@ -230,22 +240,26 @@ class BankReconciliationController extends Controller
 
     public function unmatchTransaction(Request $request)
     {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
         $validated = $request->validate([
-            'bank_transaction_id' => ['required', 'exists:bank_transactions,id'],
-            'cashbook_transaction_id' => ['required', 'exists:cashbook_transactions,id'],
+            'bank_transaction_id' => ['required', TenantExists::make('bank_transactions')],
+            'cashbook_transaction_id' => ['required', TenantExists::make('cashbook_transactions')],
         ]);
+
+        $bankTransaction = BankTransaction::where('school_id', $school->id)->findOrFail($validated['bank_transaction_id']);
+        $cashbookTransaction = CashbookTransaction::where('school_id', $school->id)->findOrFail($validated['cashbook_transaction_id']);
 
         // Remove the match
         \DB::table('transaction_matches')
-            ->where('bank_transaction_id', $validated['bank_transaction_id'])
-            ->where('cashbook_transaction_id', $validated['cashbook_transaction_id'])
+            ->where('bank_transaction_id', $bankTransaction->id)
+            ->where('cashbook_transaction_id', $cashbookTransaction->id)
             ->delete();
 
-        // Update both transactions
-        $bankTransaction = BankTransaction::findOrFail($validated['bank_transaction_id']);
-        $cashbookTransaction = CashbookTransaction::findOrFail($validated['cashbook_transaction_id']);
-
-        // Recalculate matched amounts (simplified - would need more complex logic for partial matches)
+        // Recalculate matched amounts
         $bankTransaction->update([
             'matched_amount' => 0,
             'status' => 'unmatched',
@@ -263,8 +277,13 @@ class BankReconciliationController extends Controller
 
     public function addCashbookTransaction(Request $request)
     {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -275,7 +294,7 @@ class BankReconciliationController extends Controller
         ]);
 
         $transaction = CashbookTransaction::create([
-            'school_id' => Auth::user()->school->id,
+            'school_id' => $school->id,
             'account_id' => $validated['account_id'],
             'transaction_date' => $validated['date'],
             'description' => $validated['description'],
@@ -293,8 +312,13 @@ class BankReconciliationController extends Controller
 
     public function addBankTransaction(Request $request)
     {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
         $validated = $request->validate([
-            'account_id' => ['required', 'exists:accounts,id'],
+            'account_id' => ['required', TenantExists::make('accounts')],
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -304,7 +328,7 @@ class BankReconciliationController extends Controller
         ]);
 
         $transaction = BankTransaction::create([
-            'school_id' => Auth::user()->school->id,
+            'school_id' => $school->id,
             'account_id' => $validated['account_id'],
             'transaction_date' => $validated['date'],
             'description' => $validated['description'],

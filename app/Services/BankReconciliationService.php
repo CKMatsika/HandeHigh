@@ -232,6 +232,10 @@ class BankReconciliationService
      */
     public function createMatch($bankTransaction, $cashbookTransaction, $amount, $matchType = 'manual')
     {
+        if ((int) $bankTransaction->school_id !== (int) $cashbookTransaction->school_id) {
+            throw new \InvalidArgumentException('Transactions must belong to the same school.');
+        }
+
         DB::beginTransaction();
         
         try {

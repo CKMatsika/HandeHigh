@@ -7,6 +7,7 @@ use App\Models\CreditNote;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Student;
+use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -84,9 +85,9 @@ class CreditNoteController extends Controller
 
         $request->validate([
             'type'             => 'required|in:customer,student',
-            'customer_id'      => 'required_if:type,customer|nullable|exists:customers,id',
-            'student_id'       => 'required_if:type,student|nullable|exists:students,id',
-            'invoice_id'       => 'nullable|exists:invoices,id',
+            'customer_id'      => ['required_if:type,customer', 'nullable', TenantExists::make('customers')],
+            'student_id'       => ['required_if:type,student', 'nullable', TenantExists::make('students')],
+            'invoice_id'       => ['nullable', TenantExists::make('invoices')],
             'total_amount'     => 'required|numeric|min:0.01',
             'credit_note_date' => 'required|date',
             'reason'           => 'required|string|max:1000',
@@ -183,9 +184,9 @@ class CreditNoteController extends Controller
 
         $request->validate([
             'type'             => 'required|in:customer,student',
-            'customer_id'      => 'required_if:type,customer|nullable|exists:customers,id',
-            'student_id'       => 'required_if:type,student|nullable|exists:students,id',
-            'invoice_id'       => 'nullable|exists:invoices,id',
+            'customer_id'      => ['required_if:type,customer', 'nullable', TenantExists::make('customers')],
+            'student_id'       => ['required_if:type,student', 'nullable', TenantExists::make('students')],
+            'invoice_id'       => ['nullable', TenantExists::make('invoices')],
             'total_amount'     => 'required|numeric|min:0.01',
             'credit_note_date' => 'required|date',
             'reason'           => 'required|string|max:1000',
@@ -271,7 +272,7 @@ class CreditNoteController extends Controller
         }
 
         $request->validate([
-            'invoice_id'    => 'required|exists:invoices,id',
+            'invoice_id'    => ['required', TenantExists::make('invoices')],
             'apply_amount'  => 'required|numeric|min:0.01|max:' . $creditNote->balance,
         ]);
 

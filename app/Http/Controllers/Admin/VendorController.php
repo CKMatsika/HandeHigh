@@ -37,7 +37,7 @@ class VendorController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('vendors', 'code')],
+            'code' => ['required', 'string', 'max:50', Rule::unique('vendors', 'code')->where('school_id', $school->id)],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -72,7 +72,7 @@ class VendorController extends Controller
         }
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', Rule::unique('vendors', 'code')->ignore($vendor->id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('vendors', 'code')->where('school_id', $school->id)->ignore($vendor->id)],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email'],
             'phone' => ['nullable', 'string', 'max:50'],
