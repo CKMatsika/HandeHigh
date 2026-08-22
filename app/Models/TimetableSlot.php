@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,10 +17,14 @@ class TimetableSlot extends Model
         'subject_id',
         'teacher_id',
         'room_id',
+        'school_period_id',
         'day_of_week',
         'start_time',
         'end_time',
         'status',
+        'is_locked',
+        'slot_type',
+        'activity_name',
         'conflicts',
         'ai_score',
     ];
@@ -27,9 +32,11 @@ class TimetableSlot extends Model
     protected $casts = [
         'conflicts' => 'array',
         'ai_score' => 'decimal:2',
-        'start_time' => 'datetime:H:i',
-        'end_time' => 'datetime:H:i',
+        'start_time' => 'string',
+        'end_time' => 'string',
         'status' => 'string',
+        'is_locked' => 'boolean',
+        'slot_type' => 'string',
     ];
 
     public function timetable(): BelongsTo
@@ -57,18 +64,39 @@ class TimetableSlot extends Model
         return $this->belongsTo(Room::class);
     }
 
+    public function schoolPeriod(): BelongsTo
+    {
+        return $this->belongsTo(SchoolPeriod::class);
+    }
+
     public function hasConflicts(): bool
     {
-        return !empty($this->conflicts) || $this->status === 'conflict';
+        return ! empty($this->conflicts) || $this->status === 'conflict';
     }
 
     public function getDurationMinutes(): int
     {
-        return $this->start_time->diffInMinutes($this->end_time);
+        $start = Carbon::parse($this->start_time);
+        $end = Carbon::parse($this->end_time);
+
+        return $start->diffInMinutes($end);
     }
 
     public function getFormattedTime(): string
     {
-        return $this->start_time->format('H:i') . ' - ' . $this->end_time->format('H:i');
+        $start = is_string($this->start_time) ? substr($this->start_time, 0, 5) : Carbon::parse($this->start_time)->format('H:i');
+        $end = is_string($this->end_time) ? substr($this->end_time, 0, 5) : Carbon::parse($this->end_time)->format('H:i');
+
+        return "{$start} - {$end}";
+    }
+
+    public function isLesson(): bool
+    {
+        return ($this->slot_type ?? 'lesson') === 'lesson';
+    }
+
+    public function isLocked(): bool
+    {
+        return (bool) $this->is_locked;
     }
 }

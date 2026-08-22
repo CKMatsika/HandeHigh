@@ -38,6 +38,8 @@ class RolePermissionSeeder extends Seeder
             'roles.view', 'roles.assign',
             'schemes-of-work.view', 'schemes-of-work.create', 'schemes-of-work.edit',
             'schemes-of-work.approve', 'schemes-of-work.reject',
+            'timetables.view', 'timetables.create', 'timetables.edit', 'timetables.delete',
+            'timetables.generate', 'timetables.publish', 'timetables.export',
         ];
     }
 
@@ -66,19 +68,20 @@ class RolePermissionSeeder extends Seeder
         $communication = ['communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat'];
         $reports = ['reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance'];
         $schemes = ['schemes-of-work.view', 'schemes-of-work.create', 'schemes-of-work.edit', 'schemes-of-work.approve', 'schemes-of-work.reject'];
+        $timetables = ['timetables.view', 'timetables.create', 'timetables.edit', 'timetables.delete', 'timetables.generate', 'timetables.publish', 'timetables.export'];
 
         return [
             'super-admin' => self::permissions(),
             'school-admin' => array_merge(['dashboard.view'], $academic, $finance, $accounting, [
                 'procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.approve',
                 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
-            ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign']),
+            ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign'], $timetables),
             'headmaster' => array_merge(['dashboard.headmaster'], $academic, $finance, [
                 'procurement.view', 'procurement.approve', 'procurement.vendors.view',
-            ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes),
+            ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
             'deputy-headmaster' => array_merge(['dashboard.deputy-headmaster'], $academic, $finance, [
                 'procurement.view', 'procurement.approve',
-            ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes),
+            ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
             'accounts-clerk' => array_merge(['dashboard.accounts-clerk'],
                 ['students.view', 'enrollments.view'],
                 ['fees.view', 'fees.create', 'fees.edit', 'invoices.view', 'invoices.create', 'invoices.edit', 'payments.view', 'payments.create', 'payments.edit', 'receipts.view', 'receipts.create', 'receipts.edit'],
@@ -92,7 +95,7 @@ class RolePermissionSeeder extends Seeder
             'procurement-officer' => array_merge(['dashboard.procurement-officer'],
                 ['procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.committee', 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete', 'procurement.reports.view'],
                 $communication, ['reports.view', 'reports.procurement']),
-            'teacher' => array_merge(['dashboard.view'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3)),
+            'teacher' => array_merge(['dashboard.view'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3), ['timetables.view', 'timetables.export']),
             'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
         ];
     }

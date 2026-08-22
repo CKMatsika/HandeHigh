@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Timetable extends Model
 {
@@ -40,6 +40,16 @@ class Timetable extends Model
         return $this->hasMany(TimetableSlot::class);
     }
 
+    public function fixedActivities(): HasMany
+    {
+        return $this->hasMany(TimetableFixedActivity::class);
+    }
+
+    public function examinations(): HasMany
+    {
+        return $this->hasMany(TimetableExamination::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'published');
@@ -60,6 +70,16 @@ class Timetable extends Model
         return $this->status === 'published';
     }
 
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
+    }
+
+    public function isGenerated(): bool
+    {
+        return $this->status === 'generated';
+    }
+
     public function hasConflicts(): bool
     {
         return $this->slots()->where('status', 'conflict')->exists();
@@ -68,5 +88,22 @@ class Timetable extends Model
     public function getConflictCount(): int
     {
         return $this->slots()->where('status', 'conflict')->count();
+    }
+
+    public function getHardConflictCount(): int
+    {
+        return $this->slots()->where('status', 'conflict')->get()->filter(function ($slot) {
+            $conflicts = $slot->conflicts ?? [];
+            if (! is_array($conflicts)) {
+                return true;
+            }
+            foreach ($conflicts as $c) {
+                if (is_array($c) && ($c['severity'] ?? '') === 'HARD') {
+                    return true;
+                }
+            }
+
+            return true;
+        })->count();
     }
 }

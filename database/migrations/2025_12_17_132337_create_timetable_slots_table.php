@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('timetable_slots', function (Blueprint $table) {
             $table->id();
             $table->foreignId('timetable_id')->constrained()->onDelete('cascade');
-            $table->foreignId('school_class_id')->constrained()->onDelete('cascade');
+            $table->foreignId('school_class_id')->constrained('classes')->onDelete('cascade');
             $table->foreignId('subject_id')->constrained()->onDelete('cascade');
             $table->foreignId('teacher_id')->constrained()->onDelete('cascade');
             $table->foreignId('room_id')->nullable()->constrained()->onDelete('set null');

@@ -530,25 +530,44 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/career-guidance/interests', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'interests'])->name('career-guidance.interests');
             Route::get('/career-guidance/students', [App\Http\Controllers\Admin\CareerGuidanceController::class, 'students'])->name('career-guidance.students');
 
+            // Timetable Periods Configuration
+            Route::get('/timetables/periods', [\App\Http\Controllers\Admin\TimetablePeriodController::class, 'index'])->name('timetables.periods.index');
+            Route::post('/timetables/periods', [\App\Http\Controllers\Admin\TimetablePeriodController::class, 'store'])->name('timetables.periods.store');
+            Route::post('/timetables/periods/seed-defaults', [\App\Http\Controllers\Admin\TimetablePeriodController::class, 'seedDefaults'])->name('timetables.periods.seed-defaults');
+            Route::put('/timetables/periods/{period}', [\App\Http\Controllers\Admin\TimetablePeriodController::class, 'update'])->name('timetables.periods.update');
+            Route::delete('/timetables/periods/{period}', [\App\Http\Controllers\Admin\TimetablePeriodController::class, 'destroy'])->name('timetables.periods.destroy');
+
+            // Timetable Fixed Activities
+            Route::get('/timetables/fixed-activities', [\App\Http\Controllers\Admin\TimetableFixedActivityController::class, 'index'])->name('timetables.fixed-activities.index');
+            Route::post('/timetables/fixed-activities', [\App\Http\Controllers\Admin\TimetableFixedActivityController::class, 'store'])->name('timetables.fixed-activities.store');
+            Route::put('/timetables/fixed-activities/{fixedActivity}', [\App\Http\Controllers\Admin\TimetableFixedActivityController::class, 'update'])->name('timetables.fixed-activities.update');
+            Route::delete('/timetables/fixed-activities/{fixedActivity}', [\App\Http\Controllers\Admin\TimetableFixedActivityController::class, 'destroy'])->name('timetables.fixed-activities.destroy');
+
+            // Timetable Examinations
+            Route::get('/timetables/examinations', [\App\Http\Controllers\Admin\TimetableExaminationController::class, 'index'])->name('timetables.examinations.index');
+            Route::post('/timetables/examinations', [\App\Http\Controllers\Admin\TimetableExaminationController::class, 'store'])->name('timetables.examinations.store');
+            Route::put('/timetables/examinations/{examination}', [\App\Http\Controllers\Admin\TimetableExaminationController::class, 'update'])->name('timetables.examinations.update');
+            Route::delete('/timetables/examinations/{examination}', [\App\Http\Controllers\Admin\TimetableExaminationController::class, 'destroy'])->name('timetables.examinations.destroy');
+
             // Timetable Management
-            Route::get('/timetables', [App\Http\Controllers\Admin\TimetableController::class, 'index'])->name('timetables.index');
-            Route::get('/timetables/create', [App\Http\Controllers\Admin\TimetableController::class, 'create'])->name('timetables.create');
-            Route::post('/timetables', [App\Http\Controllers\Admin\TimetableController::class, 'store'])->name('timetables.store');
-            Route::get('/timetables/{timetable}', [App\Http\Controllers\Admin\TimetableController::class, 'show'])->name('timetables.show');
-            Route::get('/timetables/{timetable}/edit', [App\Http\Controllers\Admin\TimetableController::class, 'edit'])->name('timetables.edit');
-            Route::put('/timetables/{timetable}', [App\Http\Controllers\Admin\TimetableController::class, 'update'])->name('timetables.update');
-            Route::delete('/timetables/{timetable}', [App\Http\Controllers\Admin\TimetableController::class, 'destroy'])->name('timetables.destroy');
-            Route::post('/timetables/{timetable}/generate', [App\Http\Controllers\Admin\TimetableController::class, 'generate'])->name('timetables.generate');
-            Route::get('/timetables/conflicts', [App\Http\Controllers\Admin\TimetableController::class, 'conflicts'])->name('timetables.conflicts');
-            Route::get('/timetables/create', [App\Http\Controllers\Admin\TimetableController::class, 'create'])->name('timetables.create');
-            Route::post('/timetables', [App\Http\Controllers\Admin\TimetableController::class, 'store'])->name('timetables.store');
-            Route::get('/timetables/{timetable}', [App\Http\Controllers\Admin\TimetableController::class, 'show'])->name('timetables.show');
-            Route::get('/timetables/{timetable}/edit', [App\Http\Controllers\Admin\TimetableController::class, 'edit'])->name('timetables.edit');
-            Route::put('/timetables/{timetable}', [App\Http\Controllers\Admin\TimetableController::class, 'update'])->name('timetables.update');
-            Route::post('/timetables/{timetable}/generate', [App\Http\Controllers\Admin\TimetableController::class, 'generate'])->name('timetables.generate');
-            Route::post('/timetables/{timetable}/publish', [App\Http\Controllers\Admin\TimetableController::class, 'publish'])->name('timetables.publish');
-            Route::get('/timetables/{timetable}/conflicts', [App\Http\Controllers\Admin\TimetableController::class, 'conflicts'])->name('timetables.conflicts');
-            Route::post('/timetables/{timetable}/resolve-conflicts', [App\Http\Controllers\Admin\TimetableController::class, 'resolveConflicts'])->name('timetables.resolve-conflicts');
+            Route::get('/timetables', [\App\Http\Controllers\Admin\TimetableController::class, 'index'])->name('timetables.index');
+            Route::get('/timetables/create', [\App\Http\Controllers\Admin\TimetableController::class, 'create'])->name('timetables.create');
+            Route::post('/timetables', [\App\Http\Controllers\Admin\TimetableController::class, 'store'])->name('timetables.store');
+            Route::get('/timetables/{timetable}', [\App\Http\Controllers\Admin\TimetableController::class, 'show'])->name('timetables.show');
+            Route::get('/timetables/{timetable}/edit', [\App\Http\Controllers\Admin\TimetableController::class, 'edit'])->name('timetables.edit');
+            Route::put('/timetables/{timetable}', [\App\Http\Controllers\Admin\TimetableController::class, 'update'])->name('timetables.update');
+            Route::delete('/timetables/{timetable}', [\App\Http\Controllers\Admin\TimetableController::class, 'destroy'])->name('timetables.destroy');
+            Route::post('/timetables/{timetable}/publish', [\App\Http\Controllers\Admin\TimetableController::class, 'publish'])->name('timetables.publish');
+            Route::post('/timetables/{timetable}/unpublish', [\App\Http\Controllers\Admin\TimetableController::class, 'unpublish'])->name('timetables.unpublish');
+            Route::get('/timetables/{timetable}/conflicts', [\App\Http\Controllers\Admin\TimetableController::class, 'conflicts'])->name('timetables.conflicts');
+            Route::get('/timetables/{timetable}/validate', [\App\Http\Controllers\Admin\TimetableController::class, 'validateSchedule'])->name('timetables.validate');
+            Route::get('/timetables/{timetable}/export', [\App\Http\Controllers\Admin\TimetableController::class, 'export'])->name('timetables.export');
+
+            // Timetable Manual Slot Editing & Simulation
+            Route::post('/timetables/{timetable}/slots', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'store'])->name('timetables.slots.store');
+            Route::put('/timetables/{timetable}/slots/{slot}', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'update'])->name('timetables.slots.update');
+            Route::delete('/timetables/{timetable}/slots/{slot}', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'destroy'])->name('timetables.slots.destroy');
+            Route::post('/timetables/{timetable}/check-conflict', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'checkConflict'])->name('timetables.check-conflict');
 
             Route::get('/schemes-of-work', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'index'])->name('schemes-of-work.index');
             Route::get('/schemes-of-work/teacher/{teacher}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'teacherSchemes'])->name('schemes-of-work.teacher');

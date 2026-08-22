@@ -125,6 +125,31 @@ class School extends Model
         return $this->hasMany(Cashbook::class);
     }
 
+    public function timetables()
+    {
+        return $this->hasMany(Timetable::class);
+    }
+
+    public function schoolPeriods()
+    {
+        return $this->hasMany(SchoolPeriod::class);
+    }
+
+    public function fixedActivities()
+    {
+        return $this->hasMany(TimetableFixedActivity::class);
+    }
+
+    public function timetableExaminations()
+    {
+        return $this->hasMany(TimetableExamination::class);
+    }
+
+    public function rooms()
+    {
+        return $this->hasMany(Room::class);
+    }
+
     public function getSetting($key, $default = null)
     {
         $setting = $this->settings()->where('key', $key)->first();
