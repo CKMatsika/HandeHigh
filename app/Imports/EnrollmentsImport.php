@@ -22,11 +22,19 @@ class EnrollmentsImport implements ToModel, WithHeadingRow, WithValidation
 
     public function model(array $row)
     {
-        // Find or create student
+        $name = preg_split('/\s+/', trim($row['student_name']), 2);
+        $firstName = $name[0];
+        $lastName = $name[1] ?? $name[0];
+
+        // Match students by email within the authenticated school's tenant.
         $student = Student::firstOrCreate(
-            ['email' => $row['email']],
             [
-                'name' => $row['student_name'],
+                'school_id' => $this->schoolId,
+                'email' => $row['email'],
+            ],
+            [
+                'first_name' => $firstName,
+                'last_name' => $lastName,
                 'email' => $row['email'],
                 'phone' => $row['phone'] ?? null,
                 'address' => $row['address'] ?? null,

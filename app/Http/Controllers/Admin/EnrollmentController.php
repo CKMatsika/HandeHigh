@@ -391,8 +391,9 @@ class EnrollmentController extends Controller
             $file = $request->file('file');
             $schoolId = $school->id;
 
-            // Import the file
-            Excel::import(new EnrollmentsImport($schoolId), $file);
+            DB::transaction(function () use ($file, $schoolId) {
+                Excel::import(new EnrollmentsImport($schoolId), $file);
+            });
 
             return redirect()
                 ->route('admin.enrollments.index')
