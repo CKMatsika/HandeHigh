@@ -107,7 +107,7 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('schools', SchoolController::class)->except(['show']);
         });
 
-    Route::middleware(['tenant', 'role:super-admin|school-admin'])
+    Route::middleware(['tenant', 'role:super-admin|school-admin|headmaster|deputy-headmaster|bursar|accountant|accounts-clerk|procurement-officer'])
         ->prefix('admin')
         ->name('admin.')
         ->group(function () {
@@ -233,6 +233,17 @@ Route::middleware(['auth'])->group(function () {
             Route::get('journals/{journalBatch}', [JournalBatchController::class, 'show'])->name('journals.show')->middleware('can:view,journalBatch');
 
             // Accounting - Reports
+            Route::get('reports/dashboard', [FinancialReportController::class, 'dashboard'])->name('reports.finance-dashboard');
+            Route::get('reports/debtors-aging', [FinancialReportController::class, 'debtorsAging'])->name('reports.debtors-aging');
+            Route::get('reports/debtors-aging/export', [FinancialReportController::class, 'exportDebtorsAging'])->name('reports.debtors-aging.export');
+            Route::get('reports/student-statement', [FinancialReportController::class, 'studentStatement'])->name('reports.student-statement');
+            Route::get('reports/fee-collections', [FinancialReportController::class, 'feeCollections'])->name('reports.fee-collections');
+            Route::get('reports/fee-collections/export', [FinancialReportController::class, 'exportFeeCollections'])->name('reports.fee-collections.export');
+            Route::get('reports/outstanding-fees', [FinancialReportController::class, 'outstandingFees'])->name('reports.outstanding-fees');
+            Route::get('reports/outstanding-fees/export', [FinancialReportController::class, 'exportOutstandingFees'])->name('reports.outstanding-fees.export');
+            Route::get('reports/collection-summary', [FinancialReportController::class, 'collectionSummary'])->name('reports.collection-summary');
+            Route::get('reports/income-expenditure', [FinancialReportController::class, 'incomeExpenditure'])->name('reports.income-expenditure');
+            Route::get('reports/cashbook-summary', [FinancialReportController::class, 'cashbookSummary'])->name('reports.cashbook-summary');
             Route::get('reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->name('reports.trial-balance');
             Route::get('reports/income-statement', [FinancialReportController::class, 'incomeStatement'])->name('reports.income-statement');
             Route::get('reports/balance-sheet', [FinancialReportController::class, 'balanceSheet'])->name('reports.balance-sheet');

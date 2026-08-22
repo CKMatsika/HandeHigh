@@ -2,18 +2,265 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DebtorsAgingExport;
+use App\Exports\FeeCollectionsExport;
+use App\Exports\OutstandingFeesExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
-use App\Models\JournalEntry;
-use App\Models\Invoice;
 use App\Models\Budget;
 use App\Models\Department;
+use App\Models\Invoice;
+use App\Models\JournalEntry;
+use App\Models\Student;
+use App\Services\Finance\FinanceReportingService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class FinancialReportController extends Controller
 {
+    protected FinanceReportingService $reportingService;
+
+    public function __construct(FinanceReportingService $reportingService)
+    {
+        $this->reportingService = $reportingService;
+    }
+
+    /**
+     * Management Finance Dashboard
+     */
+    public function dashboard(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $kpis = $this->reportingService->getFinanceDashboardKPIs($school);
+
+        return view('admin.reports.finance-dashboard', compact('kpis'));
+    }
+
+    /**
+     * Debtors Aging Matrix Report
+     */
+    public function debtorsAging(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'academic_year', 'term', 'form', 'class_name', 'student_id',
+            'fee_type', 'min_balance', 'as_of_date', 'group_by', 'start_date', 'end_date'
+        ]);
+
+        $reportData = $this->reportingService->getDebtorsAging($school, $filters);
+
+        return view('admin.reports.debtors-aging', $reportData);
+    }
+
+    /**
+     * Export Debtors Aging to Excel/CSV
+     */
+    public function exportDebtorsAging(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'academic_year', 'term', 'form', 'class_name', 'student_id',
+            'fee_type', 'min_balance', 'as_of_date', 'group_by', 'start_date', 'end_date'
+        ]);
+
+        $reportData = $this->reportingService->getDebtorsAging($school, $filters);
+        $filename = 'debtors-aging-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new DebtorsAgingExport($reportData), $filename);
+    }
+
+    /**
+     * Student Account Statement (Index / Selector)
+     */
+    public function studentStatement(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $students = Student::where('school_id', $school->id)->orderBy('first_name')->get();
+        $selectedStudentId = $request->input('student_id');
+        $statementData = null;
+
+        if ($selectedStudentId) {
+            $student = Student::where('school_id', $school->id)->findOrFail($selectedStudentId);
+            $filters = $request->only(['academic_year', 'term', 'start_date', 'end_date']);
+            $statementData = $this->reportingService->getStudentStatement($school, $student, $filters);
+        }
+
+        $years = Invoice::where('school_id', $school->id)->distinct()->pluck('academic_year')->filter()->sortDesc()->values();
+
+        return view('admin.reports.student-statement', compact('students', 'selectedStudentId', 'statementData', 'years'));
+    }
+
+    /**
+     * Itemized Fee Collections Report
+     */
+    public function feeCollections(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'start_date', 'end_date', 'payment_method', 'form', 'class_name', 'academic_year', 'term'
+        ]);
+
+        $reportData = $this->reportingService->getFeeCollections($school, $filters);
+
+        $availableForms = Student::where('school_id', $school->id)->distinct()->pluck('grade')->filter()->sort()->values();
+        $availableClasses = Student::where('school_id', $school->id)->distinct()->pluck('class_name')->filter()->sort()->values();
+        $availableYears = Invoice::where('school_id', $school->id)->distinct()->pluck('academic_year')->filter()->sortDesc()->values();
+
+        return view('admin.reports.fee-collections', array_merge($reportData, [
+            'available_forms' => $availableForms,
+            'available_classes' => $availableClasses,
+            'available_years' => $availableYears,
+        ]));
+    }
+
+    /**
+     * Export Fee Collections to Excel/CSV
+     */
+    public function exportFeeCollections(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'start_date', 'end_date', 'payment_method', 'form', 'class_name', 'academic_year', 'term'
+        ]);
+
+        $reportData = $this->reportingService->getFeeCollections($school, $filters);
+        $filename = 'fee-collections-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new FeeCollectionsExport($reportData), $filename);
+    }
+
+    /**
+     * Outstanding Fees Register
+     */
+    public function outstandingFees(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'academic_year', 'term', 'form', 'class_name', 'min_balance', 'group_by'
+        ]);
+
+        $reportData = $this->reportingService->getOutstandingFees($school, $filters);
+
+        $availableForms = Student::where('school_id', $school->id)->distinct()->pluck('grade')->filter()->sort()->values();
+        $availableClasses = Student::where('school_id', $school->id)->distinct()->pluck('class_name')->filter()->sort()->values();
+        $availableYears = Invoice::where('school_id', $school->id)->distinct()->pluck('academic_year')->filter()->sortDesc()->values();
+
+        return view('admin.reports.outstanding-fees', array_merge($reportData, [
+            'available_forms' => $availableForms,
+            'available_classes' => $availableClasses,
+            'available_years' => $availableYears,
+        ]));
+    }
+
+    /**
+     * Export Outstanding Fees to Excel/CSV
+     */
+    public function exportOutstandingFees(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'academic_year', 'term', 'form', 'class_name', 'min_balance', 'group_by'
+        ]);
+
+        $reportData = $this->reportingService->getOutstandingFees($school, $filters);
+        $filename = 'outstanding-fees-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new OutstandingFeesExport($reportData), $filename);
+    }
+
+    /**
+     * Fee Collection Periodic Summary
+     */
+    public function collectionSummary(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only(['year']);
+        $reportData = $this->reportingService->getCollectionSummary($school, $filters);
+
+        return view('admin.reports.collection-summary', $reportData);
+    }
+
+    /**
+     * Income and Expenditure Report
+     */
+    public function incomeExpenditure(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only(['start_date', 'end_date']);
+        $reportData = $this->reportingService->getIncomeExpenditure($school, $filters);
+
+        return view('admin.reports.income-statement', array_merge($reportData, [
+            'totalRevenue' => $reportData['total_income'],
+            'totalExpenses' => $reportData['total_expenditure'],
+            'netIncome' => $reportData['net_surplus_deficit'],
+            'revenueAccounts' => $reportData['revenue_accounts'],
+            'expenseAccounts' => $reportData['expense_accounts'],
+            'start' => $reportData['start_date'],
+            'end' => $reportData['end_date'],
+        ]));
+    }
+
+    /**
+     * Cashbook and Bank Accounts Summary
+     */
+    public function cashbookSummary(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $reportData = $this->reportingService->getCashbookBankSummary($school);
+
+        return view('admin.reports.cashbook-summary', $reportData);
+    }
+
+    // ==========================================
+    // Backwards-Compatible Financial Reports
+    // ==========================================
+
     public function trialBalance(Request $request)
     {
         $school = Auth::user()?->school;
@@ -50,30 +297,7 @@ class FinancialReportController extends Controller
 
     public function incomeStatement(Request $request)
     {
-        $school = Auth::user()?->school;
-        if (! $school) {
-            abort(403);
-        }
-
-        $start = $request->input('start_date', now()->startOfYear()->toDateString());
-        $end = $request->input('end_date', now()->toDateString());
-
-        $revenueAccounts = $this->accountsWithBalances($school->id, 'revenue', $start, $end);
-        $expenseAccounts = $this->accountsWithBalances($school->id, 'expense', $start, $end);
-
-        $totalRevenue = $revenueAccounts->sum('balance');
-        $totalExpenses = $expenseAccounts->sum('balance');
-        $netIncome = $totalRevenue - $totalExpenses;
-
-        return view('admin.reports.income-statement', compact(
-            'revenueAccounts',
-            'expenseAccounts',
-            'totalRevenue',
-            'totalExpenses',
-            'netIncome',
-            'start',
-            'end'
-        ));
+        return $this->incomeExpenditure($request);
     }
 
     public function balanceSheet(Request $request)
@@ -230,8 +454,6 @@ class FinancialReportController extends Controller
 
     protected function getDepartmentExpenses(int $schoolId, int $departmentId, int $fiscalYear): float
     {
-        // This would need to be enhanced based on your actual department-account relationships
-        // For now, we'll assume expenses are tagged to departments via cost_center_id
         return JournalEntry::whereHas('batch', function ($q) use ($schoolId, $fiscalYear) {
                 $q->where('school_id', $schoolId)
                   ->whereYear('transaction_date', $fiscalYear);
@@ -243,7 +465,6 @@ class FinancialReportController extends Controller
 
     protected function getDepartmentRevenue(int $schoolId, int $departmentId, int $fiscalYear): float
     {
-        // This would need to be enhanced based on your actual department-account relationships
         return JournalEntry::whereHas('batch', function ($q) use ($schoolId, $fiscalYear) {
                 $q->where('school_id', $schoolId)
                   ->whereYear('transaction_date', $fiscalYear);
@@ -262,7 +483,7 @@ class FinancialReportController extends Controller
 
         $start = $request->input('start_date', now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
-        $groupBy = $request->input('group_by', 'category'); // category, month, account
+        $groupBy = $request->input('group_by', 'category');
 
         $expenseAccounts = Account::where('school_id', $school->id)
             ->where('type', 'expense')
@@ -310,7 +531,7 @@ class FinancialReportController extends Controller
             })->sortByDesc(function ($item) {
                 return $item['total'];
             });
-        } else { // account
+        } else {
             $expenses = $expenseAccounts->map(function ($account) {
                 $total = $account->journalEntries->where('entry_type', 'debit')->sum('amount');
                 
@@ -339,153 +560,12 @@ class FinancialReportController extends Controller
 
     public function studentFeeCollection(Request $request)
     {
-        $school = Auth::user()?->school;
-        if (! $school) {
-            abort(403);
-        }
-
-        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $end = $request->input('end_date', now()->toDateString());
-        $groupBy = $request->input('group_by', 'month'); // month, class, fee_type
-
-        $query = Invoice::where('school_id', $school->id)
-            ->whereBetween('issued_at', [$start, $end])
-            ->with(['student']);
-
-        if ($groupBy === 'class') {
-            $collections = $query->get()
-                ->groupBy(function ($invoice) {
-                    // Get class name through student's enrollment or class_name field
-                    return $invoice->student?->class_name ?? 'Unassigned';
-                })
-                ->map(function ($classInvoices) {
-                    $totalBilled = $classInvoices->sum('total_amount');
-                    $totalCollected = $classInvoices->sum('total_amount') - $classInvoices->sum('balance');
-                    $collectionRate = $totalBilled > 0 ? ($totalCollected / $totalBilled) * 100 : 0;
-                    
-                    return [
-                        'total_billed' => $totalBilled,
-                        'total_collected' => $totalCollected,
-                        'balance' => $totalBilled - $totalCollected,
-                        'collection_rate' => $collectionRate,
-                        'invoice_count' => $classInvoices->count(),
-                    ];
-                });
-        } elseif ($groupBy === 'fee_type') {
-            $collections = $query->get()
-                ->groupBy('type')
-                ->map(function ($typeInvoices) {
-                    $totalBilled = $typeInvoices->sum('total_amount');
-                    $totalCollected = $typeInvoices->sum('total_amount') - $typeInvoices->sum('balance');
-                    $collectionRate = $totalBilled > 0 ? ($totalCollected / $totalBilled) * 100 : 0;
-                    
-                    return [
-                        'total_billed' => $totalBilled,
-                        'total_collected' => $totalCollected,
-                        'balance' => $totalBilled - $totalCollected,
-                        'collection_rate' => $collectionRate,
-                        'invoice_count' => $typeInvoices->count(),
-                    ];
-                });
-        } else { // month
-            $collections = $query->get()
-                ->groupBy(function ($invoice) {
-                    return $invoice->issued_at->format('Y-m');
-                })
-                ->map(function ($monthInvoices) {
-                    $totalBilled = $monthInvoices->sum('total_amount');
-                    $totalCollected = $monthInvoices->sum('total_amount') - $monthInvoices->sum('balance');
-                    $collectionRate = $totalBilled > 0 ? ($totalCollected / $totalBilled) * 100 : 0;
-                    
-                    return [
-                        'total_billed' => $totalBilled,
-                        'total_collected' => $totalCollected,
-                        'balance' => $totalBilled - $totalCollected,
-                        'collection_rate' => $collectionRate,
-                        'invoice_count' => $monthInvoices->count(),
-                    ];
-                });
-        }
-
-        $totalBilled = $collections->sum('total_billed');
-        $totalCollected = $collections->sum('total_collected');
-        $totalBalance = $collections->sum('balance');
-        $overallCollectionRate = $totalBilled > 0 ? ($totalCollected / $totalBilled) * 100 : 0;
-
-        return view('admin.reports.student-fee-collection', compact(
-            'collections',
-            'totalBilled',
-            'totalCollected',
-            'totalBalance',
-            'overallCollectionRate',
-            'groupBy',
-            'start',
-            'end'
-        ));
+        return $this->feeCollections($request);
     }
 
     public function agedReceivables(Request $request)
     {
-        $school = Auth::user()?->school;
-        if (! $school) {
-            abort(403);
-        }
-
-        $asOf = $request->input('date') ? Carbon::parse($request->input('date')) : now();
-        
-        $invoices = Invoice::where('school_id', $school->id)
-            ->where('balance', '>', 0)
-            ->where('status', '!=', 'paid')
-            ->with(['student', 'guardian'])
-            ->get();
-
-        $agedBuckets = [
-            'current' => collect(),
-            '0-30' => collect(),
-            '31-60' => collect(),
-            '61-90' => collect(),
-            '90+' => collect(),
-        ];
-
-        $totalByBucket = [
-            'current' => 0,
-            '0-30' => 0,
-            '31-60' => 0,
-            '61-90' => 0,
-            '90+' => 0,
-        ];
-
-        foreach ($invoices as $invoice) {
-            $dueDate = $invoice->due_date ? Carbon::parse($invoice->due_date) : null;
-            
-            if (!$dueDate) {
-                continue; // Skip invoices without due dates
-            }
-            
-            $daysOverdue = $asOf->greaterThan($dueDate) 
-                ? $asOf->diffInDays($dueDate) 
-                : 0;
-
-            $bucket = match(true) {
-                $daysOverdue <= 0 => 'current',
-                $daysOverdue <= 30 => '0-30',
-                $daysOverdue <= 60 => '31-60',
-                $daysOverdue <= 90 => '61-90',
-                default => '90+',
-            };
-
-            $agedBuckets[$bucket]->push($invoice);
-            $totalByBucket[$bucket] += $invoice->balance;
-        }
-
-        $grandTotal = array_sum($totalByBucket);
-
-        return view('admin.reports.aged-receivables', compact(
-            'agedBuckets',
-            'totalByBucket',
-            'grandTotal',
-            'asOf'
-        ));
+        return $this->debtorsAging($request);
     }
 
     public function generalLedger(Request $request)
@@ -534,17 +614,14 @@ class FinancialReportController extends Controller
         $start = $request->input('start_date', now()->startOfYear()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
 
-        // Cash flows from operating activities
         $operatingInflows = $this->getCashFlowByCategory($school->id, 'operating', 'inflow', $start, $end);
         $operatingOutflows = $this->getCashFlowByCategory($school->id, 'operating', 'outflow', $start, $end);
         $netOperating = $operatingInflows - $operatingOutflows;
 
-        // Cash flows from investing activities
         $investingInflows = $this->getCashFlowByCategory($school->id, 'investing', 'inflow', $start, $end);
         $investingOutflows = $this->getCashFlowByCategory($school->id, 'investing', 'outflow', $start, $end);
         $netInvesting = $investingInflows - $investingOutflows;
 
-        // Cash flows from financing activities
         $financingInflows = $this->getCashFlowByCategory($school->id, 'financing', 'inflow', $start, $end);
         $financingOutflows = $this->getCashFlowByCategory($school->id, 'financing', 'outflow', $start, $end);
         $netFinancing = $financingInflows - $financingOutflows;
@@ -569,7 +646,7 @@ class FinancialReportController extends Controller
 
     protected function getCashFlowByCategory(int $schoolId, string $activity, string $flowType, string $startDate, string $endDate): float
     {
-        $cashAccountCodes = ['1100', '1301', '1302', '1303']; // Cash and bank accounts
+        $cashAccountCodes = ['1100', '1301', '1302', '1303'];
         
         $query = JournalEntry::whereHas('account', function ($q) use ($schoolId, $cashAccountCodes) {
                 $q->where('school_id', $schoolId)

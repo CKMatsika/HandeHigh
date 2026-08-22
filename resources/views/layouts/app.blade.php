@@ -337,8 +337,39 @@
                                 </svg>
                             </button>
                             <div id="reports-menu" class="hidden space-y-1 pl-6">
-                                <!-- Core Financial Reports -->
-                                <div class="text-xs text-slate-500 font-medium px-3 py-1">CORE FINANCIAL REPORTS</div>
+                                <!-- Core Financial & Debtors Reports -->
+                                <div class="text-xs text-slate-500 font-medium px-3 py-1">FINANCE INTELLIGENCE</div>
+                                <a href="{{ route('admin.reports.finance-dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.finance-dashboard') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span>Finance Overview</span>
+                                </a>
+                                <a href="{{ route('admin.reports.debtors-aging') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.debtors-aging') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-red-400"></span>
+                                    <span>Debtors Aging Matrix</span>
+                                </a>
+                                <a href="{{ route('admin.reports.outstanding-fees') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.outstanding-fees') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Outstanding Fees</span>
+                                </a>
+                                <a href="{{ route('admin.reports.fee-collections') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.fee-collections') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Fee Collections Register</span>
+                                </a>
+                                <a href="{{ route('admin.reports.collection-summary') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.collection-summary') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span>Collection Summary & Trends</span>
+                                </a>
+                                <a href="{{ route('admin.reports.student-statement') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.student-statement') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span>Student Account Statements</span>
+                                </a>
+                                <a href="{{ route('admin.reports.cashbook-summary') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.cashbook-summary') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Cashbook & Bank Summary</span>
+                                </a>
+
+                                <!-- Accounting Statements -->
+                                <div class="text-xs text-slate-500 font-medium px-3 py-1 mt-2">ACCOUNTING STATEMENTS</div>
                                 <a href="{{ route('admin.reports.trial-balance') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.trial-balance') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                                     <span>Trial Balance</span>
@@ -351,43 +382,13 @@
                                     <span class="h-2 w-2 rounded-full bg-blue-400"></span>
                                     <span>Balance Sheet</span>
                                 </a>
-                                <a href="{{ route('admin.reports.cash-flow') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.cash-flow') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
-                                    <span>Cash Flow Statement</span>
-                                </a>
-                                <a href="{{ route('admin.reports.general-ledger') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.general-ledger') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-                                    <span>General Ledger</span>
-                                </a>
-
-                                <!-- Management Reports -->
-                                <div class="text-xs text-slate-500 font-medium px-3 py-1 mt-2">MANAGEMENT REPORTS</div>
-                                <a href="{{ route('admin.reports.aged-receivables') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.aged-receivables') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-red-400"></span>
-                                    <span>Aged Receivables</span>
-                                </a>
                                 <a href="{{ route('admin.reports.budget-vs-actual') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.budget-vs-actual') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-orange-400"></span>
                                     <span>Budget vs Actual</span>
                                 </a>
-                                <a href="{{ route('admin.reports.student-fee-collection') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.student-fee-collection') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-green-400"></span>
-                                    <span>Student Fee Collection</span>
-                                </a>
-                                <a href="{{ route('admin.reports.expense-analysis') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.expense-analysis') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-yellow-400"></span>
-                                    <span>Expense Analysis</span>
-                                </a>
-                                <a href="{{ route('admin.reports.departmental-performance') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.departmental-performance') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-pink-400"></span>
-                                    <span>Departmental Performance</span>
-                                </a>
-
-                                <!-- Other Reports -->
-                                <div class="text-xs text-slate-500 font-medium px-3 py-1 mt-2">OTHER REPORTS</div>
                                 <a href="{{ route('admin.reports.debtor-creditor') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.debtor-creditor') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
-                                    <span>Debtor/Creditor Report</span>
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span>Debtor / Creditor Ledger</span>
                                 </a>
                             </div>
                         </div>
