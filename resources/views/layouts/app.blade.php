@@ -37,6 +37,38 @@
                         <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                         <span>Dashboard</span>
                     </a>
+                    @if($user && $user->hasAnyRole(['super-admin', 'headmaster', 'deputy-headmaster', 'accounts-clerk', 'bursar', 'procurement-officer']))
+                        @can('dashboard.headmaster')
+                            <a href="{{ route('admin.dashboard.headmaster') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.headmaster') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                <span>Headmaster Dashboard</span>
+                            </a>
+                        @endcan
+                        @can('dashboard.deputy-headmaster')
+                            <a href="{{ route('admin.dashboard.deputy-headmaster') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.deputy-headmaster') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-green-400"></span>
+                                <span>Deputy Headmaster Dashboard</span>
+                            </a>
+                        @endcan
+                        @can('dashboard.accounts-clerk')
+                            <a href="{{ route('admin.dashboard.accounts-clerk') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.accounts-clerk') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-yellow-400"></span>
+                                <span>Accounts Clerk Dashboard</span>
+                            </a>
+                        @endcan
+                        @can('dashboard.bursar')
+                            <a href="{{ route('admin.dashboard.bursar') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.bursar') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-orange-400"></span>
+                                <span>Bursar Dashboard</span>
+                            </a>
+                        @endcan
+                        @can('dashboard.procurement-officer')
+                            <a href="{{ route('admin.dashboard.procurement-officer') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.procurement-officer') ? 'bg-indigo-500 text-slate-50' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                <span>Procurement Officer Dashboard</span>
+                            </a>
+                        @endcan
+                    @endif
                     @if($user && $user->hasRole(['super-admin','school-admin']))
                         <!-- Academic Management -->
                         <div class="space-y-1">
@@ -417,26 +449,6 @@
                                     </svg>
                                 </button>
                                 <div id="portals-menu" class="hidden space-y-1 pl-6">
-                                    <a href="/admin/dashboard/headmaster" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.headmaster') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-blue-400"></span>
-                                        <span>Headmaster Dashboard</span>
-                                    </a>
-                                    <a href="/admin/dashboard/deputy-headmaster" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.deputy-headmaster') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-green-400"></span>
-                                        <span>Deputy Headmaster Dashboard</span>
-                                    </a>
-                                    <a href="/admin/dashboard/accounts-clerk" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.accounts-clerk') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-yellow-400"></span>
-                                        <span>Accounts Clerk Dashboard</span>
-                                    </a>
-                                    <a href="/admin/dashboard/bursar" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.bursar') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-orange-400"></span>
-                                        <span>Bursar Dashboard</span>
-                                    </a>
-                                    <a href="/admin/dashboard/procurement-officer" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.procurement-officer') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-                                        <span>Procurement Officer Dashboard</span>
-                                    </a>
                                     <a href="{{ route('teacher.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                         <span class="h-2 w-2 rounded-full bg-purple-400"></span>
                                         <span>Teacher Portal</span>

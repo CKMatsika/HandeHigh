@@ -22,6 +22,33 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         $school = $user?->school;
+
+        if (! $school) {
+            abort(403);
+        }
+
+        if (! $user->hasAnyRole(['super-admin', 'school-admin', 'accountant'])) {
+            $dashboardRoutes = [
+                'headmaster' => 'admin.dashboard.headmaster',
+                'deputy-headmaster' => 'admin.dashboard.deputy-headmaster',
+                'accounts-clerk' => 'admin.dashboard.accounts-clerk',
+                'bursar' => 'admin.dashboard.bursar',
+                'procurement-officer' => 'admin.dashboard.procurement-officer',
+                'teacher' => 'teacher.dashboard',
+                'student' => 'student.dashboard',
+                'parent' => 'parent.dashboard',
+                'librarian' => 'librarian.dashboard',
+            ];
+
+            foreach ($dashboardRoutes as $role => $route) {
+                if ($user->hasRole($role)) {
+                    return redirect()->route($route);
+                }
+            }
+
+            abort(403);
+        }
+
         $data = [
             'user' => $user,
             'school' => $school,

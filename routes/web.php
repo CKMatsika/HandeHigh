@@ -85,6 +85,20 @@ Route::middleware(['auth'])->group(function () {
         Route::post('tasks/{task}/cancel', [App\Http\Controllers\Sda\SdaTaskController::class, 'cancel'])->name('tasks.cancel');
     });
 
+    // Role-specific dashboards use their own permission checks.
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::get('dashboard/headmaster', [\App\Http\Controllers\Admin\DashboardController::class, 'headmaster'])
+            ->name('dashboard.headmaster')->middleware('permission:dashboard.headmaster');
+        Route::get('dashboard/deputy-headmaster', [\App\Http\Controllers\Admin\DashboardController::class, 'deputyHeadmaster'])
+            ->name('dashboard.deputy-headmaster')->middleware('permission:dashboard.deputy-headmaster');
+        Route::get('dashboard/accounts-clerk', [\App\Http\Controllers\Admin\DashboardController::class, 'accountsClerk'])
+            ->name('dashboard.accounts-clerk')->middleware('permission:dashboard.accounts-clerk');
+        Route::get('dashboard/bursar', [\App\Http\Controllers\Admin\DashboardController::class, 'bursar'])
+            ->name('dashboard.bursar')->middleware('permission:dashboard.bursar');
+        Route::get('dashboard/procurement-officer', [\App\Http\Controllers\Admin\DashboardController::class, 'procurementOfficer'])
+            ->name('dashboard.procurement-officer')->middleware('permission:dashboard.procurement-officer');
+    });
+
     Route::middleware(['role:super-admin|school-admin'])
         ->prefix('admin')
         ->name('admin.')
@@ -165,13 +179,6 @@ Route::middleware(['auth'])->group(function () {
             Route::post('attendance/student', [AttendanceController::class, 'storeStudent'])->name('attendance.student.store');
             Route::post('attendance/staff', [AttendanceController::class, 'storeStaff'])->name('attendance.staff.store');
             Route::put('attendance/{attendance}', [AttendanceController::class, 'update'])->name('attendance.update');
-
-            // Role-specific Dashboards
-            Route::get('dashboard/headmaster', [\App\Http\Controllers\Admin\DashboardController::class, 'headmaster'])->name('admin.dashboard.headmaster')->middleware('permission:dashboard.headmaster');
-            Route::get('dashboard/deputy-headmaster', [\App\Http\Controllers\Admin\DashboardController::class, 'deputyHeadmaster'])->name('admin.dashboard.deputy-headmaster')->middleware('permission:dashboard.deputy-headmaster');
-            Route::get('dashboard/accounts-clerk', [\App\Http\Controllers\Admin\DashboardController::class, 'accountsClerk'])->name('admin.dashboard.accounts-clerk')->middleware('permission:dashboard.accounts-clerk');
-            Route::get('dashboard/bursar', [\App\Http\Controllers\Admin\DashboardController::class, 'bursar'])->name('admin.dashboard.bursar')->middleware('permission:dashboard.bursar');
-            Route::get('dashboard/procurement-officer', [\App\Http\Controllers\Admin\DashboardController::class, 'procurementOfficer'])->name('admin.dashboard.procurement-officer')->middleware('permission:dashboard.procurement-officer');
 
             // Communication
             Route::get('communication', [CommunicationController::class, 'index'])->name('communication.index');
