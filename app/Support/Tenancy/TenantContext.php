@@ -5,6 +5,7 @@ namespace App\Support\Tenancy;
 use App\Models\School;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use LogicException;
 
 class TenantContext
@@ -53,5 +54,22 @@ class TenantContext
     {
         return $this->hasTenant()
             && (int) $model->getAttribute('school_id') === $this->id();
+    }
+
+    public function resolve(string $modelClass, mixed $value): Model
+    {
+        // Route bindings may execute before the ResolveTenant middleware runs
+        // (SubstituteBindings is priority-hoisted), so fall back to the
+        // authenticated user's school and fail closed without a tenant.
+        $school = $this->school ?? Auth::user()?->school;
+
+        if (! $school) {
+            abort(404);
+        }
+
+        return $modelClass::query()
+            ->where('school_id', $school->getKey())
+            ->where((new $modelClass)->getRouteKeyName(), $value)
+            ->firstOrFail();
     }
 }

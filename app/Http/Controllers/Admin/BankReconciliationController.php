@@ -101,31 +101,29 @@ class BankReconciliationController extends Controller
 
     // Enhanced features
 
-    public function transactions($accountId)
+    public function transactions(Account $account)
     {
         $school = Auth::user()?->school;
         if (! $school) {
             abort(403);
         }
 
-        $account = Account::where('school_id', $school->id)->findOrFail($accountId);
-
         $startDate = request('start_date', now()->subDays(30)->format('Y-m-d'));
         $endDate = request('end_date', now()->format('Y-m-d'));
 
-        $bankTransactions = BankTransaction::where('account_id', $accountId)
+        $bankTransactions = BankTransaction::where('account_id', $account->id)
             ->byDateRange($startDate, $endDate)
             ->with(['cashbookMatches'])
             ->orderBy('transaction_date')
             ->get();
 
-        $cashbookTransactions = CashbookTransaction::where('account_id', $accountId)
+        $cashbookTransactions = CashbookTransaction::where('account_id', $account->id)
             ->byDateRange($startDate, $endDate)
             ->with(['bankMatches'])
             ->orderBy('transaction_date')
             ->get();
 
-        $summary = $this->reconciliationService->getReconciliationSummary($accountId, $startDate, $endDate);
+        $summary = $this->reconciliationService->getReconciliationSummary($account->id, $startDate, $endDate);
 
         return view('admin.bank-reconciliations.transactions', compact(
             'account', 

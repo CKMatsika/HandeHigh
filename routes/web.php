@@ -111,30 +111,37 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('admin')
         ->name('admin.')
         ->group(function () {
-            Route::get('enrollments/{enrollment}/print', [EnrollmentController::class, 'print'])->name('enrollments.print');
+            Route::get('enrollments/{enrollment}/print', [EnrollmentController::class, 'print'])->name('enrollments.print')->middleware('can:view,enrollment');
             Route::get('enrollments/bulk-create', [EnrollmentController::class, 'bulkCreate'])->name('enrollments.bulk-create');
             Route::post('enrollments/bulk-store', [EnrollmentController::class, 'bulkStore'])->name('enrollments.bulk-store');
             Route::get('enrollments/template', [EnrollmentController::class, 'downloadTemplate'])->name('enrollments.template');
-            Route::resource('enrollments', EnrollmentController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+            Route::resource('enrollments', EnrollmentController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update'])
+                ->middlewareFor('show', 'can:view,enrollment')
+                ->middlewareFor(['edit', 'update'], 'can:update,enrollment');
 
             Route::get('fees/print', [FeeStructureController::class, 'print'])->name('fees.print');
-            Route::get('fees/{fee}', [FeeStructureController::class, 'show'])->name('fees.show');
-            Route::resource('fees', FeeStructureController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::get('fees/{fee}', [FeeStructureController::class, 'show'])->name('fees.show')->middleware('can:view,fee');
+            Route::resource('fees', FeeStructureController::class)->only(['index', 'store', 'update', 'destroy'])
+                ->middlewareFor(['update'], 'can:update,fee')
+                ->middlewareFor('destroy', 'can:delete,fee');
 
             Route::get('invoices/bulk-create', [InvoiceController::class, 'bulkCreate'])->name('invoices.bulk.create');
             Route::post('invoices/bulk-store', [InvoiceController::class, 'bulkStore'])->name('invoices.bulk.store');
             Route::get('invoices/auto-generate', [InvoiceController::class, 'autoGenerate'])->name('invoices.auto-generate');
             Route::post('invoices/process-auto-generate', [InvoiceController::class, 'processAutoGenerate'])->name('invoices.process-auto-generate');
-            Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
-            Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
-            Route::resource('invoices', InvoiceController::class);
+            Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print')->middleware('can:view,invoice');
+            Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel')->middleware('can:update,invoice');
+            Route::resource('invoices', InvoiceController::class)
+                ->middlewareFor(['show'], 'can:view,invoice')
+                ->middlewareFor(['edit', 'update'], 'can:update,invoice')
+                ->middlewareFor('destroy', 'can:delete,invoice');
             Route::get('invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('payments.create');
             Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
-            Route::get('students/{student}/statement', [StatementController::class, 'create'])->name('students.statement.create');
-            Route::post('students/{student}/statement', [StatementController::class, 'show'])->name('students.statement.show');
-            Route::get('students/{student}/statement/print', [StatementController::class, 'print'])->name('students.statement.print');
-            Route::get('students/{student}/statement/download', [StatementController::class, 'download'])->name('students.statement.download');
-            Route::post('students/{student}/statement/email', [StatementController::class, 'email'])->name('students.statement.email');
+            Route::get('students/{student}/statement', [StatementController::class, 'create'])->name('students.statement.create')->middleware('can:view,student');
+            Route::post('students/{student}/statement', [StatementController::class, 'show'])->name('students.statement.show')->middleware('can:view,student');
+            Route::get('students/{student}/statement/print', [StatementController::class, 'print'])->name('students.statement.print')->middleware('can:view,student');
+            Route::get('students/{student}/statement/download', [StatementController::class, 'download'])->name('students.statement.download')->middleware('can:view,student');
+            Route::post('students/{student}/statement/email', [StatementController::class, 'email'])->name('students.statement.email')->middleware('can:view,student');
 
             // Student Lifecycle Management
             Route::get('students/get-beds', [AdminStudentController::class, 'getBeds'])->name('students.get-beds');
@@ -166,13 +173,24 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('students/{student}/return-asset/{asset}', [AdminStudentController::class, 'returnAsset'])->name('students.return-asset');
             Route::get('students/{student}/manage-library', [AdminStudentController::class, 'manageLibrary'])->name('students.manage-library');
             Route::post('students/{student}/update-library', [AdminStudentController::class, 'updateLibrary'])->name('students.update-library');
-            Route::resource('students', AdminStudentController::class)->except(['show']);
-            Route::get('students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
+            Route::resource('students', AdminStudentController::class)->except(['show'])
+                ->middlewareFor(['edit', 'update'], 'can:update,student')
+                ->middlewareFor('destroy', 'can:delete,student');
+            Route::get('students/{student}', [AdminStudentController::class, 'show'])->name('students.show')->middleware('can:view,student');
 
-            Route::resource('classes', SchoolClassController::class);
-            Route::resource('subjects', SubjectController::class);
+            Route::resource('classes', SchoolClassController::class)
+                ->middlewareFor('show', 'can:view,class')
+                ->middlewareFor(['edit', 'update'], 'can:update,class')
+                ->middlewareFor('destroy', 'can:delete,class');
+            Route::resource('subjects', SubjectController::class)
+                ->middlewareFor('show', 'can:view,subject')
+                ->middlewareFor(['edit', 'update'], 'can:update,subject')
+                ->middlewareFor('destroy', 'can:delete,subject');
             Route::resource('curricula', CurriculumController::class);
-            Route::resource('teachers', \App\Http\Controllers\Admin\TeacherController::class);
+            Route::resource('teachers', \App\Http\Controllers\Admin\TeacherController::class)
+                ->middlewareFor('show', 'can:view,teacher')
+                ->middlewareFor(['edit', 'update'], 'can:update,teacher')
+                ->middlewareFor('destroy', 'can:delete,teacher');
             Route::post('/teachers/{teacher}/qualifications', [\App\Http\Controllers\Admin\TeacherController::class, 'addQualification'])->name('teachers.qualifications.store');
             Route::delete('/teachers/{teacher}/qualifications/{qualification}', [\App\Http\Controllers\Admin\TeacherController::class, 'deleteQualification'])->name('teachers.qualifications.destroy');
             Route::post('/teachers/{teacher}/subjects', [\App\Http\Controllers\Admin\TeacherController::class, 'assignSubjects'])->name('teachers.subjects.assign');
@@ -185,7 +203,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance.index');
             Route::post('attendance/student', [AttendanceController::class, 'storeStudent'])->name('attendance.student.store');
             Route::post('attendance/staff', [AttendanceController::class, 'storeStaff'])->name('attendance.staff.store');
-            Route::put('attendance/{attendance}', [AttendanceController::class, 'update'])->name('attendance.update');
+            Route::put('attendance/{attendance}', [AttendanceController::class, 'update'])->name('attendance.update')->middleware('can:update,attendance');
 
             // Communication
             Route::get('communication', [CommunicationController::class, 'index'])->name('communication.index');
@@ -204,15 +222,15 @@ Route::middleware(['auth'])->group(function () {
             Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');
             Route::get('accounts/create', [AccountController::class, 'create'])->name('accounts.create');
             Route::post('accounts', [AccountController::class, 'store'])->name('accounts.store');
-            Route::get('accounts/{account}/edit', [AccountController::class, 'edit'])->name('accounts.edit');
-            Route::put('accounts/{account}', [AccountController::class, 'update'])->name('accounts.update');
-            Route::put('accounts/{account}/toggle', [AccountController::class, 'toggle'])->name('accounts.toggle');
+            Route::get('accounts/{account}/edit', [AccountController::class, 'edit'])->name('accounts.edit')->middleware('can:update,account');
+            Route::put('accounts/{account}', [AccountController::class, 'update'])->name('accounts.update')->middleware('can:update,account');
+            Route::put('accounts/{account}/toggle', [AccountController::class, 'toggle'])->name('accounts.toggle')->middleware('can:update,account');
 
             // Accounting - Journals
             Route::get('journals', [JournalBatchController::class, 'index'])->name('journals.index');
             Route::get('journals/create', [JournalBatchController::class, 'create'])->name('journals.create');
             Route::post('journals', [JournalBatchController::class, 'store'])->name('journals.store');
-            Route::get('journals/{journalBatch}', [JournalBatchController::class, 'show'])->name('journals.show');
+            Route::get('journals/{journalBatch}', [JournalBatchController::class, 'show'])->name('journals.show')->middleware('can:view,journalBatch');
 
             // Accounting - Reports
             Route::get('reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->name('reports.trial-balance');
@@ -227,8 +245,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/departmental-performance', [FinancialReportController::class, 'departmentalPerformance'])->name('reports.departmental-performance');
 
             // Bank Reconciliation & Transfers
-            Route::resource('bank-reconciliations', BankReconciliationController::class)->only(['index','create','store','show']);
-            Route::get('bank-reconciliations/transactions/{account}', [BankReconciliationController::class, 'transactions'])->name('bank-reconciliations.transactions');
+            Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index','create','store','show'])
+                ->middlewareFor('show', 'can:view,bankReconciliation');
+            Route::get('bank-reconciliations/transactions/{account}', [BankReconciliationController::class, 'transactions'])->name('bank-reconciliations.transactions')->middleware('can:view,account');
             Route::post('bank-reconciliations/import-statement', [BankReconciliationController::class, 'importStatement'])->name('bank-reconciliations.import-statement');
             Route::post('bank-reconciliations/auto-match', [BankReconciliationController::class, 'autoMatch'])->name('bank-reconciliations.auto-match');
             Route::post('bank-reconciliations/add-bank-charge', [BankReconciliationController::class, 'addBankCharge'])->name('bank-reconciliations.add-bank-charge');
@@ -239,7 +258,9 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('interbank-transfers', InterbankTransferController::class)->only(['index','create','store']);
 
             // Budgets
-            Route::resource('budgets', BudgetController::class)->only(['index','create','store','show','edit','update']);
+            Route::resource('budgets', BudgetController::class)->only(['index','create','store','show','edit','update'])
+                ->middlewareFor('show', 'can:view,budget')
+                ->middlewareFor(['edit', 'update'], 'can:update,budget');
             
             // Budget Workflow
             Route::post('budgets/{budget}/submit', [BudgetController::class, 'submit'])->name('budgets.submit');
@@ -266,7 +287,10 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('customers', CustomerController::class);
 
             // Receipts (non-student)
-            Route::resource('receipts', ReceiptController::class);
+            Route::resource('receipts', ReceiptController::class)
+                ->middlewareFor('show', 'can:view,receipt')
+                ->middlewareFor(['edit', 'update'], 'can:update,receipt')
+                ->middlewareFor('destroy', 'can:delete,receipt');
             Route::get('receipts/{receipt}/print', [ReceiptController::class, 'print'])->name('receipts.print');
             Route::get('receipts/{receipt}/duplicate', [ReceiptController::class, 'duplicate'])->name('receipts.duplicate');
 
@@ -274,7 +298,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/debtor-creditor', [DebtorCreditorReportController::class, 'index'])->name('reports.debtor-creditor');
 
             // Credit Notes
-            Route::resource('credit-notes', CreditNoteController::class)->only(['index','create','store','show','edit','update']);
+            Route::resource('credit-notes', CreditNoteController::class)->parameters(['credit-notes' => 'creditNote'])->only(['index','create','store','show','edit','update']);
             Route::post('credit-notes/{creditNote}/issue', [CreditNoteController::class, 'issue'])->name('credit-notes.issue');
             Route::post('credit-notes/{creditNote}/cancel', [CreditNoteController::class, 'cancel'])->name('credit-notes.cancel');
             Route::post('credit-notes/{creditNote}/apply', [CreditNoteController::class, 'applyToInvoice'])->name('credit-notes.apply');

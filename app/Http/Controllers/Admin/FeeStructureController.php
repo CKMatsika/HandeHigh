@@ -153,7 +153,7 @@ class FeeStructureController extends Controller
             ->with('status', 'Fee item created successfully.');
     }
 
-    public function update(Request $request, string $id)
+    public function update(Request $request, FeeStructure $fee)
     {
         $user = Auth::user();
         $school = $user?->school;
@@ -162,7 +162,9 @@ class FeeStructureController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
-        $fee = FeeStructure::where('school_id', $school->id)->findOrFail($id);
+        if ($fee->school_id !== $school->id) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'academic_year' => ['required', 'string', 'max:20'],
@@ -210,7 +212,7 @@ class FeeStructureController extends Controller
             ->with('status', 'Fee item updated successfully.');
     }
 
-    public function destroy(string $id)
+    public function destroy(FeeStructure $fee)
     {
         $user = Auth::user();
         $school = $user?->school;
@@ -219,7 +221,9 @@ class FeeStructureController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
-        $fee = FeeStructure::where('school_id', $school->id)->findOrFail($id);
+        if ($fee->school_id !== $school->id) {
+            abort(403);
+        }
         $academicYear = $fee->academic_year;
         $term = $fee->term;
 

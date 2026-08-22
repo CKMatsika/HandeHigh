@@ -25,6 +25,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\CurrencyMiddleware::class,
         ]);
+
+        $middleware->appendToPriorityList(
+            [
+                \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+                \Illuminate\Auth\Middleware\Authenticate::class,
+            ],
+            \App\Http\Middleware\ResolveTenant::class
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
