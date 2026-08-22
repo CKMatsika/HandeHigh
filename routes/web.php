@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\JournalBatchController;
 use App\Http\Controllers\Admin\FinancialReportController;
+use App\Http\Controllers\Admin\AcademicReportController;
 use App\Http\Controllers\Admin\BankReconciliationController;
 use App\Http\Controllers\Admin\InterbankTransferController;
 use App\Http\Controllers\Admin\BudgetController;
@@ -254,6 +255,23 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/student-fee-collection', [FinancialReportController::class, 'studentFeeCollection'])->name('reports.student-fee-collection');
             Route::get('reports/expense-analysis', [FinancialReportController::class, 'expenseAnalysis'])->name('reports.expense-analysis');
             Route::get('reports/departmental-performance', [FinancialReportController::class, 'departmentalPerformance'])->name('reports.departmental-performance');
+
+            // Academic, Enrollment, Examination & Attendance Reports
+            Route::get('reports/academic-dashboard', [AcademicReportController::class, 'academicDashboard'])->name('reports.academic-dashboard');
+            Route::get('reports/enrollment-summary', [AcademicReportController::class, 'enrollmentSummary'])->name('reports.enrollment-summary');
+            Route::get('reports/enrollment-summary/export', [AcademicReportController::class, 'exportEnrollmentSummary'])->name('reports.enrollment-summary.export');
+            Route::get('reports/enrollment-by-class', [AcademicReportController::class, 'enrollmentByClass'])->name('reports.enrollment-by-class');
+            Route::get('reports/student-register', [AcademicReportController::class, 'studentRegister'])->name('reports.student-register');
+            Route::get('reports/student-register/export', [AcademicReportController::class, 'exportStudentRegister'])->name('reports.student-register.export');
+            Route::get('reports/academic-performance', [AcademicReportController::class, 'academicPerformance'])->name('reports.academic-performance');
+            Route::get('reports/subject-performance', [AcademicReportController::class, 'subjectPerformance'])->name('reports.subject-performance');
+            Route::get('reports/subject-performance/export', [AcademicReportController::class, 'exportSubjectPerformance'])->name('reports.subject-performance.export');
+            Route::get('reports/student-academic-profile', [AcademicReportController::class, 'studentAcademicProfile'])->name('reports.student-academic-profile');
+            Route::get('reports/attendance-summary', [AcademicReportController::class, 'attendanceSummary'])->name('reports.attendance-summary');
+            Route::get('reports/attendance-register', [AcademicReportController::class, 'attendanceRegister'])->name('reports.attendance-register');
+            Route::get('reports/attendance-register/export', [AcademicReportController::class, 'exportAttendanceRegister'])->name('reports.attendance-register.export');
+            Route::get('reports/exam-results', [AcademicReportController::class, 'examResultsRegister'])->name('reports.exam-results');
+            Route::get('reports/exam-results/export', [AcademicReportController::class, 'exportExamResultsRegister'])->name('reports.exam-results.export');
 
             // Bank Reconciliation & Transfers
             Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index','create','store','show'])

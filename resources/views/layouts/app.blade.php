@@ -337,8 +337,47 @@
                                 </svg>
                             </button>
                             <div id="reports-menu" class="hidden space-y-1 pl-6">
+                                <!-- Academic & Operations Intelligence -->
+                                <div class="text-xs text-slate-500 font-medium px-3 py-1">ACADEMIC & OPERATIONS</div>
+                                <a href="{{ route('admin.reports.academic-dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.academic-dashboard') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                    <span>Academic Dashboard</span>
+                                </a>
+                                <a href="{{ route('admin.reports.enrollment-summary') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.enrollment-summary') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span>Enrollment Summary</span>
+                                </a>
+                                <a href="{{ route('admin.reports.enrollment-by-class') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.enrollment-by-class') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-sky-400"></span>
+                                    <span>Enrollment by Class</span>
+                                </a>
+                                <a href="{{ route('admin.reports.student-register') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.student-register') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span>Student Master Register</span>
+                                </a>
+                                <a href="{{ route('admin.reports.academic-performance') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.academic-performance') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Performance Summary</span>
+                                </a>
+                                <a href="{{ route('admin.reports.subject-performance') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.subject-performance') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span>Subject Performance</span>
+                                </a>
+                                <a href="{{ route('admin.reports.exam-results') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.exam-results') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Exam Results Register</span>
+                                </a>
+                                <a href="{{ route('admin.reports.attendance-summary') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.attendance-summary') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-green-400"></span>
+                                    <span>Attendance Summary</span>
+                                </a>
+                                <a href="{{ route('admin.reports.attendance-register') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.attendance-register') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-lime-400"></span>
+                                    <span>Attendance Register</span>
+                                </a>
+
                                 <!-- Core Financial & Debtors Reports -->
-                                <div class="text-xs text-slate-500 font-medium px-3 py-1">FINANCE INTELLIGENCE</div>
+                                <div class="text-xs text-slate-500 font-medium px-3 py-1 mt-2">FINANCE INTELLIGENCE</div>
                                 <a href="{{ route('admin.reports.finance-dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.finance-dashboard') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-blue-400"></span>
                                     <span>Finance Overview</span>
