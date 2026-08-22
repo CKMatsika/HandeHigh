@@ -31,6 +31,7 @@ class User extends Authenticatable
         'phone',
         'address',
         'metadata',
+        'is_active',
         'is_sda_member',
         'sda_positions_summary',
     ];
@@ -56,6 +57,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'metadata' => 'array',
+            'is_active' => 'boolean',
             'is_sda_member' => 'boolean',
         ];
     }

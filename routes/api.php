@@ -4,7 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AIController;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     // AI Service Endpoints
     Route::prefix('ai')->group(function () {
         Route::post('/student-performance-prediction', [AIController::class, 'studentPerformancePrediction']);
@@ -17,4 +17,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::get('/user', function (Request $request) {
     return $request->user();
-})->middleware('auth:sanctum');
+})->middleware(['auth:sanctum', 'tenant']);

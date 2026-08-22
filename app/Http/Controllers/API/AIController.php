@@ -11,26 +11,28 @@ use App\Models\Result;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Assessment;
+use App\Rules\TenantExists;
+use App\Support\Tenancy\TenantContext;
 use Carbon\Carbon;
 
 class AIController extends Controller
 {
     public function studentPerformancePrediction(Request $request)
     {
+        $schoolId = $this->resolveSchoolId($request);
+
         $request->validate([
-            'school_id' => 'required|exists:schools,id',
-            'student_ids' => 'array',
-            'student_ids.*' => 'exists:students,id',
+            'student_ids' => 'nullable|array',
+            'student_ids.*' => ['required', 'integer', TenantExists::make('students')],
         ]);
 
-        $schoolId = $request->school_id;
         $studentIds = $request->student_ids ?? [];
 
         if (empty($studentIds)) {
             $students = Student::where('school_id', $schoolId)->get();
         } else {
-            $students = Student::whereIn('id', $studentIds)
-                ->where('school_id', $schoolId)
+            $students = Student::where('school_id', $schoolId)
+                ->whereIn('id', $studentIds)
                 ->get();
         }
 
@@ -55,14 +57,14 @@ class AIController extends Controller
 
     public function timetableGeneration(Request $request)
     {
+        $schoolId = $this->resolveSchoolId($request);
+
         $request->validate([
-            'school_id' => 'required|exists:schools,id',
             'term' => 'required|string',
             'academic_year' => 'required|string',
-            'constraints' => 'array',
+            'constraints' => 'nullable|array',
         ]);
 
-        $schoolId = $request->school_id;
         $constraints = $request->constraints ?? [];
 
         $timetable = $this->generateOptimalTimetable($schoolId, $constraints);
@@ -76,13 +78,14 @@ class AIController extends Controller
 
     public function academicRecommendations(Request $request)
     {
+        $schoolId = $this->resolveSchoolId($request);
+
         $request->validate([
-            'school_id' => 'required|exists:schools,id',
-            'student_id' => 'required|exists:students,id',
+            'student_id' => ['required', 'integer', TenantExists::make('students')],
             'subject_area' => 'nullable|string',
         ]);
 
-        $student = Student::findOrFail($request->student_id);
+        $student = Student::where('school_id', $schoolId)->findOrFail($request->student_id);
         
         $recommendations = [
             'academic_focus' => $this->recommendAcademicFocus($student),
@@ -93,7 +96,7 @@ class AIController extends Controller
         ];
 
         return response()->json([
-            'student' => $student->load(['results.assessment.subject']),
+            'student' => $student->load(['results.subject']),
             'recommendations' => $recommendations,
             'generated_at' => now(),
         ]);
@@ -101,12 +104,12 @@ class AIController extends Controller
 
     public function financialForecasting(Request $request)
     {
+        $schoolId = $this->resolveSchoolId($request);
+
         $request->validate([
-            'school_id' => 'required|exists:schools,id',
-            'forecast_months' => 'integer|min:1|max:24',
+            'forecast_months' => 'nullable|integer|min:1|max:24',
         ]);
 
-        $schoolId = $request->school_id;
         $months = $request->forecast_months ?? 12;
 
         $forecast = [
@@ -127,17 +130,18 @@ class AIController extends Controller
 
     public function chatbotResponse(Request $request)
     {
+        $schoolId = $this->resolveSchoolId($request);
+
         $request->validate([
             'message' => 'required|string',
             'user_type' => 'required|in:student,parent,teacher,admin',
-            'school_id' => 'required|exists:schools,id',
             'context' => 'nullable|array',
         ]);
 
         $response = $this->generateChatbotResponse(
             $request->message,
             $request->user_type,
-            $request->school_id,
+            $schoolId,
             $request->context ?? []
         );
 
@@ -149,14 +153,22 @@ class AIController extends Controller
         ]);
     }
 
+    protected function resolveSchoolId(Request $request): int
+    {
+        $tenant = app(TenantContext::class);
+        $schoolId = $tenant->hasTenant() ? $tenant->id() : $request->user()?->school_id;
+
+        if (! $schoolId) {
+            abort(403, 'Tenant context not established.');
+        }
+
+        return (int) $schoolId;
+    }
+
     // AI Service Methods
     protected function calculateStudentGPA($student)
     {
-        return Result::where('student_id', $student->id)
-            ->whereHas('assessment', function($query) {
-                $query->where('term', Carbon::now()->term);
-            })
-            ->avg('score') ?? 0;
+        return (float) (Result::where('student_id', $student->id)->avg('total_score') ?? 0);
     }
 
     protected function predictGPA($student)
@@ -254,13 +266,13 @@ class AIController extends Controller
 
     protected function recommendAcademicFocus($student)
     {
-        $results = $student->results()->with('assessment.subject')->get();
-        $weakSubjects = $results->where('score', '<', 60)->pluck('assessment.subject.name');
-        $strongSubjects = $results->where('score', '>=', 80)->pluck('assessment.subject.name');
+        $results = $student->results()->with('subject')->get();
+        $weakSubjects = $results->where('total_score', '<', 60)->pluck('subject.name')->filter();
+        $strongSubjects = $results->where('total_score', '>=', 80)->pluck('subject.name')->filter();
         
         return [
-            'strengthen' => $weakSubjects->toArray(),
-            'leverage' => $strongSubjects->toArray(),
+            'strengthen' => $weakSubjects->values()->toArray(),
+            'leverage' => $strongSubjects->values()->toArray(),
         ];
     }
 
