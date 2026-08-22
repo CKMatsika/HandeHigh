@@ -9,7 +9,6 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Permission\Models\Role;
@@ -199,21 +198,16 @@ class EnrollmentImportTest extends TestCase
 
     public function test_template_generation_returns_an_xlsx_download(): void
     {
-        Storage::fake('local');
-        $template = storage_path('app/templates/bulk-enrollment-template.xlsx');
-        @unlink($template);
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.enrollments.template'));
 
-        try {
-            $response = $this->actingAs($this->admin)
-                ->get(route('admin.enrollments.template'));
+        $response->assertOk();
+        $this->assertSame(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            $response->headers->get('content-type')
+        );
 
-            $response->assertOk();
-            $this->assertSame(
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                $response->headers->get('content-type')
-            );
-        } finally {
-            @unlink($template);
-        }
+        $path = $response->baseResponse->getFile()->getPathname();
+        @unlink($path);
     }
 }
