@@ -45,10 +45,10 @@ Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('tenant');
 
     // SDA Portal Routes (for committee members)
-    Route::middleware(['auth'])->prefix('sda')->name('sda.')->group(function () {
+    Route::middleware(['auth', 'tenant'])->prefix('sda')->name('sda.')->group(function () {
         // Main SDA dashboard - redirects based on role
         Route::get('/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'dashboard'])->name('dashboard');
         
@@ -86,7 +86,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Role-specific dashboards use their own permission checks.
-    Route::prefix('admin')->name('admin.')->group(function () {
+    Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('dashboard/headmaster', [\App\Http\Controllers\Admin\DashboardController::class, 'headmaster'])
             ->name('dashboard.headmaster')->middleware('permission:dashboard.headmaster');
         Route::get('dashboard/deputy-headmaster', [\App\Http\Controllers\Admin\DashboardController::class, 'deputyHeadmaster'])
@@ -99,11 +99,18 @@ Route::middleware(['auth'])->group(function () {
             ->name('dashboard.procurement-officer')->middleware('permission:dashboard.procurement-officer');
     });
 
-    Route::middleware(['role:super-admin|school-admin'])
+    // School provisioning is system-level and requires a super-admin tenant exemption.
+    Route::middleware(['role:super-admin'])
         ->prefix('admin')
         ->name('admin.')
         ->group(function () {
             Route::resource('schools', SchoolController::class)->except(['show']);
+        });
+
+    Route::middleware(['tenant', 'role:super-admin|school-admin'])
+        ->prefix('admin')
+        ->name('admin.')
+        ->group(function () {
             Route::get('enrollments/{enrollment}/print', [EnrollmentController::class, 'print'])->name('enrollments.print');
             Route::get('enrollments/bulk-create', [EnrollmentController::class, 'bulkCreate'])->name('enrollments.bulk-create');
             Route::post('enrollments/bulk-store', [EnrollmentController::class, 'bulkStore'])->name('enrollments.bulk-store');
@@ -497,7 +504,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/schemes-of-work/{schemeOfWork}/reject', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'reject'])->name('schemes-of-work.reject');
         });
 
-        Route::middleware(['role:teacher|super-admin'])
+        Route::middleware(['auth', 'tenant', 'role:teacher|super-admin'])
             ->prefix('teacher')
             ->name('teacher.')
             ->group(function () {
@@ -535,7 +542,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('/flash-cards/generate', [\App\Http\Controllers\Portal\FlashCardController::class, 'generate'])->name('flash-cards.generate');
             });
 
-        Route::middleware(['role:student|super-admin'])
+        Route::middleware(['auth', 'tenant', 'role:student|super-admin'])
             ->prefix('student')
             ->name('student.')
             ->group(function () {
@@ -555,7 +562,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('/flash-cards/session/{session}/complete', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'completeSession'])->name('flash-cards.complete-session');
             });
 
-        Route::middleware(['role:parent|super-admin'])
+        Route::middleware(['auth', 'tenant', 'role:parent|super-admin'])
             ->prefix('parent')
             ->name('parent.')
             ->group(function () {
@@ -566,7 +573,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/students/{student}/statement', [ParentController::class, 'studentStatement'])->name('students.statement');
             });
 
-        Route::middleware(['role:librarian|super-admin'])
+        Route::middleware(['auth', 'tenant', 'role:librarian|super-admin'])
             ->prefix('librarian')
             ->name('librarian.')
             ->group(function () {

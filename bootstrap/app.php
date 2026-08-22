@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => \App\Http\Middleware\AuditMiddleware::class,
             'smart.rules' => \App\Http\Middleware\SmartRulesMiddleware::class,
             'currency' => \App\Http\Middleware\CurrencyMiddleware::class,
+            'tenant' => \App\Http\Middleware\ResolveTenant::class,
         ]);
         
         // Register currency middleware globally for web routes
