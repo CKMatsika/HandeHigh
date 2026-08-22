@@ -11,6 +11,7 @@ use App\Models\StaffPosition;
 use App\Models\StaffPositionAssignment;
 use App\Models\SchoolClass;
 use App\Models\Curriculum;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -83,9 +84,9 @@ class TeacherController extends Controller
             'employee_id' => ['nullable', 'string', 'max:50', 'unique:teachers,employee_id'],
             'password' => ['required', Password::defaults()],
             'subjects' => ['nullable', 'array'],
-            'subjects.*' => ['exists:subjects,id'],
+            'subjects.*' => [TenantExists::make('subjects')],
             'positions' => ['nullable', 'array'],
-            'positions.*' => ['exists:staff_positions,id'],
+            'positions.*' => [TenantExists::make('staff_positions')],
         ]);
 
         try {
@@ -216,7 +217,7 @@ class TeacherController extends Controller
             'employee_id' => ['nullable', 'string', 'max:50', 'unique:teachers,employee_id,' . $teacher->id],
             'password' => ['nullable', Password::defaults()],
             'subjects' => ['nullable', 'array'],
-            'subjects.*' => ['exists:subjects,id'],
+            'subjects.*' => [TenantExists::make('subjects')],
         ]);
 
         try {
@@ -342,7 +343,7 @@ class TeacherController extends Controller
 
         $validated = $request->validate([
             'subjects' => 'required|array',
-            'subjects.*' => 'exists:subjects,id',
+            'subjects.*' => [TenantExists::make('subjects')],
         ]);
 
         $teacher->subjects()->sync($validated['subjects']);
@@ -355,7 +356,7 @@ class TeacherController extends Controller
         if (!$school || $teacher->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'staff_position_id' => 'required|exists:staff_positions,id',
+            'staff_position_id' => ['required', TenantExists::make('staff_positions')],
             'target_id' => 'nullable|string',
             'target_type' => 'nullable|string',
             'start_date' => 'nullable|date',
@@ -395,7 +396,7 @@ class TeacherController extends Controller
         if (!$school || $teacher->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'class_id' => 'required|exists:classes,id',
+            'class_id' => ['required', TenantExists::make('classes')],
         ]);
 
         $class = SchoolClass::where('school_id', $school->id)->findOrFail($validated['class_id']);
@@ -419,8 +420,8 @@ class TeacherController extends Controller
         if (!$school || $teacher->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'class_id' => 'required|exists:classes,id',
-            'subject_id' => 'required|exists:subjects,id',
+            'class_id' => ['required', TenantExists::make('classes')],
+            'subject_id' => ['required', TenantExists::make('subjects')],
             'weekly_periods' => 'nullable|integer|min:1|max:40',
             'term' => 'nullable|string|max:50',
             'academic_year' => 'nullable|string|max:20',

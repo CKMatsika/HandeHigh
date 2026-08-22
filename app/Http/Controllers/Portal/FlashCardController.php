@@ -8,6 +8,7 @@ use App\Models\FlashCardItem;
 use App\Models\Teacher;
 use App\Models\Subject;
 use App\Models\SchoolClass;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -59,8 +60,8 @@ class FlashCardController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'subject_id' => 'nullable|exists:subjects,id',
-            'school_class_id' => 'nullable|exists:classes,id',
+            'subject_id' => ['nullable', TenantExists::make('subjects')],
+            'school_class_id' => ['nullable', TenantExists::make('classes')],
             'items' => 'required|array|min:1',
             'items.*.front_text' => 'required|string|max:500',
             'items.*.back_text' => 'required|string|max:500',
@@ -144,8 +145,8 @@ class FlashCardController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'subject_id' => 'nullable|exists:subjects,id',
-            'school_class_id' => 'nullable|exists:classes,id',
+            'subject_id' => ['nullable', TenantExists::make('subjects')],
+            'school_class_id' => ['nullable', TenantExists::make('classes')],
             'items' => 'required|array|min:1',
             'items.*.front_text' => 'required|string|max:500',
             'items.*.back_text' => 'required|string|max:500',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Student;
 use App\Models\Staff;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -83,7 +84,7 @@ class AttendanceController extends Controller
         }
 
         $validated = $request->validate([
-            'student_id' => ['required', 'exists:students,id'],
+            'student_id' => ['required', TenantExists::make('students')],
             'attendance_date' => ['required', 'date'],
             'status' => ['required', Rule::in($this->statuses())],
             'check_in_time' => ['nullable', 'date_format:H:i'],
@@ -127,7 +128,7 @@ class AttendanceController extends Controller
         }
 
         $validated = $request->validate([
-            'staff_id' => ['required', 'exists:staff,id'],
+            'staff_id' => ['required', TenantExists::make('staff')],
             'attendance_date' => ['required', 'date'],
             'status' => ['required', Rule::in($this->statuses())],
             'check_in_time' => ['nullable', 'date_format:H:i'],

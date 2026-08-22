@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Curriculum;
 use App\Models\SchoolClass;
 use App\Models\Subject;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -67,9 +68,9 @@ class CurriculumController extends Controller
         }
 
         $validated = $request->validate([
-            'class_id' => ['required', 'exists:classes,id'],
-            'subject_id' => ['required', 'exists:subjects,id'],
-            'teacher_id' => ['nullable', 'exists:users,id'],
+            'class_id' => ['required', TenantExists::make('classes')],
+            'subject_id' => ['required', TenantExists::make('subjects')],
+            'teacher_id' => ['nullable', TenantExists::make('users')],
             'academic_year' => ['required', 'string', 'max:20'],
             'term' => ['nullable', 'string', 'max:50'],
             'weekly_periods' => ['required', 'integer', 'min:1', 'max:20'],
@@ -134,9 +135,9 @@ class CurriculumController extends Controller
         }
 
         $validated = $request->validate([
-            'class_id' => ['required', 'exists:classes,id'],
-            'subject_id' => ['required', 'exists:subjects,id'],
-            'teacher_id' => ['nullable', 'exists:users,id'],
+            'class_id' => ['required', TenantExists::make('classes')],
+            'subject_id' => ['required', TenantExists::make('subjects')],
+            'teacher_id' => ['nullable', TenantExists::make('users')],
             'academic_year' => ['required', 'string', 'max:20'],
             'term' => ['nullable', 'string', 'max:50'],
             'weekly_periods' => ['required', 'integer', 'min:1', 'max:20'],

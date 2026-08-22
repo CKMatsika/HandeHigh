@@ -8,6 +8,7 @@ use App\Models\SdaMeeting;
 use App\Models\SdaMeetingAttendance;
 use App\Models\SdaMeetingMinute;
 use App\Models\User;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 
 class SdaMeetingController extends Controller
@@ -184,7 +185,7 @@ class SdaMeetingController extends Controller
     {
         $validated = $request->validate([
             'attendances' => 'required|array',
-            'attendances.*.user_id' => 'required|exists:users,id',
+            'attendances.*.user_id' => ['required', TenantExists::make('users')],
             'attendances.*.attendance_status' => 'required|in:present,absent,apologized,late',
             'attendances.*.arrival_time' => 'nullable|date_format:H:i',
             'attendances.*.apology_reason' => 'nullable|string|max:255',

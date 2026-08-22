@@ -8,6 +8,7 @@ use App\Models\CareerGuidanceAssessment;
 use App\Models\StudentCareerInterest;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Rules\TenantExists;
 use App\Services\CareerGuidanceEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -42,7 +43,7 @@ class CareerGuidanceController extends Controller
         if (!$school) abort(403);
 
         $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
+            'student_id' => ['required', TenantExists::make('students')],
         ]);
 
         $student = Student::where('school_id', $school->id)->findOrFail($validated['student_id']);
@@ -99,7 +100,7 @@ class CareerGuidanceController extends Controller
             'skills' => 'nullable|string',
             'outlook' => 'nullable|string',
             'subject_requirements' => 'nullable|array',
-            'subject_requirements.*.subject_id' => 'required|exists:subjects,id',
+            'subject_requirements.*.subject_id' => ['required', TenantExists::make('subjects')],
             'subject_requirements.*.subject_name' => 'required|string',
             'subject_requirements.*.min_score' => 'required|numeric|min:0|max:100',
         ]);
@@ -134,7 +135,7 @@ class CareerGuidanceController extends Controller
             'outlook' => 'nullable|string',
             'is_active' => 'boolean',
             'subject_requirements' => 'nullable|array',
-            'subject_requirements.*.subject_id' => 'required|exists:subjects,id',
+            'subject_requirements.*.subject_id' => ['required', TenantExists::make('subjects')],
             'subject_requirements.*.subject_name' => 'required|string',
             'subject_requirements.*.min_score' => 'required|numeric|min:0|max:100',
         ]);

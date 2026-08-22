@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\Enrollment;
 use App\Models\Subject;
+use App\Rules\TenantExists;
 use App\Models\SchoolClass;
 use App\Models\SchoolHouse;
 use App\Models\Dormitory;
@@ -115,11 +116,11 @@ class StudentController extends Controller
             'registration_number' => 'nullable|string|unique:students,registration_number,NULL,id,school_id,' . $school->id,
             'grade' => 'nullable|string',
             'class_name' => 'nullable|string',
-            'house_id' => 'nullable|exists:school_houses,id',
+            'house_id' => ['nullable', TenantExists::make('school_houses')],
             'is_boarding' => 'boolean',
             'has_transport' => 'boolean',
             'guardian_ids' => 'nullable|array',
-            'guardian_ids.*' => 'exists:guardians,id',
+            'guardian_ids.*' => [TenantExists::make('guardians')],
         ]);
 
         $guardianIds = $validated['guardian_ids'] ?? [];
@@ -130,11 +131,14 @@ class StudentController extends Controller
         $validated['is_boarding'] = $request->boolean('is_boarding');
         $validated['has_transport'] = $request->boolean('has_transport');
 
-        $student = Student::create($validated);
+        $student = DB::transaction(function () use ($validated, $guardianIds) {
+            $student = Student::create($validated);
 
-        if (!empty($guardianIds)) {
-            $student->guardians()->attach($guardianIds);
-        }
+            if (!empty($guardianIds)) {
+                $student->guardians()->attach($guardianIds);
+            }
+            return $student;
+        });
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', 'Student profile created successfully.');
@@ -169,11 +173,12 @@ class StudentController extends Controller
             'registration_number' => 'nullable|string|unique:students,registration_number,' . $student->id . ',id,school_id,' . $school->id,
             'grade' => 'nullable|string',
             'class_name' => 'nullable|string',
-            'house_id' => 'nullable|exists:school_houses,id',
+            'house_id' => ['nullable', TenantExists::make('school_houses')],
             'is_boarding' => 'boolean',
             'has_transport' => 'boolean',
             'status' => 'nullable|string|in:active,inactive,graduated,transferred,expelled',
             'guardian_ids' => 'nullable|array',
+            'guardian_ids.*' => [TenantExists::make('guardians')],
         ]);
 
         $guardianIds = $validated['guardian_ids'] ?? [];
@@ -182,8 +187,10 @@ class StudentController extends Controller
         $validated['is_boarding'] = $request->boolean('is_boarding');
         $validated['has_transport'] = $request->boolean('has_transport');
 
-        $student->update($validated);
-        $student->guardians()->sync($guardianIds);
+        DB::transaction(function () use ($student, $validated, $guardianIds) {
+            $student->update($validated);
+            $student->guardians()->sync($guardianIds);
+        });
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', 'Student profile updated successfully.');
@@ -227,7 +234,7 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'subject_id' => 'required|exists:subjects,id',
+            'subject_id' => ['required', TenantExists::make('subjects')],
             'academic_year' => 'required|string',
             'term' => 'nullable|string',
         ]);
@@ -248,7 +255,7 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $subject->school_id !== $school->id) abort(403);
 
         $student->subjects()->detach($subject->id);
 
@@ -433,7 +440,7 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'house_id' => 'required|exists:school_houses,id',
+            'house_id' => ['required', TenantExists::make('school_houses')],
         ]);
 
         $student->update(['house_id' => $validated['house_id']]);
@@ -465,25 +472,27 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'bed_id' => 'required|exists:beds,id',
+            'bed_id' => ['required', TenantExists::make('beds')],
             'academic_year' => 'required|string',
             'term' => 'required|string',
         ]);
 
-        $student->update(['is_boarding' => true]);
+        DB::transaction(function () use ($student, $validated) {
+            $student->update(['is_boarding' => true]);
 
-        if ($student->currentBedAssignment) {
-            $student->currentBedAssignment->update(['is_current' => false, 'released_date' => now()]);
-        }
+            if ($student->currentBedAssignment) {
+                $student->currentBedAssignment->update(['is_current' => false, 'released_date' => now()]);
+            }
 
-        BedAssignment::create([
-            'bed_id' => $validated['bed_id'],
-            'student_id' => $student->id,
-            'academic_year' => $validated['academic_year'],
-            'term' => $validated['term'],
-            'assigned_date' => now(),
-            'is_current' => true,
-        ]);
+            BedAssignment::create([
+                'bed_id' => $validated['bed_id'],
+                'student_id' => $student->id,
+                'academic_year' => $validated['academic_year'],
+                'term' => $validated['term'],
+                'assigned_date' => now(),
+                'is_current' => true,
+            ]);
+        });
 
         return redirect()->route('admin.students.manage-boarding', $student)
             ->with('success', 'Bed assigned successfully.');
@@ -559,7 +568,7 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $club->student_id !== $student->user_id) abort(403);
 
         $club->update(['is_active' => false, 'left_date' => now()]);
 
@@ -608,7 +617,7 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $sport->student_id !== $student->user_id) abort(403);
 
         $sport->update(['is_active' => false, 'ended_date' => now()]);
 
@@ -656,7 +665,7 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $position->student_id !== $student->user_id) abort(403);
 
         $position->update(['is_active' => false, 'end_date' => now()]);
 
@@ -688,7 +697,7 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'school_asset_id' => 'required|exists:school_assets,id',
+            'school_asset_id' => ['required', TenantExists::make('school_assets')],
             'quantity' => 'required|integer|min:1',
             'allocated_date' => 'required|date',
             'condition_at_issue' => 'nullable|string|in:new,good,fair,poor',
@@ -700,17 +709,19 @@ class StudentController extends Controller
             return back()->with('error', 'Insufficient asset availability.');
         }
 
-        StudentAsset::create([
-            'student_id' => $student->id,
-            'school_asset_id' => $validated['school_asset_id'],
-            'quantity' => $validated['quantity'],
-            'allocated_date' => $validated['allocated_date'],
-            'condition_at_issue' => $validated['condition_at_issue'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'status' => 'allocated',
-        ]);
+        DB::transaction(function () use ($student, $validated, $asset) {
+            StudentAsset::create([
+                'student_id' => $student->id,
+                'school_asset_id' => $validated['school_asset_id'],
+                'quantity' => $validated['quantity'],
+                'allocated_date' => $validated['allocated_date'],
+                'condition_at_issue' => $validated['condition_at_issue'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'status' => 'allocated',
+            ]);
 
-        $asset->decrement('available_quantity', $validated['quantity']);
+            $asset->decrement('available_quantity', $validated['quantity']);
+        });
 
         return redirect()->route('admin.students.manage-assets', $student)
             ->with('success', 'Asset allocated successfully.');
@@ -720,15 +731,20 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $asset->student_id !== $student->id) abort(403);
+        if ($asset->status === 'returned') {
+            return back()->with('error', 'Asset has already been returned.');
+        }
 
-        $asset->update([
-            'status' => 'returned',
-            'returned_date' => now(),
-            'condition_at_return' => request('condition_at_return', 'good'),
-        ]);
+        DB::transaction(function () use ($asset) {
+            $asset->update([
+                'status' => 'returned',
+                'returned_date' => now(),
+                'condition_at_return' => request('condition_at_return', 'good'),
+            ]);
 
-        $asset->schoolAsset->increment('available_quantity', $asset->quantity);
+            $asset->schoolAsset?->increment('available_quantity', $asset->quantity);
+        });
 
         return redirect()->route('admin.students.manage-assets', $student)
             ->with('success', 'Asset returned successfully.');

@@ -224,6 +224,11 @@ class CommunicationController extends Controller
             return back()->withErrors(['participants' => 'Please select at least one participant.']);
         }
 
+        $validCount = User::where('school_id', $school->id)->whereIn('id', $participants)->count();
+        if ($validCount !== count(array_unique($participants))) {
+            return back()->withErrors(['participants' => 'The selected participants are invalid.']);
+        }
+
         if ($request->type === 'direct' && count($participants) !== 1) {
             return back()->withErrors(['participants' => 'Direct conversations can only have one other participant.']);
         }
@@ -244,20 +249,24 @@ class CommunicationController extends Controller
             }
         }
 
-        $conversation = Conversation::create([
-            'school_id' => $school->id,
-            'name' => $request->name,
-            'type' => $request->type,
-            'created_by' => $user->id,
-        ]);
-
-        $allParticipants = array_merge([$user->id], $participants);
-        foreach ($allParticipants as $participantId) {
-            $conversation->participants()->attach($participantId, [
-                'role' => $participantId === $user->id ? 'admin' : 'member',
-                'joined_at' => now(),
+        $conversation = \Illuminate\Support\Facades\DB::transaction(function () use ($school, $request, $user, $participants) {
+            $conversation = Conversation::create([
+                'school_id' => $school->id,
+                'name' => $request->name,
+                'type' => $request->type,
+                'created_by' => $user->id,
             ]);
-        }
+
+            $allParticipants = array_merge([$user->id], $participants);
+            foreach ($allParticipants as $participantId) {
+                $conversation->participants()->attach($participantId, [
+                    'role' => $participantId === $user->id ? 'admin' : 'member',
+                    'joined_at' => now(),
+                ]);
+            }
+
+            return $conversation;
+        });
 
         return redirect()->route('admin.communication.chat', $conversation)
             ->with('success', 'Conversation created successfully.');

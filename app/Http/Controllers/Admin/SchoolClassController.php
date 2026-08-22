@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -64,7 +65,7 @@ class SchoolClassController extends Controller
             'grade' => ['required', 'string', 'max:50'],
             'academic_year' => ['required', 'string', 'max:20'],
             'term' => ['nullable', 'string', 'max:50'],
-            'teacher_id' => ['nullable', 'exists:users,id'],
+            'teacher_id' => ['nullable', TenantExists::make('users')],
         ]);
 
         $school->classes()->create($validated);
@@ -124,7 +125,7 @@ class SchoolClassController extends Controller
             'grade' => ['required', 'string', 'max:50'],
             'academic_year' => ['required', 'string', 'max:20'],
             'term' => ['nullable', 'string', 'max:50'],
-            'teacher_id' => ['nullable', 'exists:users,id'],
+            'teacher_id' => ['nullable', TenantExists::make('users')],
         ]);
 
         $class->update($validated);

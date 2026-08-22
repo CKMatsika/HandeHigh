@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SdaCommittee;
 use App\Models\SdaCommitteeMember;
 use App\Models\User;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -17,7 +18,7 @@ class SdaCommitteeMemberController extends Controller
     public function store(Request $request, SdaCommittee $committee)
     {
         $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => ['required', TenantExists::make('users')],
             'sda_role_id' => 'required|exists:sda_roles,id',
             'is_chairperson' => 'boolean',
             'is_secretary' => 'boolean',

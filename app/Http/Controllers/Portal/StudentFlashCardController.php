@@ -109,10 +109,18 @@ class StudentFlashCardController extends Controller
             'confidence' => 'required|in:know,unsure,dont_know',
         ]);
 
-        $session = FlashCardStudySession::findOrFail($validated['session_id']);
+        $session = FlashCardStudySession::with('flashCardSet')->findOrFail($validated['session_id']);
 
-        if ($session->user_id !== $user->id) {
+        if ($session->user_id !== $user->id || $session->flashCardSet?->school_id !== $school->id) {
             return response()->json(['error' => 'Forbidden'], 403);
+        }
+
+        $itemExists = FlashCardItem::where('flash_card_set_id', $session->flash_card_set_id)
+            ->where('id', $validated['item_id'])
+            ->exists();
+
+        if (!$itemExists) {
+            return response()->json(['error' => 'Invalid item'], 422);
         }
 
         $result = FlashCardItemResult::updateOrCreate(
@@ -138,7 +146,7 @@ class StudentFlashCardController extends Controller
     {
         $user = Auth::user();
 
-        if ($session->user_id !== $user->id) {
+        if ($session->user_id !== $user->id || $session->flashCardSet?->school_id !== $user->school_id) {
             return response()->json(['error' => 'Forbidden'], 403);
         }
 

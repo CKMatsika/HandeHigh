@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SchemeOfWork;
 use App\Models\SchemeOfWorkItem;
 use App\Models\Teacher;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -85,8 +86,8 @@ class SchemeOfWorkController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'subject_id' => 'required|exists:subjects,id',
-            'school_class_id' => 'required|exists:classes,id',
+            'subject_id' => ['required', TenantExists::make('subjects')],
+            'school_class_id' => ['required', TenantExists::make('classes')],
             'academic_year' => 'required|string',
             'term' => 'required|string',
             'items' => 'required|array|min:1',
@@ -205,8 +206,8 @@ class SchemeOfWorkController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'subject_id' => 'required|exists:subjects,id',
-            'school_class_id' => 'required|exists:classes,id',
+            'subject_id' => ['required', TenantExists::make('subjects')],
+            'school_class_id' => ['required', TenantExists::make('classes')],
             'academic_year' => 'required|string',
             'term' => 'required|string',
             'items' => 'required|array|min:1',

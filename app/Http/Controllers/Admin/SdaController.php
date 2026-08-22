@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\SdaCommittee;
 use App\Models\SdaCommitteeMember;
 use App\Models\SdaRole;
+use App\Models\SdaTask;
 use App\Models\User;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -100,7 +102,7 @@ class SdaController extends Controller
     public function membersStore(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'user_id' => ['required', TenantExists::make('users')],
             'sda_committee_id' => 'required|exists:sda_committees,id',
             'sda_role_id' => 'required|exists:sda_roles,id',
             'appointment_date' => 'required|date',

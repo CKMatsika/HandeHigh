@@ -7,6 +7,7 @@ use App\Models\SdaMeeting;
 use App\Models\SdaResolution;
 use App\Models\SdaTask;
 use App\Models\User;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 
 class SdaResolutionController extends Controller
@@ -46,8 +47,8 @@ class SdaResolutionController extends Controller
             'implementation_plan' => 'nullable|string',
             'resolution_type' => 'required|in:policy,budget,procurement,appointment,general',
             'priority' => 'required|in:low,medium,high,urgent',
-            'proposed_by' => 'required|exists:users,id',
-            'seconded_by' => 'required|exists:users,id|different:proposed_by',
+            'proposed_by' => ['required', TenantExists::make('users')],
+            'seconded_by' => ['required', TenantExists::make('users'), 'different:proposed_by'],
             'implementation_deadline' => 'nullable|date|after:today',
         ]);
 
@@ -108,8 +109,8 @@ class SdaResolutionController extends Controller
             'implementation_plan' => 'nullable|string',
             'resolution_type' => 'required|in:policy,budget,procurement,appointment,general',
             'priority' => 'required|in:low,medium,high,urgent',
-            'proposed_by' => 'required|exists:users,id',
-            'seconded_by' => 'required|exists:users,id|different:proposed_by',
+            'proposed_by' => ['required', TenantExists::make('users')],
+            'seconded_by' => ['required', TenantExists::make('users'), 'different:proposed_by'],
             'implementation_deadline' => 'nullable|date|after:today',
         ]);
 
@@ -243,7 +244,7 @@ class SdaResolutionController extends Controller
             'tasks' => 'required|array|min:1',
             'tasks.*.title' => 'required|string|max:255',
             'tasks.*.description' => 'required|string',
-            'tasks.*.assigned_to' => 'required|exists:users,id',
+            'tasks.*.assigned_to' => ['required', TenantExists::make('users')],
             'tasks.*.priority' => 'required|in:low,medium,high,urgent',
             'tasks.*.due_date' => 'required|date|after:today',
         ]);

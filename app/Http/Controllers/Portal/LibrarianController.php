@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\BorrowRecord;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class LibrarianController extends Controller
 {
@@ -299,8 +301,8 @@ class LibrarianController extends Controller
         }
 
         $validated = $request->validate([
-            'student_id' => 'required|exists:students,id',
-            'book_id' => 'required|exists:books,id',
+            'student_id' => ['required', TenantExists::make('students')],
+            'book_id' => ['required', TenantExists::make('books')],
             'due_date' => 'required|date|after:today',
         ]);
 
@@ -324,15 +326,17 @@ class LibrarianController extends Controller
                 ->with('error', 'Student already has this book!');
         }
 
-        $borrowRecord = BorrowRecord::create([
-            'school_id' => $school->id,
-            'student_id' => $student->id,
-            'book_id' => $book->id,
-            'borrowed_at' => now(),
-            'due_date' => $validated['due_date'],
-        ]);
+        DB::transaction(function () use ($school, $student, $book, $validated) {
+            BorrowRecord::create([
+                'school_id' => $school->id,
+                'student_id' => $student->id,
+                'book_id' => $book->id,
+                'borrowed_at' => now(),
+                'due_date' => $validated['due_date'],
+            ]);
 
-        $book->decrement('available_copies');
+            $book->decrement('available_copies');
+        });
 
         return redirect()->route('librarian.borrow.index')
             ->with('success', 'Book issued successfully!');

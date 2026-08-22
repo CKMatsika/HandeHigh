@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Models\Department;
 use App\Services\AuditService;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -61,7 +62,7 @@ class EmployeeController extends Controller
             'email' => 'required|email|max:255|unique:users,email',
             'phone' => 'required|string|max:20',
             'employee_id' => 'required|string|max:50|unique:employees,employee_id',
-            'department_id' => 'required|exists:departments,id',
+            'department_id' => ['required', TenantExists::make('departments')],
             'position' => 'required|string|max:255',
             'employment_type' => 'required|in:full_time,part_time,contract,intern',
             'employment_status' => 'required|in:active,terminated,resigned,on_leave',
@@ -205,7 +206,7 @@ class EmployeeController extends Controller
             'email' => 'required|email|max:255|unique:users,email,' . ($employee->user_id ?? 0),
             'phone' => 'required|string|max:20',
             'employee_id' => 'required|string|max:50|unique:employees,employee_id,' . $employee->id,
-            'department_id' => 'required|exists:departments,id',
+            'department_id' => ['required', TenantExists::make('departments')],
             'position' => 'required|string|max:255',
             'employment_type' => 'required|in:full_time,part_time,contract,intern',
             'employment_status' => 'required|in:active,terminated,resigned,on_leave',

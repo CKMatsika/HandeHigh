@@ -7,6 +7,7 @@ use App\Models\SdaCommittee;
 use App\Models\SdaResolution;
 use App\Models\SdaTask;
 use App\Models\User;
+use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 
 class SdaTaskController extends Controller
@@ -41,7 +42,7 @@ class SdaTaskController extends Controller
     {
         $validated = $request->validate([
             'sda_committee_id' => 'required|exists:sda_committees,id',
-            'assigned_to' => 'required|exists:users,id',
+            'assigned_to' => ['required', TenantExists::make('users')],
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'priority' => 'required|in:low,medium,high,urgent',
@@ -97,7 +98,7 @@ class SdaTaskController extends Controller
         }
 
         $validated = $request->validate([
-            'assigned_to' => 'required|exists:users,id',
+            'assigned_to' => ['required', TenantExists::make('users')],
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'priority' => 'required|in:low,medium,high,urgent',
@@ -186,7 +187,7 @@ class SdaTaskController extends Controller
         }
 
         $validated = $request->validate([
-            'assigned_to' => 'required|exists:users,id|different:' . $task->assigned_to,
+            'assigned_to' => ['required', TenantExists::make('users'), 'different:' . $task->assigned_to],
             'reassignment_reason' => 'required|string|max:500',
         ]);
 

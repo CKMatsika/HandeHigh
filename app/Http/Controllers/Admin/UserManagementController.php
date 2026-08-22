@@ -41,7 +41,7 @@ class UserManagementController extends Controller
         }
 
         $users = $query->latest()->paginate(50);
-        $roles = Role::where('school_id', $school->id)->get();
+        $roles = Role::where('guard_name', 'web')->get();
 
         return view('admin.user-management.index', compact('users', 'roles'));
     }
@@ -49,7 +49,7 @@ class UserManagementController extends Controller
     public function create()
     {
         $school = auth()->user()->school;
-        $roles = Role::where('school_id', $school->id)->get();
+        $roles = Role::where('guard_name', 'web')->get();
         $permissions = Permission::all();
 
         return view('admin.user-management.create', compact('roles', 'permissions'));
@@ -131,7 +131,7 @@ class UserManagementController extends Controller
     {
         $this->authorizeSchoolAccess($user);
         $school = auth()->user()->school;
-        $roles = Role::where('school_id', $school->id)->get();
+        $roles = Role::where('guard_name', 'web')->get();
         $permissions = Permission::all();
         $userRoles = $user->roles->pluck('id')->toArray();
         $userPermissions = $user->permissions->pluck('id')->toArray();
