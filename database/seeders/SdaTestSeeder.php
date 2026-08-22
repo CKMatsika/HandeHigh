@@ -15,6 +15,11 @@ class SdaTestSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command?->warn('SdaTestSeeder is disabled in production.');
+            return;
+        }
+
         // Get or create SDA roles
         $chairmanRole = SdaRole::firstOrCreate(['name' => 'Chairman'], [
             'description' => 'Committee Chairman',
