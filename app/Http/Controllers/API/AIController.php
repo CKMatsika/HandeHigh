@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Student;
 use App\Models\Teacher;
-use App\Models\Class;
+use App\Models\SchoolClass;
 use App\Models\Result;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -225,7 +225,7 @@ class AIController extends Controller
     protected function generateOptimalTimetable($schoolId, $constraints)
     {
         // Simplified timetable generation
-        $classes = Class::where('school_id', $schoolId)->get();
+        $classes = SchoolClass::where('school_id', $schoolId)->get();
         $teachers = Teacher::where('school_id', $schoolId)->get();
         
         $timetable = [];

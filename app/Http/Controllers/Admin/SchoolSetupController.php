@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\SchoolSetting;
 use App\Models\AuditLog;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -105,8 +106,7 @@ class SchoolSetupController extends Controller
         }
 
         // Log the update
-        AuditService::log($school->id, auth()->id(), 'update', 'school', $school->id, 
-            'School setup updated', request()->ip(), request()->userAgent(), 'school-setup');
+        AuditService::log('update', $school, 'School setup updated', 'school-setup');
 
         return redirect()->route('admin.school-setup.index')
             ->with('success', 'School setup updated successfully.');
@@ -196,8 +196,7 @@ class SchoolSetupController extends Controller
         }
 
         // Log the update
-        AuditService::log($school->id, auth()->id(), 'update', 'school_settings', $school->id, 
-            'School settings updated', request()->ip(), request()->userAgent(), 'school-setup');
+        AuditService::log('update', $school, 'School settings updated', 'school-setup');
 
         return redirect()->route('admin.school-setup.settings')
             ->with('success', 'School settings updated successfully.');

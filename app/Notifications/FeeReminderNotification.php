@@ -54,7 +54,7 @@ class FeeReminderNotification extends BaseNotification
     {
         return $this->daysOverdue > 0 
             ? "Reminder: {$this->daysOverdue} Days Overdue Payment"
-            : "Upcoming Fee Payment Due"
+            : "Upcoming Fee Payment Due";
     }
 
     protected function getSmsContent()
