@@ -145,6 +145,21 @@ class School extends Model
         return $this->hasMany(TimetableExamination::class);
     }
 
+    public function timetableRequirements()
+    {
+        return $this->hasMany(TimetableRequirement::class);
+    }
+
+    public function timetableGenerationRuns()
+    {
+        return $this->hasMany(TimetableGenerationRun::class);
+    }
+
+    public function timetableCandidates()
+    {
+        return $this->hasMany(TimetableCandidate::class);
+    }
+
     public function rooms()
     {
         return $this->hasMany(Room::class);

@@ -156,6 +156,52 @@ class TimetableSlotController extends Controller
         ]);
     }
 
+    public function lock(Timetable $timetable, TimetableSlot $slot, Request $request)
+    {
+        $this->authorizeSchoolAccess($timetable);
+
+        if ($slot->timetable_id !== $timetable->id) {
+            abort(404);
+        }
+
+        $slot->update(['is_locked' => true]);
+
+        AuditService::log('update', $slot, "Timetable slot #{$slot->id} locked", 'timetable');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Slot locked successfully.',
+                'slot' => $slot->fresh(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Slot locked successfully.');
+    }
+
+    public function unlock(Timetable $timetable, TimetableSlot $slot, Request $request)
+    {
+        $this->authorizeSchoolAccess($timetable);
+
+        if ($slot->timetable_id !== $timetable->id) {
+            abort(404);
+        }
+
+        $slot->update(['is_locked' => false]);
+
+        AuditService::log('update', $slot, "Timetable slot #{$slot->id} unlocked", 'timetable');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Slot unlocked successfully.',
+                'slot' => $slot->fresh(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Slot unlocked successfully.');
+    }
+
     protected function authorizeSchoolAccess(Timetable $timetable): void
     {
         $school = auth()->user()?->school;

@@ -50,6 +50,21 @@ class Timetable extends Model
         return $this->hasMany(TimetableExamination::class);
     }
 
+    public function requirements(): HasMany
+    {
+        return $this->hasMany(TimetableRequirement::class);
+    }
+
+    public function generationRuns(): HasMany
+    {
+        return $this->hasMany(TimetableGenerationRun::class);
+    }
+
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(TimetableCandidate::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'published');

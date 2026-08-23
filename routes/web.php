@@ -567,7 +567,24 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/timetables/{timetable}/slots', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'store'])->name('timetables.slots.store');
             Route::put('/timetables/{timetable}/slots/{slot}', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'update'])->name('timetables.slots.update');
             Route::delete('/timetables/{timetable}/slots/{slot}', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'destroy'])->name('timetables.slots.destroy');
+            Route::post('/timetables/{timetable}/slots/{slot}/lock', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'lock'])->name('timetables.slots.lock');
+            Route::post('/timetables/{timetable}/slots/{slot}/unlock', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'unlock'])->name('timetables.slots.unlock');
             Route::post('/timetables/{timetable}/check-conflict', [\App\Http\Controllers\Admin\TimetableSlotController::class, 'checkConflict'])->name('timetables.check-conflict');
+
+            // Phase 3D Timetable Requirements
+            Route::get('/timetables/{timetable}/requirements', [\App\Http\Controllers\Admin\TimetableRequirementController::class, 'index'])->name('timetables.requirements.index');
+            Route::post('/timetables/{timetable}/requirements', [\App\Http\Controllers\Admin\TimetableRequirementController::class, 'store'])->name('timetables.requirements.store');
+            Route::post('/timetables/{timetable}/requirements/import-curriculum', [\App\Http\Controllers\Admin\TimetableRequirementController::class, 'importFromCurriculum'])->name('timetables.requirements.import');
+            Route::delete('/timetables/{timetable}/requirements/{requirement}', [\App\Http\Controllers\Admin\TimetableRequirementController::class, 'destroy'])->name('timetables.requirements.destroy');
+
+            // Phase 3D Timetable Generation, Optimization, Simulation & Candidates
+            Route::get('/timetables/{timetable}/generate', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'showGenerate'])->name('timetables.generate.show');
+            Route::post('/timetables/{timetable}/generate', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'generate'])->name('timetables.generate.run');
+            Route::post('/timetables/{timetable}/simulate-generation', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'simulate'])->name('timetables.simulate');
+            Route::get('/timetables/{timetable}/candidates', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'candidates'])->name('timetables.candidates.index');
+            Route::get('/timetables/{timetable}/candidates/{candidate}', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'showCandidate'])->name('timetables.candidates.show');
+            Route::get('/timetables/{timetable}/compare', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'compare'])->name('timetables.compare');
+            Route::post('/timetables/{timetable}/candidates/{candidate}/apply', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'applyCandidate'])->name('timetables.candidates.apply');
 
             Route::get('/schemes-of-work', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'index'])->name('schemes-of-work.index');
             Route::get('/schemes-of-work/teacher/{teacher}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'teacherSchemes'])->name('schemes-of-work.teacher');
