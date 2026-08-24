@@ -30,6 +30,9 @@ class TimetableCandidateService
      */
     public function applyCandidate(Timetable $timetable, TimetableCandidate $candidate, ?User $user = null): array
     {
+        $timetable = $timetable->fresh();
+        $candidate = $candidate->fresh();
+
         // 1. Multi-tenant ownership check
         if ((int) $candidate->school_id !== (int) $timetable->school_id || (int) $candidate->timetable_id !== (int) $timetable->id) {
             throw ValidationException::withMessages([
@@ -44,16 +47,41 @@ class TimetableCandidateService
             ]);
         }
 
-        // 2. Pre-application Revalidation: Convert candidate allocations to temporary slots and verify hard constraints
-        $testSlots = collect();
-        foreach ($allocations as $item) {
-            $testSlot = new TimetableSlot($item);
-            $testSlot->timetable_id = $timetable->id;
-            $testSlots->push($testSlot);
+        // 2. Concurrency / Stale Candidate Check: If timetable was updated after candidate generation
+        if ($candidate->created_at && $timetable->updated_at && $timetable->updated_at->timestamp > $candidate->created_at->timestamp + 1) {
+            AuditService::log('apply_candidate_rejected', $timetable, "Attempted to apply stale candidate #{$candidate->candidate_number} after timetable was modified.", 'timetable');
+            throw ValidationException::withMessages([
+                'candidate' => ['This candidate schedule is stale because the timetable was modified after generation. Please generate a new candidate.'],
+            ]);
         }
 
-        $revalidation = $this->conflictService->detectConflicts($timetable, $testSlots);
+        // 3. Pre-application Revalidation: Merge existing locked slots with candidate allocations to verify hard constraints against current environment
+        $existingLockedSlots = $timetable->slots()->where('is_locked', true)->get();
+        $allTestSlots = collect();
+
+        foreach ($existingLockedSlots as $ls) {
+            $allTestSlots->push($ls);
+        }
+
+        foreach ($allocations as $item) {
+            // If this item is already an existing locked slot, don't duplicate in test collection
+            $isLockedMatch = $existingLockedSlots->first(function ($ls) use ($item) {
+                return (int) $ls->school_class_id === (int) ($item['school_class_id'] ?? null)
+                    && strcasecmp((string) $ls->day_of_week, (string) ($item['day_of_week'] ?? '')) === 0
+                    && (int) $ls->school_period_id === (int) ($item['school_period_id'] ?? null);
+            });
+
+            if (! $isLockedMatch) {
+                $testSlot = new TimetableSlot($item);
+                $testSlot->timetable_id = $timetable->id;
+                $testSlot->school_id = $timetable->school_id;
+                $allTestSlots->push($testSlot);
+            }
+        }
+
+        $revalidation = $this->conflictService->detectConflicts($timetable, $allTestSlots);
         if ($revalidation['has_hard_conflicts']) {
+            AuditService::log('apply_candidate_rejected', $timetable, "Application of candidate #{$candidate->candidate_number} blocked due to environmental hard conflicts.", 'timetable');
             $errorMessages = array_map(fn ($c) => $c->message, $revalidation['hard']);
             throw ValidationException::withMessages([
                 'candidate' => array_merge(
@@ -63,16 +91,15 @@ class TimetableCandidateService
             ]);
         }
 
-        // 3. Transactional Application
-        return DB::transaction(function () use ($timetable, $candidate, $allocations, $revalidation) {
+        // 4. Transactional Application
+        return DB::transaction(function () use ($timetable, $candidate, $allocations, $existingLockedSlots) {
             // Keep locked slots, delete unlocked slots
-            $lockedSlots = $timetable->slots()->where('is_locked', true)->get();
             $timetable->slots()->where('is_locked', false)->delete();
 
             $createdSlots = [];
             foreach ($allocations as $alloc) {
                 // If a locked slot already exists at this exact period/class, skip inserting duplicate
-                $alreadyExists = $lockedSlots->first(function ($ls) use ($alloc) {
+                $alreadyExists = $existingLockedSlots->first(function ($ls) use ($alloc) {
                     return (int) $ls->school_class_id === (int) ($alloc['school_class_id'] ?? null)
                         && strcasecmp((string) $ls->day_of_week, (string) ($alloc['day_of_week'] ?? '')) === 0
                         && (int) $ls->school_period_id === (int) ($alloc['school_period_id'] ?? null);

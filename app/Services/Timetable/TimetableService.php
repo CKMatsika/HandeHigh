@@ -97,6 +97,17 @@ class TimetableService
      */
     public function updateSlot(TimetableSlot $slot, array $slotData): TimetableSlot
     {
+        if ($slot->is_locked && ($slotData['is_locked'] ?? true)) {
+            $coreFields = ['school_class_id', 'subject_id', 'teacher_id', 'room_id', 'school_period_id', 'day_of_week', 'start_time', 'end_time'];
+            foreach ($coreFields as $field) {
+                if (array_key_exists($field, $slotData) && (string) $slotData[$field] !== (string) $slot->$field) {
+                    throw ValidationException::withMessages([
+                        'slot' => ['Cannot modify a locked timetable slot. Unlock the slot first before editing.'],
+                    ]);
+                }
+            }
+        }
+
         $slot->update($slotData);
         $this->conflictService->syncSlotConflicts($slot->timetable);
 
@@ -108,6 +119,12 @@ class TimetableService
      */
     public function deleteSlot(TimetableSlot $slot): void
     {
+        if ($slot->is_locked) {
+            throw ValidationException::withMessages([
+                'slot' => ['Cannot delete a locked timetable slot. Unlock the slot first before removing.'],
+            ]);
+        }
+
         $timetable = $slot->timetable;
         $slot->delete();
         $this->conflictService->syncSlotConflicts($timetable);

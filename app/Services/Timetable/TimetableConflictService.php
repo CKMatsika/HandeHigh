@@ -82,10 +82,12 @@ class TimetableConflictService
         }
 
         $softConflicts = [];
-        foreach ($this->softConstraints as $constraint) {
-            $results = $constraint->evaluate($timetable, $slots, $context);
-            foreach ($results as $conflict) {
-                $softConflicts[] = $conflict;
+        if (! ($context['hard_only'] ?? false)) {
+            foreach ($this->softConstraints as $constraint) {
+                $results = $constraint->evaluate($timetable, $slots, $context);
+                foreach ($results as $conflict) {
+                    $softConflicts[] = $conflict;
+                }
             }
         }
 

@@ -106,11 +106,26 @@ class TimetableSimulationService
         $currentBreakdown = $this->scorer->score($timetable, $currentSlots);
 
         $allocations = $candidate->allocations ?? [];
+        $existingLockedSlots = $timetable->slots()->where('is_locked', true)->get();
         $simulatedSlots = collect();
+
+        foreach ($existingLockedSlots as $ls) {
+            $simulatedSlots->push($ls);
+        }
+
         foreach ($allocations as $alloc) {
-            $slot = new TimetableSlot($alloc);
-            $slot->timetable_id = $timetable->id;
-            $simulatedSlots->push($slot);
+            $isLockedMatch = $existingLockedSlots->first(function ($ls) use ($alloc) {
+                return (int) $ls->school_class_id === (int) ($alloc['school_class_id'] ?? null)
+                    && strcasecmp((string) $ls->day_of_week, (string) ($alloc['day_of_week'] ?? '')) === 0
+                    && (int) $ls->school_period_id === (int) ($alloc['school_period_id'] ?? null);
+            });
+
+            if (! $isLockedMatch) {
+                $slot = new TimetableSlot($alloc);
+                $slot->timetable_id = $timetable->id;
+                $slot->school_id = $timetable->school_id;
+                $simulatedSlots->push($slot);
+            }
         }
 
         $conflicts = $this->conflictService->detectConflicts($timetable, $simulatedSlots);
@@ -120,7 +135,7 @@ class TimetableSimulationService
         $affectedClassIds = $simulatedSlots->pluck('school_class_id')->unique()->filter()->values();
         $affectedTeacherIds = $simulatedSlots->pluck('teacher_id')->unique()->filter()->values();
         $affectedRoomIds = $simulatedSlots->pluck('room_id')->unique()->filter()->values();
-        $lockedCount = $simulatedSlots->where('is_locked', true)->count();
+        $lockedCount = $existingLockedSlots->count();
 
         $isSafe = ($hardCount === 0);
 

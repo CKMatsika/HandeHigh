@@ -13,7 +13,7 @@ class ActivePeriodConstraint implements TimetableConstraintInterface
     public function evaluate(Timetable $timetable, Collection $slots, array $context = []): array
     {
         $conflicts = [];
-        $periodsCache = [];
+        $periodsCache = $context['periods_by_id'] ?? [];
 
         foreach ($slots as $slot) {
             if ($slot->status === 'cancelled') {
@@ -21,11 +21,13 @@ class ActivePeriodConstraint implements TimetableConstraintInterface
             }
 
             if ($slot->school_period_id) {
-                if (! isset($periodsCache[$slot->school_period_id])) {
-                    $periodsCache[$slot->school_period_id] = SchoolPeriod::find($slot->school_period_id);
-                }
+                $period = $periodsCache[$slot->school_period_id]
+                    ?? ($slot->relationLoaded('schoolPeriod') ? $slot->schoolPeriod : null);
 
-                $period = $periodsCache[$slot->school_period_id];
+                if ($period === null && ! array_key_exists($slot->school_period_id, $periodsCache)) {
+                    $period = SchoolPeriod::find($slot->school_period_id);
+                    $periodsCache[$slot->school_period_id] = $period;
+                }
 
                 if (! $period) {
                     $conflicts[] = TimetableConflict::create(

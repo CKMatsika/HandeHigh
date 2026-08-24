@@ -22,7 +22,7 @@ class TeacherSubjectEligibilityConstraint implements TimetableConstraintInterfac
             }
 
             if (! isset($teacherSubjectsCache[$slot->teacher_id])) {
-                $teacher = Teacher::with('subjects')->find($slot->teacher_id);
+                $teacher = $slot->relationLoaded('teacher') ? $slot->teacher : Teacher::with('subjects')->find($slot->teacher_id);
                 if (! $teacher) {
                     $teacherSubjectsCache[$slot->teacher_id] = [
                         'teacher' => null,

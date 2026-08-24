@@ -30,6 +30,8 @@ class TimetableScorer
      */
     public function score(Timetable $timetable, Collection $slots, array $customWeights = []): ScoreBreakdown
     {
+        self::clearCache();
+
         $weights = array_merge(self::DEFAULT_WEIGHTS, $customWeights);
         $totalWeight = array_sum($weights);
         if ($totalWeight <= 0) {
@@ -201,6 +203,15 @@ class TimetableScorer
         return array_sum($scores) / count($scores);
     }
 
+    protected static array $subjectNameCache = [];
+    protected static array $periodSeqCache = [];
+
+    public static function clearCache(): void
+    {
+        static::$subjectNameCache = [];
+        static::$periodSeqCache = [];
+    }
+
     protected function evaluateConsecutiveLessons(Collection $slots): float
     {
         // Group by class & day, sort by period sequence or start time
@@ -210,7 +221,16 @@ class TimetableScorer
 
         foreach ($grouped as $daySlots) {
             $sorted = $daySlots->sortBy(function ($s) {
-                return $s->schoolPeriod?->period_sequence ?? $s->start_time;
+                if ($s->school_period_id) {
+                    $seq = static::$periodSeqCache[$s->school_period_id] ?? null;
+                    if ($seq === null) {
+                        $p = $s->relationLoaded('schoolPeriod') ? $s->schoolPeriod : SchoolPeriod::find($s->school_period_id);
+                        $seq = $p?->period_sequence ?? 1;
+                        static::$periodSeqCache[$s->school_period_id] = $seq;
+                    }
+                    return $seq;
+                }
+                return $s->start_time;
             })->values();
 
             $currentSubjectId = null;
@@ -244,7 +264,17 @@ class TimetableScorer
         $morningCoreSlots = 0;
 
         foreach ($slots as $slot) {
-            $subjectName = strtolower($slot->subject?->name ?? '');
+            $subjectName = '';
+            if ($slot->subject_id) {
+                $cached = static::$subjectNameCache[$slot->subject_id] ?? null;
+                if ($cached === null) {
+                    $sub = $slot->relationLoaded('subject') ? $slot->subject : Subject::find($slot->subject_id);
+                    $cached = strtolower($sub?->name ?? '');
+                    static::$subjectNameCache[$slot->subject_id] = $cached;
+                }
+                $subjectName = $cached;
+            }
+
             $isCore = false;
             foreach ($coreKeywords as $kw) {
                 if (str_contains($subjectName, $kw)) {
@@ -255,7 +285,17 @@ class TimetableScorer
 
             if ($isCore) {
                 $coreSlots++;
-                $seq = $slot->schoolPeriod?->period_sequence ?? 1;
+                $seq = 1;
+                if ($slot->school_period_id) {
+                    $cachedSeq = static::$periodSeqCache[$slot->school_period_id] ?? null;
+                    if ($cachedSeq === null) {
+                        $p = $slot->relationLoaded('schoolPeriod') ? $slot->schoolPeriod : SchoolPeriod::find($slot->school_period_id);
+                        $cachedSeq = $p?->period_sequence ?? 1;
+                        static::$periodSeqCache[$slot->school_period_id] = $cachedSeq;
+                    }
+                    $seq = $cachedSeq;
+                }
+
                 if ($seq <= 4 || (is_string($slot->start_time) && substr($slot->start_time, 0, 2) < '12')) {
                     $morningCoreSlots++;
                 }
@@ -280,7 +320,24 @@ class TimetableScorer
 
         $isolatedGaps = 0;
         foreach ($grouped as $daySlots) {
-            $seqs = $daySlots->map(fn ($s) => $s->schoolPeriod?->period_sequence)->filter()->sort()->values()->toArray();
+            $seqs = [];
+            foreach ($daySlots as $s) {
+                if ($s->school_period_id) {
+                    $seq = static::$periodSeqCache[$s->school_period_id] ?? null;
+                    if ($seq === null) {
+                        $p = $s->relationLoaded('schoolPeriod') ? $s->schoolPeriod : SchoolPeriod::find($s->school_period_id);
+                        $seq = $p?->period_sequence;
+                        if ($seq !== null) {
+                            static::$periodSeqCache[$s->school_period_id] = $seq;
+                        }
+                    }
+                    if ($seq !== null) {
+                        $seqs[] = $seq;
+                    }
+                }
+            }
+            sort($seqs);
+
             if (count($seqs) < 2) {
                 continue;
             }
@@ -318,7 +375,24 @@ class TimetableScorer
 
         $gapDays = 0;
         foreach ($grouped as $daySlots) {
-            $seqs = $daySlots->map(fn ($s) => $s->schoolPeriod?->period_sequence)->filter()->sort()->values()->toArray();
+            $seqs = [];
+            foreach ($daySlots as $s) {
+                if ($s->school_period_id) {
+                    $seq = static::$periodSeqCache[$s->school_period_id] ?? null;
+                    if ($seq === null) {
+                        $p = $s->relationLoaded('schoolPeriod') ? $s->schoolPeriod : SchoolPeriod::find($s->school_period_id);
+                        $seq = $p?->period_sequence;
+                        if ($seq !== null) {
+                            static::$periodSeqCache[$s->school_period_id] = $seq;
+                        }
+                    }
+                    if ($seq !== null) {
+                        $seqs[] = $seq;
+                    }
+                }
+            }
+            sort($seqs);
+
             if (count($seqs) < 2) {
                 continue;
             }

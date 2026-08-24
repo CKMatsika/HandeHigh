@@ -85,8 +85,10 @@ class TimetableGenerationController extends Controller
                 ->where('timetable_id', $timetable->id)
                 ->findOrFail($validated['candidate_id']);
             $simResult = $this->simulationService->simulateCandidate($timetable, $candidate);
+            AuditService::log('simulate', $timetable, "Simulated application of candidate #{$candidate->candidate_number} (Safety: {$simResult['status']})", 'timetable');
         } else {
             $simResult = $this->simulationService->simulateGeneration($timetable, $validated);
+            AuditService::log('simulate', $timetable, "Simulated timetable generation (Safety: {$simResult['status']})", 'timetable');
         }
 
         return response()->json([

@@ -12,13 +12,24 @@ class CoreSubjectMorningPreferenceConstraint implements TimetableConstraintInter
     public function evaluate(Timetable $timetable, Collection $slots, array $context = []): array
     {
         $conflicts = [];
+        $subjectCache = [];
 
         foreach ($slots as $slot) {
-            if ($slot->status === 'cancelled' || ! $slot->isLesson() || ! $slot->subject) {
+            if ($slot->status === 'cancelled' || ! $slot->isLesson() || ! $slot->subject_id) {
                 continue;
             }
 
-            $isCore = (bool) $slot->subject->is_core;
+            $subject = $subjectCache[$slot->subject_id] ?? null;
+            if ($subject === null && ! array_key_exists($slot->subject_id, $subjectCache)) {
+                $subject = $slot->relationLoaded('subject') ? $slot->subject : \App\Models\Subject::find($slot->subject_id);
+                $subjectCache[$slot->subject_id] = $subject;
+            }
+
+            if (! $subject) {
+                continue;
+            }
+
+            $isCore = (bool) $subject->is_core;
             $start = substr((string) ($slot->start_time instanceof \DateTimeInterface ? $slot->start_time->format('H:i') : $slot->start_time), 0, 5);
 
             // If core subject scheduled after 14:00 (late afternoon)
