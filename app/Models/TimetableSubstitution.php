@@ -28,7 +28,7 @@ class TimetableSubstitution extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date' => 'string',
         'score' => 'decimal:2',
         'score_breakdown' => 'array',
         'approved_at' => 'datetime',

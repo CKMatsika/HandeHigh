@@ -25,8 +25,8 @@ class TeacherAbsence extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'string',
+        'end_date' => 'string',
         'affected_period_ids' => 'array',
         'status' => 'string',
     ];

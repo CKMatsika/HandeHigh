@@ -30,10 +30,8 @@ class NotificationController extends Controller
 
     public function markAsRead(Request $request, string $id): JsonResponse|RedirectResponse
     {
-        $notification = $request->user()->notifications()->where('id', $id)->first();
-        if ($notification) {
-            $notification->markAsRead();
-        }
+        $notification = $request->user()->notifications()->where('id', $id)->firstOrFail();
+        $notification->markAsRead();
 
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);

@@ -92,8 +92,8 @@ class TimetableSubstitutionController extends Controller
             'expected_revision' => 'nullable|integer',
         ]);
 
-        $substitute = Teacher::findOrFail($validated['substitute_teacher_id']);
-        $absence = ! empty($validated['teacher_absence_id']) ? TeacherAbsence::find($validated['teacher_absence_id']) : null;
+        $substitute = Teacher::where('school_id', $slot->timetable->school_id)->findOrFail($validated['substitute_teacher_id']);
+        $absence = ! empty($validated['teacher_absence_id']) ? TeacherAbsence::where('school_id', $slot->timetable->school_id)->findOrFail($validated['teacher_absence_id']) : null;
 
         try {
             if ($request->boolean('auto_approve', true)) {
