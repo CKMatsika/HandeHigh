@@ -42,6 +42,11 @@ class SchoolClass extends Model
         return $this->hasMany(Enrollment::class, 'class_id');
     }
 
+    public function students()
+    {
+        return $this->hasManyThrough(Student::class, Enrollment::class, 'class_id', 'id', 'id', 'student_id');
+    }
+
     public function results()
     {
         return $this->hasMany(Result::class, 'class_id');

@@ -18,6 +18,8 @@ class Timetable extends Model
         'academic_year',
         'term',
         'status',
+        'revision',
+        'is_operational',
         'settings',
         'generated_at',
         'published_at',
@@ -28,6 +30,8 @@ class Timetable extends Model
         'generated_at' => 'datetime',
         'published_at' => 'datetime',
         'status' => 'string',
+        'revision' => 'integer',
+        'is_operational' => 'boolean',
     ];
 
     public function school(): BelongsTo
@@ -63,6 +67,22 @@ class Timetable extends Model
     public function candidates(): HasMany
     {
         return $this->hasMany(TimetableCandidate::class);
+    }
+
+    public function operationalChanges(): HasMany
+    {
+        return $this->hasMany(TimetableOperationalChange::class);
+    }
+
+    public function substitutions(): HasMany
+    {
+        return $this->hasMany(TimetableSubstitution::class);
+    }
+
+    public function incrementRevision(): int
+    {
+        $this->increment('revision');
+        return $this->fresh()->revision;
     }
 
     public function scopeActive($query)

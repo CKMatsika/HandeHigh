@@ -586,6 +586,28 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/timetables/{timetable}/compare', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'compare'])->name('timetables.compare');
             Route::post('/timetables/{timetable}/candidates/{candidate}/apply', [\App\Http\Controllers\Admin\TimetableGenerationController::class, 'applyCandidate'])->name('timetables.candidates.apply');
 
+            // Phase 3E Master Operations, Live Changes, Absences & Substitutions
+            Route::get('/timetables-operations', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'index'])->name('timetables.operations');
+            Route::get('/timetables/{timetable}/changes', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'changes'])->name('timetables.changes');
+            Route::post('/timetables/{timetable}/slots/{slot}/change-teacher', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'changeTeacher'])->name('timetables.slots.change-teacher');
+            Route::post('/timetables/{timetable}/slots/{slot}/change-room', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'changeRoom'])->name('timetables.slots.change-room');
+            Route::post('/timetables/{timetable}/slots/{slot}/move', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'moveLesson'])->name('timetables.slots.move');
+            Route::post('/timetables/{timetable}/slots/{slot}/cancel', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'cancelLesson'])->name('timetables.slots.cancel');
+            Route::post('/timetables/{timetable}/slots/{slot}/restore', [\App\Http\Controllers\Admin\TimetableOperationsController::class, 'restoreLesson'])->name('timetables.slots.restore');
+
+            // Teacher Absences
+            Route::get('/timetables-absences', [\App\Http\Controllers\Admin\TimetableAbsenceController::class, 'index'])->name('timetables.absences.index');
+            Route::post('/timetables-absences', [\App\Http\Controllers\Admin\TimetableAbsenceController::class, 'store'])->name('timetables.absences.store');
+            Route::get('/timetables-absences/{absence}', [\App\Http\Controllers\Admin\TimetableAbsenceController::class, 'show'])->name('timetables.absences.show');
+            Route::post('/timetables-absences/{absence}/cancel', [\App\Http\Controllers\Admin\TimetableAbsenceController::class, 'cancel'])->name('timetables.absences.cancel');
+
+            // Teacher Substitutions
+            Route::get('/timetables-substitutions', [\App\Http\Controllers\Admin\TimetableSubstitutionController::class, 'index'])->name('timetables.substitutions.index');
+            Route::get('/timetables/slots/{slot}/substitutions/recommend', [\App\Http\Controllers\Admin\TimetableSubstitutionController::class, 'recommend'])->name('timetables.substitutions.recommend');
+            Route::post('/timetables/slots/{slot}/substitutions', [\App\Http\Controllers\Admin\TimetableSubstitutionController::class, 'store'])->name('timetables.substitutions.store');
+            Route::post('/timetables-substitutions/{substitution}/approve', [\App\Http\Controllers\Admin\TimetableSubstitutionController::class, 'approve'])->name('timetables.substitutions.approve');
+            Route::post('/timetables-substitutions/{substitution}/reject', [\App\Http\Controllers\Admin\TimetableSubstitutionController::class, 'reject'])->name('timetables.substitutions.reject');
+
             Route::get('/schemes-of-work', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'index'])->name('schemes-of-work.index');
             Route::get('/schemes-of-work/teacher/{teacher}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'teacherSchemes'])->name('schemes-of-work.teacher');
             Route::get('/schemes-of-work/{schemeOfWork}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'show'])->name('schemes-of-work.show');
@@ -599,6 +621,8 @@ Route::middleware(['auth'])->group(function () {
             ->group(function () {
                 Route::get('/dashboard', [\App\Http\Controllers\Portal\TeacherController::class, 'dashboard'])->name('dashboard');
                 Route::get('/profile', [\App\Http\Controllers\Portal\TeacherController::class, 'profile'])->name('profile');
+                Route::get('/timetable', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'index'])->name('timetable.index');
+                Route::get('/timetable/today', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'today'])->name('timetable.today');
 
                 Route::get('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'index'])->name('schemes-of-work.index');
                 Route::get('/schemes-of-work/create', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'create'])->name('schemes-of-work.create');
@@ -637,6 +661,8 @@ Route::middleware(['auth'])->group(function () {
             ->group(function () {
                 Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('dashboard');
                 Route::get('/profile', [StudentController::class, 'profile'])->name('profile');
+                Route::get('/timetable', [\App\Http\Controllers\Portal\StudentTimetableController::class, 'index'])->name('timetable.index');
+                Route::get('/timetable/today', [\App\Http\Controllers\Portal\StudentTimetableController::class, 'today'])->name('timetable.today');
                 Route::get('/fees', [StudentController::class, 'fees'])->name('fees');
                 Route::get('/results', [StudentController::class, 'results'])->name('results');
                 Route::get('/career-counsellor', [StudentController::class, 'careerCounsellor'])->name('counsellor');
@@ -650,6 +676,12 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('/flash-cards/result', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'submitResult'])->name('flash-cards.submit-result');
                 Route::post('/flash-cards/session/{session}/complete', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'completeSession'])->name('flash-cards.complete-session');
             });
+
+        // Notifications
+        Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+        Route::get('/notifications/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
 
         Route::middleware(['auth', 'tenant', 'role:parent|super-admin'])
             ->prefix('parent')

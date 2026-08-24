@@ -89,15 +89,53 @@ class AppServiceProvider extends ServiceProvider
             'schemeOfWork' => SchemeOfWork::class,
             'flashCardSet' => FlashCardSet::class,
             'timetable' => Timetable::class,
+            'room' => \App\Models\Room::class,
+            'absence' => \App\Models\TeacherAbsence::class,
+            'substitution' => \App\Models\TimetableSubstitution::class,
+            'change' => \App\Models\TimetableOperationalChange::class,
         ];
 
         foreach ($bindings as $parameter => $model) {
             Route::bind($parameter, fn ($value) => app(TenantContext::class)->resolve($model, $value));
         }
 
+        Route::bind('slot', function ($value) {
+            $context = app(TenantContext::class);
+            $user = request()->user()
+                ?? (Auth::guard('sanctum')->check() ? Auth::guard('sanctum')->user() : null)
+                ?? Auth::user();
+            $school = $context->school() ?? $user?->school ?? ($user?->school_id ? School::find($user->school_id) : null);
+            if (! $school) {
+                abort(404);
+            }
+            return \App\Models\TimetableSlot::whereHas('timetable', fn ($q) => $q->where('school_id', $school->id))->findOrFail($value);
+        });
+
         Gate::policy(School::class, SchoolPolicy::class);
         foreach ($bindings as $model) {
             Gate::policy($model, TenantRecordPolicy::class);
         }
+
+        // Register Timetable Event Listeners
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\Timetable\TeacherChanged::class,
+            \App\Listeners\Timetable\SendTimetableChangeNotifications::class
+        );
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\Timetable\RoomChanged::class,
+            \App\Listeners\Timetable\SendTimetableChangeNotifications::class
+        );
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\Timetable\LessonMoved::class,
+            \App\Listeners\Timetable\SendTimetableChangeNotifications::class
+        );
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\Timetable\LessonCancelled::class,
+            \App\Listeners\Timetable\SendTimetableChangeNotifications::class
+        );
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\Timetable\LessonRestored::class,
+            \App\Listeners\Timetable\SendTimetableChangeNotifications::class
+        );
     }
 }

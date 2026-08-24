@@ -58,10 +58,10 @@ class TenantContext
 
     public function resolve(string $modelClass, mixed $value): Model
     {
-        // Route bindings may execute before the ResolveTenant middleware runs
-        // (SubstituteBindings is priority-hoisted), so fall back to the
-        // authenticated user's school and fail closed without a tenant.
-        $school = $this->school ?? Auth::user()?->school;
+        $user = request()->user()
+            ?? (Auth::guard('sanctum')->check() ? Auth::guard('sanctum')->user() : null)
+            ?? Auth::user();
+        $school = $this->school ?? $user?->school ?? ($user?->school_id ? School::find($user->school_id) : null);
 
         if (! $school) {
             abort(404);

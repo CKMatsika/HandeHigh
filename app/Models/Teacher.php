@@ -87,6 +87,21 @@ class Teacher extends Model
         return $this->hasMany(Assessment::class, 'teacher_id', 'user_id');
     }
 
+    public function absences()
+    {
+        return $this->hasMany(TeacherAbsence::class);
+    }
+
+    public function substitutionsAsOriginal()
+    {
+        return $this->hasMany(TimetableSubstitution::class, 'original_teacher_id');
+    }
+
+    public function substitutionsAsSubstitute()
+    {
+        return $this->hasMany(TimetableSubstitution::class, 'substitute_teacher_id');
+    }
+
     public function getFullNameAttribute()
     {
         return "{$this->first_name} {$this->last_name}";

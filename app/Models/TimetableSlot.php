@@ -69,6 +69,25 @@ class TimetableSlot extends Model
         return $this->belongsTo(SchoolPeriod::class);
     }
 
+    public function operationalChanges(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TimetableOperationalChange::class, 'timetable_slot_id');
+    }
+
+    public function substitutions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TimetableSubstitution::class, 'timetable_slot_id');
+    }
+
+    public function activeSubstitutionForDate(string|\Carbon\Carbon $date): ?TimetableSubstitution
+    {
+        $dateStr = $date instanceof \Carbon\Carbon ? $date->toDateString() : \Carbon\Carbon::parse($date)->toDateString();
+        return $this->substitutions()
+            ->where('date', $dateStr)
+            ->where('status', 'approved')
+            ->first();
+    }
+
     public function hasConflicts(): bool
     {
         return ! empty($this->conflicts) || $this->status === 'conflict';
