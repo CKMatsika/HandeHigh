@@ -1014,4 +1014,168 @@ class FinanceReportingService
             'outstanding_by_form' => $outstandingByForm,
         ];
     }
+
+    /**
+     * Authoritative School Revenue Summary by Category & Period (Daily, Weekly, Monthly, Term, Academic Year).
+     */
+    public function getSchoolRevenueSummary(School $school, array $filters = []): array
+    {
+        $period = $filters['period'] ?? 'academic_year';
+        $startDate = !empty($filters['start_date']) ? Carbon::parse($filters['start_date'])->startOfDay() : now()->startOfYear()->startOfDay();
+        $endDate = !empty($filters['end_date']) ? Carbon::parse($filters['end_date'])->endOfDay() : now()->endOfDay();
+
+        $startStr = $startDate->format('Y-m-d');
+        $endStr = $endDate->format('Y-m-d');
+        $startDt = $startDate->format('Y-m-d H:i:s');
+        $endDt = $endDate->format('Y-m-d H:i:s');
+
+        // Calculate Revenue from GL Journal Entries
+        $journalEntries = JournalEntry::whereHas('batch', function ($q) use ($school, $startStr, $endStr) {
+            $q->where('school_id', $school->id)
+                ->where('status', 'posted')
+                ->whereBetween('transaction_date', [$startStr, $endStr]);
+        })->with('account')->get();
+
+        $tuitionRevenue = (float) $journalEntries->filter(fn ($e) => $e->account && $e->account->code === '5100' && $e->entry_type === 'credit')->sum('amount');
+        $boardingRevenue = (float) $journalEntries->filter(fn ($e) => $e->account && $e->account->code === '5200' && $e->entry_type === 'credit')->sum('amount');
+        $transportRevenue = (float) $journalEntries->filter(fn ($e) => $e->account && $e->account->code === '5300' && $e->entry_type === 'credit')->sum('amount');
+        $examinationRevenue = (float) $journalEntries->filter(fn ($e) => $e->account && $e->account->code === '5500' && $e->entry_type === 'credit')->sum('amount');
+        $levyRevenue = (float) $journalEntries->filter(fn ($e) => $e->account && in_array($e->account->code, ['5400', '5600', '5700']) && $e->entry_type === 'credit')->sum('amount');
+        $kioskRevenue = (float) $journalEntries->filter(fn ($e) => $e->account && $e->account->code === '5803' && $e->entry_type === 'credit')->sum('amount');
+        $projectRevenue = (float) $journalEntries->filter(fn ($e) => $e->project_id !== null && $e->account && $e->account->type === 'revenue' && $e->entry_type === 'credit')->sum('amount');
+        $otherRevenue = (float) $journalEntries->filter(fn ($e) => $e->project_id === null && $e->account && in_array($e->account->code, ['5800', '5801', '5802', '5804', '5900', '5901', '5902']) && $e->entry_type === 'credit')->sum('amount');
+
+        $totalRevenue = $tuitionRevenue + $boardingRevenue + $transportRevenue + $examinationRevenue + $levyRevenue + $kioskRevenue + $projectRevenue + $otherRevenue;
+
+        // Cash Collections
+        $studentCashCollected = (float) Payment::where('school_id', $school->id)
+            ->whereBetween('paid_at', [$startStr, $endStr . ' 23:59:59'])
+            ->sum('amount');
+
+        $kioskCashCollected = (float) \App\Models\KioskSale::where('school_id', $school->id)
+            ->whereBetween('sale_date', [$startStr, $endStr])
+            ->sum('grand_total');
+
+        $receiptsCashCollected = (float) Receipt::where('school_id', $school->id)
+            ->whereBetween('receipt_date', [$startStr, $endStr])
+            ->sum('grand_total');
+
+        $totalCashCollected = $studentCashCollected + $kioskCashCollected + $receiptsCashCollected;
+
+        // Accounts Receivable & Outstanding Fees
+        $arAccount = Account::where('school_id', $school->id)->whereIn('code', ['1201', '1200'])->first();
+        $arBalance = $arAccount ? (float) $arAccount->current_balance : 0.0;
+        $outstandingStudentFees = (float) Invoice::where('school_id', $school->id)->where('status', '!=', 'cancelled')->sum('balance');
+
+        return [
+            'period' => $period,
+            'start_date' => $startStr,
+            'end_date' => $endStr,
+            'categories' => [
+                'tuition_revenue' => $tuitionRevenue,
+                'boarding_revenue' => $boardingRevenue,
+                'transport_revenue' => $transportRevenue,
+                'examination_revenue' => $examinationRevenue,
+                'levy_revenue' => $levyRevenue,
+                'kiosk_revenue' => $kioskRevenue,
+                'project_revenue' => $projectRevenue,
+                'other_revenue' => $otherRevenue,
+            ],
+            'total_revenue' => $totalRevenue,
+            'cash_collected' => [
+                'student_payments' => $studentCashCollected,
+                'kiosk_sales' => $kioskCashCollected,
+                'receipts' => $receiptsCashCollected,
+                'total_cash_collected' => $totalCashCollected,
+            ],
+            'accounts_receivable_balance' => $arBalance,
+            'outstanding_student_fees' => $outstandingStudentFees,
+        ];
+    }
+
+    /**
+     * Complete Accounting Reconciliation Matrix.
+     */
+    public function getAccountingReconciliation(School $school, array $filters = []): array
+    {
+        $startDate = !empty($filters['start_date']) ? Carbon::parse($filters['start_date'])->startOfDay() : now()->startOfYear()->startOfDay();
+        $endDate = !empty($filters['end_date']) ? Carbon::parse($filters['end_date'])->endOfDay() : now()->endOfDay();
+
+        $startStr = $startDate->format('Y-m-d');
+        $endStr = $endDate->format('Y-m-d');
+
+        // 1. Invoices vs Invoicing GL Postings
+        $invoicesTotal = (float) Invoice::where('school_id', $school->id)
+            ->where('status', '!=', 'cancelled')
+            ->whereBetween('issued_at', [$startStr, $endStr . ' 23:59:59'])
+            ->sum('total_amount');
+
+        $arDebits = (float) JournalEntry::whereHas('batch', function ($q) use ($school, $startStr, $endStr) {
+            $q->where('school_id', $school->id)
+                ->where('source_type', 'invoice')
+                ->where('status', 'posted')
+                ->whereBetween('transaction_date', [$startStr, $endStr]);
+        })->whereHas('account', fn ($q) => $q->whereIn('code', ['1201', '1200']))
+          ->where('entry_type', 'debit')
+          ->sum('amount');
+
+        $invoiceReconciliation = [
+            'invoices_total' => $invoicesTotal,
+            'gl_ar_debits' => $arDebits,
+            'discrepancy' => round(abs($invoicesTotal - $arDebits), 2),
+            'is_reconciled' => abs($invoicesTotal - $arDebits) < 0.01,
+        ];
+
+        // 2. Student Payments vs GL Settlement
+        $paymentsTotal = (float) Payment::where('school_id', $school->id)
+            ->whereBetween('paid_at', [$startStr, $endStr . ' 23:59:59'])
+            ->sum('amount');
+
+        $arCredits = (float) JournalEntry::whereHas('batch', function ($q) use ($school, $startStr, $endStr) {
+            $q->where('school_id', $school->id)
+                ->where('source_type', 'payment')
+                ->where('status', 'posted')
+                ->whereBetween('transaction_date', [$startStr, $endStr]);
+        })->whereHas('account', fn ($q) => $q->whereIn('code', ['1201', '1200']))
+          ->where('entry_type', 'credit')
+          ->sum('amount');
+
+        $paymentReconciliation = [
+            'payments_total' => $paymentsTotal,
+            'gl_ar_credits' => $arCredits,
+            'discrepancy' => round(abs($paymentsTotal - $arCredits), 2),
+            'is_reconciled' => abs($paymentsTotal - $arCredits) < 0.01,
+        ];
+
+        // 3. Kiosk Sales vs Kiosk GL
+        $kioskTotal = (float) \App\Models\KioskSale::where('school_id', $school->id)
+            ->whereBetween('sale_date', [$startStr, $endStr])
+            ->sum('grand_total');
+
+        $kioskGlCredits = (float) JournalEntry::whereHas('batch', function ($q) use ($school, $startStr, $endStr) {
+            $q->where('school_id', $school->id)
+                ->where('source_type', 'receipt')
+                ->where('status', 'posted')
+                ->whereBetween('transaction_date', [$startStr, $endStr]);
+        })->whereHas('account', fn ($q) => $q->where('code', '5803'))
+          ->where('entry_type', 'credit')
+          ->sum('amount');
+
+        $kioskReconciliation = [
+            'kiosk_sales_total' => $kioskTotal,
+            'gl_kiosk_credits' => $kioskGlCredits,
+            'discrepancy' => round(abs($kioskTotal - $kioskGlCredits), 2),
+            'is_reconciled' => abs($kioskTotal - $kioskGlCredits) < 0.01,
+        ];
+
+        return [
+            'start_date' => $startStr,
+            'end_date' => $endStr,
+            'invoices' => $invoiceReconciliation,
+            'payments' => $paymentReconciliation,
+            'kiosk' => $kioskReconciliation,
+            'is_fully_reconciled' => $invoiceReconciliation['is_reconciled'] && $paymentReconciliation['is_reconciled'] && $kioskReconciliation['is_reconciled'],
+        ];
+    }
 }
+

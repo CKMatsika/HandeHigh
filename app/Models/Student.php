@@ -209,6 +209,34 @@ class Student extends Model
             ->where('bed_assignments.is_current', true);
     }
 
+    public function latestEnrollment()
+    {
+        return $this->hasOne(Enrollment::class)->latestOfMany();
+    }
+
+    public function getEffectiveResidency(?string $academicYear = null, ?string $term = null): string
+    {
+        $query = $this->enrollments();
+        if ($academicYear) {
+            $query->where('academic_year', $academicYear);
+        }
+        if ($term) {
+            $query->where('term', $term);
+        }
+        $enrollment = $query->latest('enrollment_date')->first() ?? $this->latestEnrollment;
+
+        if ($enrollment) {
+            return $enrollment->isBoarder() ? 'boarding' : 'day';
+        }
+
+        return $this->is_boarding ? 'boarding' : 'day';
+    }
+
+    public function isBoardingOn(?string $academicYear = null, ?string $term = null): bool
+    {
+        return $this->getEffectiveResidency($academicYear, $term) === 'boarding';
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

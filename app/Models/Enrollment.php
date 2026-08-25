@@ -81,4 +81,14 @@ class Enrollment extends Model
         $this->extracurricular_activities = is_array($value) ? 
             json_encode($value) : $value;
     }
+
+    public function isBoarder(): bool
+    {
+        return ($this->student_type === 'boarding') || (bool) $this->is_boarding;
+    }
+
+    public function isDayScholar(): bool
+    {
+        return ! $this->isBoarder();
+    }
 }

@@ -76,8 +76,16 @@
     </div>
 
     <!-- Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 overflow-hidden space-y-4">
+        <x-documents.school-header 
+            :school="$school ?? null"
+            title="Official Examination Results Register"
+            :subtitle="(request('academic_year') ? 'Year: ' . request('academic_year') : 'All Academic Years') . (request('term') ? ' · ' . request('term') : '')"
+            reference="EXAM-LEDGER-{{ date('Ymd') }}"
+            :date="now()"
+        />
+
+        <div class="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white">Exam Results Entries ({{ number_format($total_results) }} Total)</h3>
         </div>
         <div class="overflow-x-auto">
@@ -125,6 +133,10 @@
             {{ $paginator->links() }}
         </div>
         @endif
+
+        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <x-documents.school-footer :school="$school ?? null" />
+        </div>
     </div>
 </div>
 @endsection

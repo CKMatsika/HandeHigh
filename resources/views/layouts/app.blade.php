@@ -215,6 +215,10 @@
                                     <span class="h-2 w-2 rounded-full bg-lime-400"></span>
                                     <span>Chart of Accounts</span>
                                 </a>
+                                <a href="{{ route('admin.accounting-periods.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.accounting-periods.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-yellow-400"></span>
+                                    <span>Accounting Periods</span>
+                                </a>
                                 <a href="{{ route('admin.journals.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.journals.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
                                     <span>Journal Entries</span>
@@ -443,11 +447,16 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </button>
-                            <div id="system-menu" class="hidden space-y-1 pl-6">
-                                <a href="{{ route('admin.schools.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.schools.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
-                                    <span>Schools</span>
+                                <a href="{{ route('admin.school.profile') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.school.profile') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>School Profile & Branding</span>
                                 </a>
+                                @if($user && $user->hasRole('super-admin'))
+                                    <a href="{{ route('admin.schools.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.schools.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                        <span>Schools (Provisioning)</span>
+                                    </a>
+                                @endif
                             </div>
                         </div>
                         

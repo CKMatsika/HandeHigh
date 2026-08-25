@@ -203,6 +203,46 @@ class FinancialReportController extends Controller
     }
 
     /**
+     * Authoritative School Revenue Summary by Category & Period
+     */
+    public function schoolRevenueSummary(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only(['period', 'start_date', 'end_date']);
+        $summary = $this->reportingService->getSchoolRevenueSummary($school, $filters);
+
+        if ($request->wantsJson() || $request->is('api/*')) {
+            return response()->json($summary);
+        }
+
+        return view('admin.reports.revenue-summary', compact('summary'));
+    }
+
+    /**
+     * Accounting Reconciliation Matrix
+     */
+    public function accountingReconciliation(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only(['start_date', 'end_date']);
+        $reconciliation = $this->reportingService->getAccountingReconciliation($school, $filters);
+
+        if ($request->wantsJson() || $request->is('api/*')) {
+            return response()->json($reconciliation);
+        }
+
+        return view('admin.reports.accounting-reconciliation', compact('reconciliation'));
+    }
+
+    /**
      * Fee Collection Periodic Summary
      */
     public function collectionSummary(Request $request)

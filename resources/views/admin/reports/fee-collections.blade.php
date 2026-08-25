@@ -3,7 +3,7 @@
 @section('content')
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="no-print flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('admin.reports.finance-dashboard') }}" class="text-xs text-slate-400 hover:text-slate-200">&larr; Financial Reports</a>
@@ -14,6 +14,10 @@
             <p class="text-xs text-slate-400 mt-0.5">Itemized transaction log of all payments and receipts received</p>
         </div>
         <div class="flex items-center gap-3">
+            <button onclick="window.print()" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Print Register
+            </button>
             <a href="{{ route('admin.reports.fee-collections.export', request()->query()) }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/30 transition flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 Export Excel (.xlsx)
@@ -119,23 +123,34 @@
         </div>
     </div>
 
-    <!-- Collections Table -->
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-xl">
+    <x-documents.school-header 
+        :school="$school ?? null"
+        title="Official Fee Collections & Revenue Audit Register"
+        :subtitle="'Period: ' . $start_date . ' to ' . $end_date . ' · Total Collections: $' . number_format($total_collected, 2)"
+        :date="now()"
+    />
+
+    <!-- Transactions Table -->
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-200">Collections Log ({{ $collections->count() }} Transactions)</h3>
+            <span class="text-xs text-slate-400">Total: <strong class="text-emerald-400 font-mono">${{ number_format($total_collected, 2) }}</strong></span>
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-xs">
-                <thead class="text-slate-300 bg-slate-950/80">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-slate-950/60 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
                     <tr>
-                        <th class="px-4 py-3 text-left font-medium">Date</th>
-                        <th class="px-4 py-3 text-left font-medium">Reference #</th>
-                        <th class="px-4 py-3 text-left font-medium">Student / Payer</th>
-                        <th class="px-4 py-3 text-left font-medium">Form / Class</th>
-                        <th class="px-4 py-3 text-left font-medium">Payment Mode</th>
-                        <th class="px-4 py-3 text-left font-medium">Fee Category</th>
-                        <th class="px-4 py-3 text-right font-medium">Amount ($)</th>
-                        <th class="px-4 py-3 text-left font-medium">Cashier</th>
+                        <th class="px-4 py-3">Date</th>
+                        <th class="px-4 py-3">Receipt / Ref</th>
+                        <th class="px-4 py-3">Student Name</th>
+                        <th class="px-4 py-3">Form / Class</th>
+                        <th class="px-4 py-3">Method</th>
+                        <th class="px-4 py-3">Fee Type</th>
+                        <th class="px-4 py-3 text-right">Amount</th>
+                        <th class="px-4 py-3">Cashier</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800">
+                <tbody class="divide-y divide-slate-800/60">
                     @forelse($collections as $item)
                         <tr class="hover:bg-slate-800/30 transition">
                             <td class="px-4 py-3 text-slate-300 font-mono whitespace-nowrap">{{ $item['date'] }}</td>
@@ -174,5 +189,11 @@
             </table>
         </div>
     </div>
+
+    <x-documents.school-footer 
+        :school="$school ?? null"
+        :show-banking="false"
+        notice="Official financial fee collection register. Audited and generated from verified school financial journals."
+    />
 </div>
 @endsection

@@ -3,7 +3,7 @@
 @section('content')
 <div class="space-y-6">
     <!-- Header & Action Bar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="no-print flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('admin.reports.finance-dashboard') }}" class="text-xs text-slate-400 hover:text-slate-200">&larr; Financial Reports</a>
@@ -14,6 +14,10 @@
             <p class="text-xs text-slate-400 mt-0.5">As of {{ $as_of_date }} | Grouped by: {{ ucfirst($group_by) }}</p>
         </div>
         <div class="flex items-center gap-3">
+            <button onclick="window.print()" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Print Report
+            </button>
             <a href="{{ route('admin.reports.debtors-aging.export', request()->query()) }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/30 transition flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 Export Excel (.xlsx)
@@ -155,18 +159,24 @@
         </div>
     </div>
 
-    <!-- Data Matrix Table -->
+    <x-documents.school-header 
+        :school="$school ?? null"
+        title="Official Debtors Aging Analysis & Audit Report"
+        :subtitle="'As of: ' . $as_of_date . ' · Grouped by: ' . ucfirst($group_by) . ' · Total Overdue: $' . number_format($totals['total_outstanding'], 2)"
+        :date="now()"
+    />
+
+    <!-- Data Table Section -->
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-xl">
         <div class="overflow-x-auto">
-            @if($group_by !== 'none' && $grouped_data->isNotEmpty())
-                <!-- Grouped View -->
+            @if($group_by !== 'none' && !empty($grouped_data))
                 <div class="divide-y divide-slate-800">
                     @foreach($grouped_data as $group)
                         <div class="p-4 bg-slate-950/60">
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                                 <h3 class="text-sm font-bold text-blue-400 flex items-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-blue-500"></span>
-                                    {{ $group['group_label'] }} ({{ count($group['rows']) }} invoices)
+                                    {{ $group['group_label'] }} ({{ $group['student_count'] }} students)
                                 </h3>
                                 <div class="flex items-center gap-4 text-xs font-mono">
                                     <span class="text-slate-400">Invoiced: ${{ number_format($group['total_invoiced'], 2) }}</span>
@@ -179,9 +189,10 @@
                                 <thead class="text-slate-400 bg-slate-900/80">
                                     <tr>
                                         <th class="px-3 py-2 text-left font-medium">Invoice #</th>
-                                        <th class="px-3 py-2 text-left font-medium">Student / Adm #</th>
+                                        <th class="px-3 py-2 text-left font-medium">Student Name</th>
+                                        <th class="px-3 py-2 text-left font-medium">Form / Class</th>
                                         <th class="px-3 py-2 text-left font-medium">Due Date</th>
-                                        <th class="px-3 py-2 text-right font-medium">Original</th>
+                                        <th class="px-3 py-2 text-right font-medium">Invoiced</th>
                                         <th class="px-3 py-2 text-right font-medium">Paid</th>
                                         <th class="px-3 py-2 text-right font-medium text-emerald-400">Current</th>
                                         <th class="px-3 py-2 text-right font-medium text-teal-400">1–30d</th>
@@ -200,12 +211,8 @@
                                                 {{ $row['student_name'] }}
                                                 <span class="text-[10px] text-slate-500 font-mono block">{{ $row['admission_number'] }}</span>
                                             </td>
-                                            <td class="px-3 py-2 text-slate-400">
-                                                {{ $row['due_date'] }}
-                                                @if($row['days_overdue'] > 0)
-                                                    <span class="text-[10px] text-red-400/80 block">{{ $row['days_overdue'] }}d overdue</span>
-                                                @endif
-                                            </td>
+                                            <td class="px-3 py-2 text-slate-400">{{ $row['form'] }} ({{ $row['class_name'] }})</td>
+                                            <td class="px-3 py-2 text-slate-400">{{ $row['due_date'] }}</td>
                                             <td class="px-3 py-2 text-right text-slate-300 font-mono">${{ number_format($row['original_amount'], 2) }}</td>
                                             <td class="px-3 py-2 text-right text-emerald-400 font-mono">${{ number_format($row['paid_amount'], 2) }}</td>
                                             <td class="px-3 py-2 text-right text-slate-400 font-mono">{{ $row['current_amount'] > 0 ? '$' . number_format($row['current_amount'], 2) : '-' }}</td>
@@ -223,15 +230,14 @@
                     @endforeach
                 </div>
             @else
-                <!-- Flat Table View -->
                 <table class="w-full text-xs">
                     <thead class="text-slate-300 bg-slate-950/80">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium">Invoice #</th>
-                            <th class="px-4 py-3 text-left font-medium">Student / Adm #</th>
+                            <th class="px-4 py-3 text-left font-medium">Student Name</th>
                             <th class="px-4 py-3 text-left font-medium">Form / Class</th>
                             <th class="px-4 py-3 text-left font-medium">Due Date</th>
-                            <th class="px-4 py-3 text-right font-medium">Original</th>
+                            <th class="px-4 py-3 text-right font-medium">Invoiced</th>
                             <th class="px-4 py-3 text-right font-medium">Paid</th>
                             <th class="px-4 py-3 text-right font-medium text-emerald-400">Current</th>
                             <th class="px-4 py-3 text-right font-medium text-teal-400">1–30d</th>
@@ -295,5 +301,11 @@
             @endif
         </div>
     </div>
+
+    <x-documents.school-footer 
+        :school="$school ?? null"
+        :show-banking="false"
+        notice="Official debtors aging report. Generated from active student receivables ledger."
+    />
 </div>
 @endsection

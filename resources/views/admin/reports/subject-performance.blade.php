@@ -5,10 +5,10 @@
 @section('content')
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="no-print flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Subject Performance Report</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Subject-by-subject assessment averages, score ranges, and pass rate analysis for {{ $school->name }}.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Subject-by-subject assessment averages, score ranges, and pass rate analysis for {{ $school->display_name ?: $school->name }}.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <button onclick="window.print()" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition flex items-center gap-2">
@@ -23,7 +23,7 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="no-print bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <form method="GET" action="{{ route('admin.reports.subject-performance') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
                 <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Academic Year</label>
@@ -53,6 +53,13 @@
             </div>
         </form>
     </div>
+
+    <x-documents.school-header 
+        :school="$school ?? null"
+        title="Subject Academic Performance & Ranking Report"
+        :subtitle="'Academic Period: ' . (request('academic_year') ?: 'All Years') . ' · ' . (request('term') ?: 'All Terms')"
+        :date="now()"
+    />
 
     <!-- Table -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -96,5 +103,11 @@
             </table>
         </div>
     </div>
+
+    <x-documents.school-footer 
+        :school="$school ?? null"
+        :show-banking="false"
+        notice="Official departmental subject performance analysis report generated from verified academic records."
+    />
 </div>
 @endsection

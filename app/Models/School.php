@@ -12,10 +12,15 @@ class School extends Model
 
     protected $fillable = [
         'name',
+        'display_name',
         'code',
         'email',
         'phone',
+        'telephone',
+        'mobile',
+        'whatsapp',
         'address',
+        'postal_address',
         'city',
         'state',
         'country',
@@ -26,9 +31,46 @@ class School extends Model
         'logo',
         'established_year',
         'school_type',
+        'registration_number',
+        'zimsec_center_number',
+        'principal_name',
+        'bursar_name',
+        'administrator_name',
+        'primary_color',
+        'secondary_color',
+        'footer_text',
+        'bank_name',
+        'bank_account_name',
+        'bank_account_number',
+        'bank_branch',
+        'payment_instructions',
         'timezone',
         'currency',
     ];
+
+    /**
+     * Get the full branding data payload for document generation.
+     */
+    public function getBrandingDataAttribute(): array
+    {
+        return app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getBrandingPayload($this);
+    }
+
+    /**
+     * Get public logo URL.
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        return app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getLogoUrl($this);
+    }
+
+    /**
+     * Get base64 logo data for offline print/PDF.
+     */
+    public function getLogoBase64Attribute(): ?string
+    {
+        return app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getLogoBase64($this);
+    }
 
     public function users()
     {

@@ -112,9 +112,34 @@
         <button class="btn" onclick="window.print()">Print Timetable</button>
     </div>
 
-    <div class="header">
-        <h1>{{ $timetable->school->name }}</h1>
-        <p>{{ $title }} &bull; {{ $timetable->academic_year }} - {{ $timetable->term }} &bull; Status: {{ ucfirst($timetable->status) }}</p>
+    @php
+        $branding = $timetable->school->branding_data;
+    @endphp
+
+    <div class="header" style="text-align: left; display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="display: flex; gap: 16px; align-items: flex-start;">
+            @if(!empty($branding['logo_base64']) || !empty($branding['logo_url']))
+                <div>
+                    <img src="{{ $branding['logo_base64'] ?: $branding['logo_url'] }}" alt="{{ $branding['name'] }}" style="max-height: 56px; max-width: 56px; object-fit: contain;">
+                </div>
+            @else
+                <div style="width: 50px; height: 50px; border-radius: 8px; background: linear-gradient(135deg, {{ $branding['primary_color'] ?? '#1e3a8a' }}, {{ $branding['secondary_color'] ?? '#d97706' }}); color: #fff; font-weight: bold; font-size: 16px; display: flex; align-items: center; justify-content: center;">
+                    {{ strtoupper(substr($branding['name'] ?? 'H', 0, 2)) }}
+                </div>
+            @endif
+            <div>
+                <h1 style="font-size: 18px; text-transform: uppercase; margin-bottom: 2px;">{{ $branding['name'] }}</h1>
+                @if(!empty($branding['motto']))
+                    <p style="font-size: 11px; font-style: italic; color: #64748b; margin-bottom: 2px;">"{{ $branding['motto'] }}"</p>
+                @endif
+                <p style="font-size: 11px; color: #475569;">{{ $branding['formatted_address'] }} &bull; {{ $branding['formatted_contacts'] }}</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 13px; font-weight: 700; color: #2563eb; text-transform: uppercase;">{{ $title }}</div>
+            <div style="font-size: 11px; color: #475569; margin-top: 2px;">Academic Year: {{ $timetable->academic_year }} &bull; {{ $timetable->term }}</div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Status: <strong>{{ ucfirst($timetable->status) }}</strong> &bull; {{ now()->format('d M Y') }}</div>
+        </div>
     </div>
 
     @if($type === 'class' && $data)

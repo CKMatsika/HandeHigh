@@ -72,8 +72,16 @@
     </div>
 
     <!-- Register Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 overflow-hidden space-y-4">
+        <x-documents.school-header 
+            :school="$school ?? null"
+            title="Official Student Master Register Directory"
+            :subtitle="(request('grade') ? 'Grade/Form: ' . request('grade') : 'All Forms & Classes')"
+            reference="STUDENT-REG-{{ date('Ymd') }}"
+            :date="now()"
+        />
+
+        <div class="px-2 py-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <h3 class="font-semibold text-gray-900 dark:text-white">Registered Students ({{ number_format($total_students) }} Total)</h3>
         </div>
         <div class="overflow-x-auto">
@@ -125,6 +133,10 @@
             {{ $paginator->links() }}
         </div>
         @endif
+
+        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <x-documents.school-footer :school="$school ?? null" />
+        </div>
     </div>
 </div>
 @endsection

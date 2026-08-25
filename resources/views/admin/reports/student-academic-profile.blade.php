@@ -5,10 +5,10 @@
 @section('content')
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="no-print flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Student Academic Profile</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Comprehensive student transcript, assessment history, and attendance records for {{ $school->name }}.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Comprehensive student transcript, assessment history, and attendance records for {{ $school->display_name ?: $school->name }}.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <button onclick="window.print()" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition flex items-center gap-2">
@@ -20,7 +20,7 @@
     </div>
 
     <!-- Student Selector -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="no-print bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <form method="GET" action="{{ route('admin.reports.student-academic-profile') }}" class="flex flex-col sm:flex-row items-end gap-3">
             <div class="flex-1 w-full">
                 <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Select Student</label>
@@ -39,6 +39,12 @@
     </div>
 
     @if($selected_student && $profile)
+    <x-documents.school-header 
+        :school="$school ?? null"
+        title="Official Student Academic Transcript & Profile"
+        :subtitle="$selected_student->first_name . ' ' . $selected_student->last_name . ' · Admission ' . ($selected_student->admission_number ?? 'N/A') . ' · ' . $selected_student->grade . ' ' . $selected_student->class_name"
+        :date="now()"
+    />
     <!-- Student Demographic & KPI Card -->
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-5">
@@ -127,6 +133,12 @@
             </table>
         </div>
     </div>
+
+    <x-documents.school-footer 
+        :school="$school ?? null"
+        :show-banking="false"
+        notice="Official transcript of academic assessment records. Verified and issued by school administration."
+    />
     @else
     <div class="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 shadow-sm border border-gray-200 dark:border-gray-700">
         Please select a student above to inspect their academic profile.

@@ -70,19 +70,13 @@
         <!-- Official Printable Statement Container -->
         <div class="rounded-2xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl print:border-none print:bg-white print:text-slate-900 print:p-0">
             <!-- Statement Header -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-800 print:border-slate-300 gap-4">
-                <div>
-                    <h2 class="text-xl font-bold text-slate-100 print:text-slate-900">{{ $statementData['school']->name }}</h2>
-                    <p class="text-xs text-slate-400 print:text-slate-600 mt-1">OFFICIAL STUDENT ACCOUNT STATEMENT</p>
-                    <p class="text-xs text-slate-400 print:text-slate-600">Generated: {{ now()->format('d M Y, H:i') }}</p>
-                </div>
-                <div class="text-right sm:text-right">
-                    <div class="text-xs text-slate-400 print:text-slate-600">Statement Period</div>
-                    <div class="text-sm font-semibold text-slate-200 print:text-slate-900 mt-0.5">
-                        {{ $statementData['academic_year'] ?? 'All Time' }} {{ $statementData['term'] ? ' - ' . $statementData['term'] : '' }}
-                    </div>
-                </div>
-            </div>
+            <x-documents.school-header 
+                :school="$statementData['school']"
+                title="Official Student Account Statement"
+                :subtitle="($statementData['academic_year'] ?? 'All Academic Years') . ($statementData['term'] ? ' · ' . $statementData['term'] : '')"
+                :reference="'STMT-' . ($statementData['student']->admission_number ?? $statementData['student']->id)"
+                :date="now()"
+            />
 
             <!-- Student Metadata Box -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 py-5 border-b border-slate-800 print:border-slate-300">
@@ -193,17 +187,11 @@
                 </table>
             </div>
 
-            <!-- Sign-off Section -->
-            <div class="mt-12 pt-6 border-t border-slate-800 print:border-slate-300 grid grid-cols-2 gap-8 text-xs text-slate-400 print:text-slate-600">
-                <div>
-                    <p class="mb-8">Accounts Office Stamp & Signature:</p>
-                    <div class="border-b border-dashed border-slate-700 print:border-slate-400 w-48"></div>
-                </div>
-                <div class="text-right">
-                    <p class="mb-8">Date of Issue:</p>
-                    <div class="border-b border-dashed border-slate-700 print:border-slate-400 w-48 ml-auto"></div>
-                </div>
-            </div>
+            <!-- Unified Document Footer -->
+            <x-documents.school-footer 
+                :school="$statementData['school']"
+                :showBanking="true"
+            />
         </div>
     @else
         <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-12 text-center text-slate-500">

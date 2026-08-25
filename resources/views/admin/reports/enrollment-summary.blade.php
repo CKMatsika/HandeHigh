@@ -5,10 +5,10 @@
 @section('content')
 <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="no-print flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Enrollment Summary Report</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Demographic breakdown, form/class distributions, and age demographics for {{ $school->name }}.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Demographic breakdown, form/class distributions, and age demographics for {{ $school->display_name ?: $school->name }}.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <button onclick="window.print()" class="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition flex items-center gap-2">
@@ -23,7 +23,7 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="no-print bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <form method="GET" action="{{ route('admin.reports.enrollment-summary') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
                 <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Grade / Form</label>
@@ -67,6 +67,13 @@
             </div>
         </form>
     </div>
+
+    <x-documents.school-header 
+        :school="$school ?? null"
+        title="Official Student Enrollment & Demographic Summary Report"
+        :subtitle="'Grade: ' . (request('grade') ?: 'All Grades') . ' · Class: ' . (request('class_name') ?: 'All Classes') . ' · Status: ' . (request('status') ? ucfirst(request('status')) : 'All')"
+        :date="now()"
+    />
 
     <!-- Summary Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -149,5 +156,11 @@
             @endforeach
         </div>
     </div>
+
+    <x-documents.school-footer 
+        :school="$school ?? null"
+        :show-banking="false"
+        notice="Official institutional enrollment demographic report generated from verified student registry."
+    />
 </div>
 @endsection

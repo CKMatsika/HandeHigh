@@ -23,12 +23,39 @@ class AccountingService
         DB::beginTransaction();
         
         try {
+            // Period Validation: ensure accounting period is open for transaction date
+            app(\App\Services\Finance\AccountingPeriodService::class)->assertPeriodOpen(
+                $data['transaction_date'],
+                $data['school_id'],
+                'create or post journal batch'
+            );
+
             // Validate entries are balanced
             $debitTotal = collect($data['entries'])->where('entry_type', 'debit')->sum('amount');
             $creditTotal = collect($data['entries'])->where('entry_type', 'credit')->sum('amount');
             
             if (abs($debitTotal - $creditTotal) > 0.01) {
                 throw new \Exception('Journal entries are not balanced. Debits: ' . $debitTotal . ', Credits: ' . $creditTotal);
+            }
+
+            // Validate all accounts are postable, active, and belong to the correct school tenant
+            $accountIds = collect($data['entries'])->pluck('account_id')->unique();
+            $accounts = Account::whereIn('id', $accountIds)->get()->keyBy('id');
+
+            foreach ($data['entries'] as $entryData) {
+                $acc = $accounts->get($entryData['account_id']);
+                if (! $acc) {
+                    throw new \InvalidArgumentException("Account ID {$entryData['account_id']} not found.");
+                }
+                if (! $acc->is_postable) {
+                    throw new \InvalidArgumentException("Cannot post journal entry to non-postable header account: {$acc->code} - {$acc->name}.");
+                }
+                if (! $acc->is_active) {
+                    throw new \InvalidArgumentException("Cannot post journal entry to deactivated account: {$acc->code} - {$acc->name}.");
+                }
+                if ($acc->school_id !== (int) $data['school_id']) {
+                    throw new \InvalidArgumentException("Cross-tenant violation: Account {$acc->code} does not belong to school {$data['school_id']}.");
+                }
             }
             
             // Generate batch number
@@ -67,7 +94,7 @@ class AccountingService
                 $this->postBatch($batch);
             } elseif ($batch->status === 'posted') {
                 // If batch was created as posted, update account balances directly
-                foreach ($batch->entries as $entry) {
+                foreach ($batch->entries()->get() as $entry) {
                     $this->updateAccountBalance(
                         $entry->account_id,
                         $batch->school_id,
@@ -105,6 +132,13 @@ class AccountingService
         if (!$batch->isBalanced()) {
             throw new \Exception('Batch is not balanced and cannot be posted');
         }
+
+        // Assert accounting period is open for batch transaction date
+        app(\App\Services\Finance\AccountingPeriodService::class)->assertPeriodOpen(
+            $batch->transaction_date,
+            $batch->school_id,
+            'post journal batch'
+        );
         
         DB::beginTransaction();
         
@@ -178,59 +212,302 @@ class AccountingService
     }
     
     /**
-     * Post invoice to accounting
+     * Post invoice to accounting with itemized revenue account allocation
      */
     public function postInvoice($invoice): JournalBatch
     {
         $school = $invoice->school;
         
-        // Prevent duplicate journal batch postings for the same invoice
+        $invoice->load(['items.feeStructure', 'student', 'school']);
+
+        // Check if batch already exists for this invoice
         $existingBatch = JournalBatch::where('school_id', $school->id)
             ->where('source_type', 'invoice')
             ->where('source_id', $invoice->id)
             ->first();
             
         if ($existingBatch) {
-            return $existingBatch;
+            // If items now exist and existing batch only had 1 un-itemized credit entry, update it
+            if ($invoice->items && $invoice->items->count() > 1 && $existingBatch->entries()->where('entry_type', 'credit')->count() <= 1) {
+                $existingBatch->entries()->delete();
+                $repostExisting = true;
+            } else {
+                return $existingBatch;
+            }
         }
-        
-        // Get or create accounts
+
+        // Accounts Receivable Account
         $feesReceivableAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['1201', '1200']) // Student Fees AR fallback to AR
-            ->first();
+            ->where('code', '1201')
+            ->first() ?? Account::where('school_id', $school->id)->where('code', '1200')->first();
         
-        $feesRevenueAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['5100', '4100']) // Tuition Revenue
-            ->first();
-        
-        if (!$feesReceivableAccount || !$feesRevenueAccount) {
-            throw new \Exception('Required accounts not found. Please ensure Chart of Accounts is set up.');
+        if (! $feesReceivableAccount) {
+            $feesReceivableAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => '1201',
+                'name' => 'Student Fees Receivable',
+                'type' => 'asset',
+                'category' => 'receivable',
+                'is_active' => true,
+            ]);
         }
+
+        $resolver = app(\App\Services\Finance\FeeRevenueAccountResolver::class);
+        $creditEntries = [];
+        $totalItemizedCredits = 0.0;
+
+        if ($invoice->items && $invoice->items->count() > 0) {
+            // Group items by resolved revenue account
+            $accountGroups = [];
+            foreach ($invoice->items as $item) {
+                $account = $resolver->resolveAccountForItem($school, $item);
+                $amount = (float) $item->line_total;
+                if ($amount <= 0) {
+                    continue;
+                }
+
+                if (! isset($accountGroups[$account->id])) {
+                    $accountGroups[$account->id] = [
+                        'account' => $account,
+                        'total' => 0.0,
+                    ];
+                }
+                $accountGroups[$account->id]['total'] += $amount;
+            }
+
+            foreach ($accountGroups as $group) {
+                $creditEntries[] = [
+                    'account_id' => $group['account']->id,
+                    'entry_type' => 'credit',
+                    'amount' => $group['total'],
+                    'memo' => "Invoice {$invoice->number} - {$group['account']->name}",
+                ];
+                $totalItemizedCredits += $group['total'];
+            }
+        }
+
+        // Fallback if no items or zero total items
+        if (empty($creditEntries)) {
+            $defaultRevenue = Account::where('school_id', $school->id)
+                ->whereIn('code', ['5100', '4100'])
+                ->first() ?? Account::create([
+                    'school_id' => $school->id,
+                    'code' => '5100',
+                    'name' => 'Tuition Fees',
+                    'type' => 'revenue',
+                    'category' => 'tuition_revenue',
+                    'is_active' => true,
+                ]);
+
+            $creditEntries[] = [
+                'account_id' => $defaultRevenue->id,
+                'entry_type' => 'credit',
+                'amount' => $invoice->total_amount,
+                'memo' => "Invoice {$invoice->number} - General Revenue",
+            ];
+            $totalItemizedCredits = (float) $invoice->total_amount;
+        }
+
+        // Handle any rounding difference between total_amount and items sum
+        $invoiceTotal = (float) $invoice->total_amount;
+        if (abs($invoiceTotal - $totalItemizedCredits) > 0.001) {
+            $diff = $invoiceTotal - $totalItemizedCredits;
+            $creditEntries[0]['amount'] += $diff;
+        }
+
+        $entries = array_merge([
+            [
+                'account_id' => $feesReceivableAccount->id,
+                'entry_type' => 'debit',
+                'amount' => $invoiceTotal,
+                'memo' => 'Invoice ' . $invoice->number,
+            ],
+        ], $creditEntries);
         
+        if (! empty($repostExisting) && $existingBatch) {
+            foreach ($entries as $entryData) {
+                JournalEntry::create([
+                    'journal_batch_id' => $existingBatch->id,
+                    'account_id' => $entryData['account_id'],
+                    'entry_type' => $entryData['entry_type'],
+                    'amount' => $entryData['amount'],
+                    'memo' => $entryData['memo'] ?? null,
+                    'cost_center_id' => $entryData['cost_center_id'] ?? null,
+                    'project_id' => $entryData['project_id'] ?? null,
+                    'reference' => $entryData['reference'] ?? null,
+                ]);
+            }
+            return $existingBatch->fresh(['entries.account']);
+        }
+
         return $this->createJournalBatch([
             'school_id' => $school->id,
-            'transaction_date' => $invoice->issued_at,
+            'transaction_date' => $invoice->issued_at ?? now()->toDateString(),
             'reference_number' => $invoice->number,
             'description' => 'Invoice ' . $invoice->number . ' for ' . ($invoice->student->full_name ?? 'Student'),
             'source_type' => 'invoice',
             'source_id' => $invoice->id,
             'status' => 'posted',
-            'created_by' => auth()->id(),
-            'entries' => [
-                [
-                    'account_id' => $feesReceivableAccount->id,
-                    'entry_type' => 'debit',
-                    'amount' => $invoice->total_amount,
-                    'memo' => 'Invoice ' . $invoice->number,
-                ],
-                [
-                    'account_id' => $feesRevenueAccount->id,
-                    'entry_type' => 'credit',
-                    'amount' => $invoice->total_amount,
-                    'memo' => 'Invoice ' . $invoice->number,
-                ],
-            ],
+            'created_by' => auth()->id() ?? 1,
+            'entries' => $entries,
         ]);
+    }
+
+    /**
+     * Post a kiosk/canteen sale to accounting
+     */
+    public function postKioskSale($kioskSale): JournalBatch
+    {
+        $school = $kioskSale->school;
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'receipt')
+            ->where('reference_number', $kioskSale->receipt_number)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
+        $cashAccountCode = match($kioskSale->payment_method) {
+            'cash' => '1102',
+            'bank_transfer', 'card' => '1301',
+            'mobile_money' => '1303',
+            default => '1102',
+        };
+
+        $cashAccount = Account::where('school_id', $school->id)
+            ->where('code', $cashAccountCode)
+            ->first() ?? Account::where('school_id', $school->id)->whereIn('code', ['1100', '1301', '1010'])->first();
+
+        $kioskRevenueAccount = Account::where('school_id', $school->id)
+            ->where('code', '5803')
+            ->first();
+
+        if (! $kioskRevenueAccount) {
+            $kioskRevenueAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => '5803',
+                'name' => 'Canteen / Kiosk Sales',
+                'type' => 'revenue',
+                'category' => 'other_revenue',
+                'is_active' => true,
+            ]);
+        }
+
+        if (! $cashAccount) {
+            $cashAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => '1102',
+                'name' => 'Petty Cash',
+                'type' => 'asset',
+                'category' => 'cash',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
+        }
+
+        $creditEntries = [];
+        $kioskSale->loadMissing(['items.product.revenueAccount']);
+        if ($kioskSale->items && $kioskSale->items->count() > 0) {
+            $accountGroups = [];
+            foreach ($kioskSale->items as $item) {
+                $revAcc = ($item->product && $item->product->revenue_account_id)
+                    ? $item->product->revenueAccount
+                    : null;
+
+                if (! $revAcc) {
+                    $revAcc = $kioskRevenueAccount;
+                }
+
+                if (! isset($accountGroups[$revAcc->id])) {
+                    $accountGroups[$revAcc->id] = [
+                        'account' => $revAcc,
+                        'total' => 0.0,
+                    ];
+                }
+                $accountGroups[$revAcc->id]['total'] += (float) $item->line_total;
+            }
+
+            foreach ($accountGroups as $group) {
+                $creditEntries[] = [
+                    'account_id' => $group['account']->id,
+                    'entry_type' => 'credit',
+                    'amount' => $group['total'],
+                    'memo' => 'Kiosk Sale ' . $kioskSale->receipt_number . ' - ' . $group['account']->name,
+                ];
+            }
+        }
+
+        if (empty($creditEntries)) {
+            $creditEntries[] = [
+                'account_id' => $kioskRevenueAccount->id,
+                'entry_type' => 'credit',
+                'amount' => $kioskSale->grand_total,
+                'memo' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+            ];
+        }
+
+        $journalBatch = $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $kioskSale->sale_date ?? now()->toDateString(),
+            'reference_number' => $kioskSale->receipt_number,
+            'description' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+            'source_type' => 'receipt',
+            'source_id' => $kioskSale->id,
+            'status' => 'posted',
+            'created_by' => $kioskSale->cashier_id ?? auth()->id() ?? 1,
+            'entries' => array_merge([
+                [
+                    'account_id' => $cashAccount->id,
+                    'entry_type' => 'debit',
+                    'amount' => $kioskSale->grand_total,
+                    'memo' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+                ],
+            ], $creditEntries),
+        ]);
+
+        // Create cashbook entry
+        $this->createCashbookEntryForKiosk($kioskSale, $cashAccount);
+
+        return $journalBatch;
+    }
+
+    /**
+     * Create cashbook entry for kiosk sale
+     */
+    private function createCashbookEntryForKiosk($kioskSale, $cashAccount): void
+    {
+        $school = $kioskSale->school;
+
+        $lastBalance = \App\Models\Cashbook::where('school_id', $school->id)
+            ->where('account_id', $cashAccount->id)
+            ->orderBy('transaction_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->value('balance_after') ?? 0;
+
+        $newBalance = $lastBalance + $kioskSale->grand_total;
+
+        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
+
+        try {
+            \App\Models\Cashbook::create([
+                'school_id' => $school->id,
+                'account_id' => $cashAccount->id,
+                'transaction_type' => 'income',
+                'category' => 'kiosk_sales',
+                'description' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+                'amount' => $kioskSale->grand_total,
+                'balance_after' => $newBalance,
+                'transaction_date' => $kioskSale->sale_date ?? now()->toDateString(),
+                'reference_number' => $kioskSale->receipt_number,
+                'payment_method' => $kioskSale->payment_method,
+                'created_by' => $kioskSale->cashier_id ?? auth()->id() ?? 1,
+                'notes' => 'Kiosk / Canteen retail sale',
+            ]);
+        } finally {
+            \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
+        }
     }
     
     /**

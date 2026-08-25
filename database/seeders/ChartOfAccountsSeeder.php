@@ -27,7 +27,7 @@ class ChartOfAccountsSeeder extends Seeder
     {
         // Check if accounts already exist
         if (Account::where('school_id', $school->id)->exists()) {
-            $this->command->warn("Accounts already exist for school: {$school->name}. Skipping...");
+            $this->command?->warn("Accounts already exist for school: {$school->name}. Skipping...");
             return;
         }
         
@@ -166,6 +166,8 @@ class ChartOfAccountsSeeder extends Seeder
         
         $parentMap = [];
         
+        $nonPostableCodes = ['1000', '2000', '3000', '4000', '5000', '6000'];
+
         foreach ($accounts as $accountData) {
             $parentId = null;
             
@@ -173,6 +175,8 @@ class ChartOfAccountsSeeder extends Seeder
                 $parentId = $parentMap[$accountData['parent_code']] ?? null;
             }
             
+            $isPostable = $accountData['is_postable'] ?? (! in_array($accountData['code'], $nonPostableCodes));
+
             $account = Account::create([
                 'school_id' => $school->id,
                 'code' => $accountData['code'],
@@ -183,12 +187,13 @@ class ChartOfAccountsSeeder extends Seeder
                 'opening_balance' => 0,
                 'currency' => 'USD',
                 'is_active' => true,
+                'is_postable' => $isPostable,
                 'sort_order' => $accountData['sort_order'],
             ]);
             
             $parentMap[$accountData['code']] = $account->id;
         }
         
-        $this->command->info("Chart of Accounts created for school: {$school->name}");
+        $this->command?->info("Chart of Accounts created for school: {$school->name}");
     }
 }

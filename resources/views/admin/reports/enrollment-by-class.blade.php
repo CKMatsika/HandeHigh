@@ -47,7 +47,15 @@
     </div>
 
     <!-- Matrix Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 overflow-hidden space-y-4">
+        <x-documents.school-header 
+            :school="$school ?? null"
+            title="Institutional Enrollment by Form & Stream Matrix"
+            :subtitle="(request('grade') ? 'Form: ' . request('grade') : 'All Forms & Streams') . (request('status') ? ' · Status: ' . ucfirst(request('status')) : '')"
+            reference="ENROLL-MAT-{{ date('Ymd') }}"
+            :date="now()"
+        />
+
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-900/50 text-xs font-semibold text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
@@ -91,6 +99,9 @@
                     </tr>
                 </tfoot>
             </table>
+        </div>
+        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <x-documents.school-footer :school="$school ?? null" />
         </div>
     </div>
 </div>

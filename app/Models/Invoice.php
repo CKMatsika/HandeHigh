@@ -23,6 +23,7 @@ class Invoice extends Model
         'issued_at',
         'due_date',
         'status',
+        'school_snapshot',
     ];
 
     protected $casts = [
@@ -30,7 +31,17 @@ class Invoice extends Model
         'balance' => 'decimal:2',
         'issued_at' => 'date',
         'due_date' => 'date',
+        'school_snapshot' => 'array',
     ];
+
+    /**
+     * Resolve document branding payload using frozen snapshot or live school fallback.
+     */
+    public function getSchoolBrandingAttribute(): array
+    {
+        return app(\App\Services\Branding\SchoolDocumentBrandingService::class)
+            ->getBrandingPayload($this->school, $this->school_snapshot);
+    }
 
     public function school()
     {

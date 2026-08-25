@@ -1,13 +1,26 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="flex items-center justify-between mb-4">
+    <div class="no-print flex items-center justify-between mb-4">
         <div>
             <h1 class="text-lg font-semibold text-slate-50">Expense Analysis Report</h1>
             <p class="text-xs text-slate-400 mt-1">{{ $start }} to {{ $end }}</p>
         </div>
-        <a href="{{ route('admin.reports.expense-analysis') }}" class="text-xs text-slate-300 hover:text-white">Refresh</a>
+        <div class="flex items-center gap-2">
+            <button onclick="window.print()" class="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Print Report
+            </button>
+            <a href="{{ route('admin.reports.expense-analysis') }}" class="text-xs text-slate-300 hover:text-white px-3 py-2">Refresh</a>
+        </div>
     </div>
+
+    <x-documents.school-header 
+        :school="$school ?? null"
+        title="Official Expenditure & Expense Analysis Report"
+        :subtitle="'Reporting Period: ' . $start . ' to ' . $end . ' · Grouped by: ' . ucfirst($groupBy) . ' · Total Expenditure: $' . number_format($totalExpenses, 2)"
+        :date="now()"
+    />
 
     <!-- Filters -->
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 mb-4">
@@ -136,4 +149,10 @@
             <div class="text-slate-500 text-xs mt-2">Try adjusting the date range or check if expense transactions have been recorded</div>
         </div>
     @endif
+
+    <x-documents.school-footer 
+        :school="$school ?? null"
+        :show-banking="false"
+        notice="Official institutional expense breakdown and cost ledger audit statement."
+    />
 @endsection

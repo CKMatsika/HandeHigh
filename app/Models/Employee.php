@@ -118,4 +118,34 @@ class Employee extends Model
     {
         return $query->where('department_id', $departmentId);
     }
+
+    public function managedHostels(): HasMany
+    {
+        return $this->hasMany(Hostel::class, 'supervisor_id');
+    }
+
+    public function managedDormitories(): HasMany
+    {
+        return $this->hasMany(Dormitory::class, 'supervisor_id');
+    }
+
+    public function isNonTeaching(): bool
+    {
+        $pos = strtolower($this->position ?? '');
+        $dept = strtolower($this->department?->name ?? '');
+        
+        return ! str_contains($pos, 'teacher') && ! str_contains($dept, 'academics');
+    }
+
+    public function isMatron(): bool
+    {
+        $pos = strtolower($this->position ?? '');
+        return str_contains($pos, 'matron');
+    }
+
+    public function isBoardingMaster(): bool
+    {
+        $pos = strtolower($this->position ?? '');
+        return str_contains($pos, 'boarding master') || str_contains($pos, 'hostel master') || str_contains($pos, 'dorm master');
+    }
 }

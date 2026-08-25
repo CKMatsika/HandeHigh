@@ -69,10 +69,19 @@
         </form>
     </div>
 
-    <!-- Register Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+    <!-- Register Table Container -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 overflow-hidden">
+        <x-documents.school-header 
+            :school="$school ?? null"
+            title="Official Daily Student Attendance Register"
+            :subtitle="(request('start_date') ? 'From ' . request('start_date') : 'Current Session') . (request('end_date') ? ' to ' . request('end_date') : '')"
+            reference="ATT-REG-{{ date('Ymd') }}"
+            :date="now()"
+        />
+
+        <div class="px-2 py-2 border-b border-gray-200 dark:border-gray-700 mb-3 flex justify-between items-center text-xs text-gray-500">
             <h3 class="font-semibold text-gray-900 dark:text-white">Attendance Records ({{ number_format($total_records) }} Total)</h3>
+            <span>Class Teacher Daily Register Session</span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
@@ -124,6 +133,8 @@
             {{ $paginator->links() }}
         </div>
         @endif
+
+        <x-documents.school-footer :school="$school ?? null" />
     </div>
 </div>
 @endsection

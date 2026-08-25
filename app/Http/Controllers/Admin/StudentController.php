@@ -475,24 +475,24 @@ class StudentController extends Controller
             'bed_id' => ['required', TenantExists::make('beds')],
             'academic_year' => 'required|string',
             'term' => 'required|string',
+            'notes' => 'nullable|string|max:255',
         ]);
 
-        DB::transaction(function () use ($student, $validated) {
-            $student->update(['is_boarding' => true]);
+        $bed = Bed::whereHas('dormitory', fn ($q) => $q->where('school_id', $school->id))->findOrFail($validated['bed_id']);
 
-            if ($student->currentBedAssignment) {
-                $student->currentBedAssignment->update(['is_current' => false, 'released_date' => now()]);
-            }
-
-            BedAssignment::create([
-                'bed_id' => $validated['bed_id'],
-                'student_id' => $student->id,
-                'academic_year' => $validated['academic_year'],
-                'term' => $validated['term'],
-                'assigned_date' => now(),
-                'is_current' => true,
-            ]);
-        });
+        try {
+            $allocationService = app(\App\Services\Residency\BedAllocationService::class);
+            $allocationService->allocateBed(
+                $student,
+                $bed,
+                $validated['academic_year'],
+                $validated['term'],
+                $validated['notes'] ?? null
+            );
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('admin.students.manage-boarding', $student)
+                ->withErrors(['bed_id' => $e->getMessage()]);
+        }
 
         return redirect()->route('admin.students.manage-boarding', $student)
             ->with('success', 'Bed assigned successfully.');
@@ -504,26 +504,50 @@ class StudentController extends Controller
         $school = $user->school;
         if (!$school || $student->school_id !== $school->id) abort(403);
 
-        if ($student->currentBedAssignment) {
-            $student->currentBedAssignment->update([
-                'is_current' => false,
-                'released_date' => now(),
-            ]);
-        }
-
-        $student->update(['is_boarding' => false]);
+        $allocationService = app(\App\Services\Residency\BedAllocationService::class);
+        $allocationService->releaseBed($student);
 
         return redirect()->route('admin.students.manage-boarding', $student)
             ->with('success', 'Bed released successfully.');
     }
 
+    public function transitionResidency(Request $request, Student $student)
+    {
+        $user = Auth::user();
+        $school = $user->school;
+        if (!$school || $student->school_id !== $school->id) abort(403);
+
+        $validated = $request->validate([
+            'target_residency' => 'required|in:boarding,day',
+            'academic_year' => 'required|string',
+            'term' => 'required|string',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $residencyService = app(\App\Services\Residency\StudentResidencyService::class);
+        $residencyService->transitionResidency(
+            $student,
+            $validated['target_residency'],
+            $validated['academic_year'],
+            $validated['term'],
+            $validated['reason'] ?? null
+        );
+
+        $label = $validated['target_residency'] === 'boarding' ? 'Boarder' : 'Day Scholar';
+        return redirect()->route('admin.students.show', $student)
+            ->with('success', "Student residency successfully updated to {$label} for {$validated['academic_year']} {$validated['term']}.");
+    }
+
     public function getBeds(Request $request)
     {
+        $school = Auth::user()?->school;
+        if (! $school) abort(403);
+
         $dormitoryId = $request->dormitory_id;
-        $beds = Bed::where('dormitory_id', $dormitoryId)
-            ->where('is_available', true)
-            ->whereDoesntHave('currentAssignment')
-            ->get();
+        $dormitory = Dormitory::where('school_id', $school->id)->findOrFail($dormitoryId);
+        
+        $allocationService = app(\App\Services\Residency\BedAllocationService::class);
+        $beds = $allocationService->getAvailableBeds($dormitory);
 
         return response()->json($beds);
     }

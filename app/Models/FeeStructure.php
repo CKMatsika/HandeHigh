@@ -21,6 +21,7 @@ class FeeStructure extends Model
         'is_optional',
         'subject_name',
         'service_type',
+        'revenue_account_id',
     ];
 
     protected $casts = [
@@ -31,6 +32,11 @@ class FeeStructure extends Model
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function revenueAccount()
+    {
+        return $this->belongsTo(Account::class, 'revenue_account_id');
     }
 
     public function invoiceItems()

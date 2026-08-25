@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\SchoolController;
+use App\Http\Controllers\Admin\SchoolProfileController;
 use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\FeeStructureController;
 use App\Http\Controllers\Admin\InvoiceController;
@@ -112,6 +113,10 @@ Route::middleware(['auth'])->group(function () {
         ->prefix('admin')
         ->name('admin.')
         ->group(function () {
+            // School Profile, Identity & Branding Management
+            Route::get('school/profile', [SchoolProfileController::class, 'edit'])->name('school.profile');
+            Route::match(['put', 'patch', 'post'], 'school/profile', [SchoolProfileController::class, 'update'])->name('school.profile.update');
+
             Route::get('enrollments/{enrollment}/print', [EnrollmentController::class, 'print'])->name('enrollments.print')->middleware('can:view,enrollment');
             Route::get('enrollments/bulk-create', [EnrollmentController::class, 'bulkCreate'])->name('enrollments.bulk-create');
             Route::post('enrollments/bulk-store', [EnrollmentController::class, 'bulkStore'])->name('enrollments.bulk-store');
@@ -160,6 +165,12 @@ Route::middleware(['auth'])->group(function () {
             Route::get('students/{student}/manage-boarding', [AdminStudentController::class, 'manageBoarding'])->name('students.manage-boarding');
             Route::post('students/{student}/assign-bed', [AdminStudentController::class, 'assignBed'])->name('students.assign-bed');
             Route::delete('students/{student}/release-bed', [AdminStudentController::class, 'releaseBed'])->name('students.release-bed');
+            Route::post('students/{student}/residency/transition', [AdminStudentController::class, 'transitionResidency'])->name('students.residency.transition');
+
+            // Hostels & Dormitories Management
+            Route::resource('hostels', \App\Http\Controllers\Admin\HostelController::class);
+            Route::resource('dormitories', \App\Http\Controllers\Admin\DormitoryController::class);
+            Route::post('dormitories/{dormitory}/beds', [\App\Http\Controllers\Admin\DormitoryController::class, 'addBed'])->name('dormitories.beds.store');
             Route::get('students/{student}/manage-clubs', [AdminStudentController::class, 'manageClubs'])->name('students.manage-clubs');
             Route::post('students/{student}/add-club', [AdminStudentController::class, 'addClub'])->name('students.add-club');
             Route::delete('students/{student}/remove-club/{club}', [AdminStudentController::class, 'removeClub'])->name('students.remove-club');
@@ -211,6 +222,11 @@ Route::middleware(['auth'])->group(function () {
             Route::get('communication/chat/{conversation}', [CommunicationController::class, 'showConversation'])->name('communication.chat');
             Route::post('conversation/create', [CommunicationController::class, 'createConversation'])->name('conversation.create');
             Route::post('communication/message/{conversation}', [CommunicationController::class, 'sendMessage'])->name('communication.message.send');
+            Route::post('communication/conversations/{conversation}/voice-note', [CommunicationController::class, 'uploadVoiceNote'])->name('communication.voice-note');
+            Route::post('communication/messages/{message}/react', [CommunicationController::class, 'toggleReaction'])->name('communication.message.react');
+            Route::post('communication/conversations/{conversation}/members', [CommunicationController::class, 'addGroupMember'])->name('communication.group.add-member');
+            Route::delete('communication/conversations/{conversation}/members/{targetUser}', [CommunicationController::class, 'removeGroupMember'])->name('communication.group.remove-member');
+            Route::put('communication/conversations/{conversation}/group', [CommunicationController::class, 'updateGroup'])->name('communication.group.update');
             Route::get('communication/sms', [CommunicationController::class, 'showSMS'])->name('communication.sms');
             Route::post('communication/sms/send', [CommunicationController::class, 'sendSMS'])->name('communication.sms.send');
             Route::get('communication/email', [CommunicationController::class, 'showEmail'])->name('communication.email');
@@ -219,6 +235,13 @@ Route::middleware(['auth'])->group(function () {
             Route::get('communication/messages/{conversation}/poll', [CommunicationController::class, 'pollMessages'])->name('communication.poll');
             Route::get('communication/unread-count', [CommunicationController::class, 'unreadCount'])->name('communication.unread-count');
 
+            // Accounting - Accounting Periods
+            Route::get('accounting-periods', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'index'])->name('accounting-periods.index');
+            Route::post('accounting-periods', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'store'])->name('accounting-periods.store');
+            Route::post('accounting-periods/{accountingPeriod}/close', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'close'])->name('accounting-periods.close');
+            Route::post('accounting-periods/{accountingPeriod}/reopen', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'reopen'])->name('accounting-periods.reopen');
+            Route::get('accounting-periods/{accountingPeriod}/validate-trial-balance', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'validateTrialBalance'])->name('accounting-periods.validate-trial-balance');
+
             // Accounting - Chart of Accounts
             Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');
             Route::get('accounts/create', [AccountController::class, 'create'])->name('accounts.create');
@@ -226,6 +249,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('accounts/{account}/edit', [AccountController::class, 'edit'])->name('accounts.edit')->middleware('can:update,account');
             Route::put('accounts/{account}', [AccountController::class, 'update'])->name('accounts.update')->middleware('can:update,account');
             Route::put('accounts/{account}/toggle', [AccountController::class, 'toggle'])->name('accounts.toggle')->middleware('can:update,account');
+            Route::delete('accounts/{account}', [AccountController::class, 'destroy'])->name('accounts.destroy');
 
             // Accounting - Journals
             Route::get('journals', [JournalBatchController::class, 'index'])->name('journals.index');
@@ -235,6 +259,8 @@ Route::middleware(['auth'])->group(function () {
 
             // Accounting - Reports
             Route::get('reports/dashboard', [FinancialReportController::class, 'dashboard'])->name('reports.finance-dashboard');
+            Route::get('reports/school-revenue-summary', [FinancialReportController::class, 'schoolRevenueSummary'])->name('reports.school-revenue-summary');
+            Route::get('reports/accounting-reconciliation', [FinancialReportController::class, 'accountingReconciliation'])->name('reports.accounting-reconciliation');
             Route::get('reports/debtors-aging', [FinancialReportController::class, 'debtorsAging'])->name('reports.debtors-aging');
             Route::get('reports/debtors-aging/export', [FinancialReportController::class, 'exportDebtorsAging'])->name('reports.debtors-aging.export');
             Route::get('reports/student-statement', [FinancialReportController::class, 'studentStatement'])->name('reports.student-statement');
@@ -311,6 +337,16 @@ Route::middleware(['auth'])->group(function () {
             
             // Projects
             Route::resource('projects', ProjectController::class)->only(['index','create','store','show','edit','update']);
+            Route::post('projects/{project}/income', [ProjectController::class, 'recordIncome'])->name('projects.income');
+
+            // Kiosk & Canteen Management
+            Route::get('kiosk', [\App\Http\Controllers\Admin\KioskController::class, 'index'])->name('kiosk.index');
+            Route::get('kiosk/products', [\App\Http\Controllers\Admin\KioskController::class, 'products'])->name('kiosk.products');
+            Route::post('kiosk/products', [\App\Http\Controllers\Admin\KioskController::class, 'storeProduct'])->name('kiosk.products.store');
+            Route::put('kiosk/products/{product}', [\App\Http\Controllers\Admin\KioskController::class, 'updateProduct'])->name('kiosk.products.update');
+            Route::get('kiosk/pos', [\App\Http\Controllers\Admin\KioskController::class, 'pos'])->name('kiosk.pos');
+            Route::post('kiosk/sales', [\App\Http\Controllers\Admin\KioskController::class, 'storeSale'])->name('kiosk.sales.store');
+            Route::get('kiosk/sales/{sale}', [\App\Http\Controllers\Admin\KioskController::class, 'showSale'])->name('kiosk.sales.show');
             
             // Customers
             Route::resource('customers', CustomerController::class);

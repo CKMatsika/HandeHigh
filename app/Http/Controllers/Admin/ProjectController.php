@@ -124,6 +124,26 @@ class ProjectController extends Controller
             ->with('status', 'Project updated successfully');
     }
 
+    public function recordIncome(Request $request, Project $project)
+    {
+        $this->authorizeSchoolAccess($project);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_method' => ['required', 'in:cash,bank_transfer,mobile_money'],
+            'bank_account_id' => ['nullable', \App\Rules\TenantExists::make('bank_accounts')],
+            'transaction_date' => ['required', 'date'],
+            'description' => ['required', 'string', 'max:255'],
+            'customer_name' => ['nullable', 'string', 'max:255'],
+            'reference' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $projectRevenueService = app(\App\Services\Finance\ProjectRevenueService::class);
+        $receipt = $projectRevenueService->recordProjectIncome($project, $validated);
+
+        return redirect()->route('admin.projects.show', $project)->with('status', "Project income of \${$validated['amount']} recorded successfully. Receipt #{$receipt->receipt_number}");
+    }
+
     private function authorizeSchoolAccess($model)
     {
         $user = auth()->user();

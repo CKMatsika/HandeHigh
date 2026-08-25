@@ -492,10 +492,22 @@ class InvoiceController extends Controller
                     ]);
 
                     $totalAmount = 0;
+                    $isBoarder = $enrollment->isBoarder();
+                    $hasTransport = (bool) $enrollment->has_transport;
+
                     foreach ($feeStructures as $feeStructure) {
-                        // Skip boarding/transport if not applicable
-                        if (!$validated['include_boarding'] && str_contains($feeStructure->category, 'boarding')) continue;
-                        if (!$validated['include_transport'] && str_contains($feeStructure->category, 'transport')) continue;
+                        $isBoardingFee = str_contains(strtolower($feeStructure->category ?? ''), 'boarding') || $feeStructure->service_type === 'boarding';
+                        $isTransportFee = str_contains(strtolower($feeStructure->category ?? ''), 'transport') || $feeStructure->service_type === 'transport';
+
+                        // Boarding fee applies only if student is officially a boarder
+                        if ($isBoardingFee && ! $isBoarder) {
+                            continue;
+                        }
+
+                        // Transport fee applies only if student has transport
+                        if ($isTransportFee && ! $hasTransport && ! ($validated['include_transport'] ?? false)) {
+                            continue;
+                        }
 
                         $lineTotal = (float) $feeStructure->amount;
                         $totalAmount += $lineTotal;

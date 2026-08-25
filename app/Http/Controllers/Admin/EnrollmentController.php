@@ -264,7 +264,8 @@ class EnrollmentController extends Controller
                 ->get();
 
             $selectedFees = $feeStructures->filter(function (FeeStructure $fee) use ($isBoarding, $hasTransport) {
-                if ($fee->service_type === 'boarding' && ! $isBoarding) {
+                $isBoardingFee = $fee->service_type === 'boarding' || str_contains(strtolower($fee->category ?? ''), 'boarding');
+                if ($isBoardingFee && ! $isBoarding) {
                     return false;
                 }
                 if ($fee->service_type === 'transport' && ! $hasTransport) {

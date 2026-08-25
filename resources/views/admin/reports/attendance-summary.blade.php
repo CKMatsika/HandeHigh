@@ -63,6 +63,17 @@
         </form>
     </div>
 
+    <!-- Centralized Document Header (Visible in Web & Print) -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <x-documents.school-header 
+            :school="$school ?? null"
+            title="Institutional Attendance Summary Report"
+            :subtitle="(request('start_date') ? 'Period: ' . request('start_date') : 'Current Academic Term') . (request('end_date') ? ' to ' . request('end_date') : '')"
+            reference="ATT-SUM-{{ date('Ymd') }}"
+            :date="now()"
+        />
+    </div>
+
     <!-- Summary Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -126,6 +137,9 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+            <x-documents.school-footer :school="$school ?? null" />
         </div>
     </div>
 </div>

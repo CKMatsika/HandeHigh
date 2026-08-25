@@ -221,7 +221,7 @@ class TimetableExperienceTest extends TestCase
     public function test_admin_can_view_master_operations_dashboard(): void
     {
         $response = $this->actingAs($this->adminUser)
-            ->get(route('admin.timetables.operations'));
+            ->get(route('admin.timetables.operations', ['day' => 'Monday', 'date' => '2026-08-24']));
 
         $response->assertStatus(200);
         $response->assertSee('Master Timetable Operations');

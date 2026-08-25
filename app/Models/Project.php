@@ -19,6 +19,7 @@ class Project extends Model
         'budget_amount',
         'status',
         'project_type',
+        'revenue_account_id',
     ];
 
     protected $casts = [
@@ -30,6 +31,11 @@ class Project extends Model
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function revenueAccount()
+    {
+        return $this->belongsTo(Account::class, 'revenue_account_id');
     }
 
     public function journalEntries()

@@ -45,6 +45,11 @@ class Message extends Model
         return $this->hasMany(MessageRead::class);
     }
 
+    public function reactions()
+    {
+        return $this->hasMany(MessageReaction::class);
+    }
+
     public function markAsRead($userId)
     {
         if (!$this->is_read && $this->sender_id !== $userId) {

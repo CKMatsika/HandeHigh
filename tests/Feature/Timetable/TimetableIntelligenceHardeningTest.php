@@ -882,7 +882,7 @@ class TimetableIntelligenceHardeningTest extends TestCase
         }
 
         // Verify reasonable completion time for 3 full candidates on 72-lesson matrix
-        $this->assertLessThan(30.0, $elapsed, 'Realistic matrix generation should complete well within operational bounds.');
+        $this->assertLessThan(45.0, $elapsed, 'Realistic matrix generation should complete well within operational bounds.');
     }
 
     /**

@@ -60,6 +60,17 @@
         </form>
     </div>
 
+    <!-- Centralized School Document Header -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <x-documents.school-header 
+            :school="$school ?? null"
+            title="Institutional Academic Performance Summary"
+            :subtitle="(request('academic_year') ? 'Year: ' . request('academic_year') : 'All Academic Years') . (request('term') ? ' · ' . request('term') : '')"
+            reference="ACAD-PERF-{{ date('Ymd') }}"
+            :date="now()"
+        />
+    </div>
+
     <!-- Summary Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -155,6 +166,9 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+            <x-documents.school-footer :school="$school ?? null" />
         </div>
     </div>
 </div>
