@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::dropIfExists('performance_report_audits');
+        Schema::dropIfExists('performance_report_subjects');
+        Schema::dropIfExists('performance_reports');
+
         Schema::create('performance_reports', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
@@ -96,7 +100,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['performance_report_id', 'subject_id'], 'perf_report_subject_unique');
-            $table->index(['school_id', 'assigned_teacher_id', 'status']);
+            $table->index(['school_id', 'assigned_teacher_id', 'status'], 'perf_rep_subj_sch_tch_stat_idx');
         });
 
         Schema::create('performance_report_audits', function (Blueprint $table) {
