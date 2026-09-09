@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::dropIfExists('transaction_matches');
         Schema::create('transaction_matches', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bank_transaction_id')->constrained()->onDelete('cascade');
@@ -20,7 +21,7 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
             
-            $table->unique(['bank_transaction_id', 'cashbook_transaction_id']);
+            $table->unique(['bank_transaction_id', 'cashbook_transaction_id'], 'tm_bank_tx_cashbook_tx_unique');
             $table->index(['bank_transaction_id', 'match_amount']);
             $table->index(['cashbook_transaction_id', 'match_amount']);
         });
