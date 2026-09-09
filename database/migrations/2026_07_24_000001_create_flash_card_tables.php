@@ -49,7 +49,7 @@ return new class extends Migration
             $table->string('confidence'); // know, unsure, dont_know
             $table->timestamp('reviewed_at');
             $table->timestamps();
-            $table->unique(['study_session_id', 'flash_card_item_id']);
+            $table->unique(['study_session_id', 'flash_card_item_id'], 'fc_results_session_item_unique');
         });
     }
 
