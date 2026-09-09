@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::dropIfExists('flash_card_item_results');
+        Schema::dropIfExists('flash_card_study_sessions');
+        Schema::dropIfExists('flash_card_items');
+        Schema::dropIfExists('flash_card_sets');
+
         Schema::create('flash_card_sets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->cascadeOnDelete();
