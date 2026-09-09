@@ -27,7 +27,7 @@ class SmartRulesService
             "school_settings_{$this->school->id}",
             3600,
             function () {
-                return $this->school->settings()->pluck('typed_value', 'key')->toArray();
+                return $this->school->settings()->get()->pluck('typed_value', 'key')->toArray();
             }
         );
     }
