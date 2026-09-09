@@ -21,7 +21,6 @@ class SuperAdminSeeder extends Seeder
                 'address' => null,
                 'timezone' => 'Africa/Harare',
                 'currency' => 'USD',
-                'setup_completed' => true,
             ]
         );
 
