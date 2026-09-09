@@ -11,6 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::dropIfExists('year_end_processes');
+        
         Schema::create('year_end_processes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
@@ -26,7 +28,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['school_id', 'status']);
-            $table->index(['school_id', 'source_academic_year', 'target_academic_year']);
+            $table->index(['school_id', 'source_academic_year', 'target_academic_year'], 'yep_sch_src_tgt_year_idx');
         });
     }
 

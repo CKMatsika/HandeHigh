@@ -11,6 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::dropIfExists('timetable_operational_changes');
+        
         Schema::create('timetable_operational_changes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->onDelete('cascade');
@@ -25,7 +27,7 @@ return new class extends Migration
             $table->unsignedInteger('revision');
             $table->timestamps();
 
-            $table->index(['school_id', 'timetable_id', 'revision']);
+            $table->index(['school_id', 'timetable_id', 'revision'], 'tt_ops_changes_sch_tt_rev_idx');
             $table->index(['timetable_id', 'created_at']);
         });
     }
