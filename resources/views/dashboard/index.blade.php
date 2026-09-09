@@ -181,7 +181,7 @@
         @endif
 
             <!-- Recent Transactions -->
-            @if($recent_transactions->count() > 0)
+            @if(isset($recent_transactions) && $recent_transactions->count() > 0)
                 <div class="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-4">
                     <h3 class="text-sm font-semibold text-slate-50 mb-3">Recent Transactions</h3>
                     <div class="space-y-2">
