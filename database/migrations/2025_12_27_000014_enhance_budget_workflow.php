@@ -28,38 +28,40 @@ return new class extends Migration
         ");
 
         // Add workflow tracking fields.
-        Schema::table('budgets', function (Blueprint $table) {
-            $table->foreignId('submitted_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
+        if (!Schema::hasColumn('budgets', 'submitted_by')) {
+            Schema::table('budgets', function (Blueprint $table) {
+                $table->foreignId('submitted_by')
+                    ->nullable()
+                    ->constrained('users')
+                    ->nullOnDelete();
 
-            $table->timestamp('submitted_at')->nullable();
+                $table->timestamp('submitted_at')->nullable();
 
-            $table->foreignId('bursar_reviewed_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
+                $table->foreignId('bursar_reviewed_by')
+                    ->nullable()
+                    ->constrained('users')
+                    ->nullOnDelete();
 
-            $table->timestamp('bursar_reviewed_at')->nullable();
+                $table->timestamp('bursar_reviewed_at')->nullable();
 
-            $table->foreignId('committee_reviewed_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
+                $table->foreignId('committee_reviewed_by')
+                    ->nullable()
+                    ->constrained('users')
+                    ->nullOnDelete();
 
-            $table->timestamp('committee_reviewed_at')->nullable();
+                $table->timestamp('committee_reviewed_at')->nullable();
 
-            // Review notes
-            $table->text('bursar_notes')->nullable();
-            $table->text('committee_notes')->nullable();
-            $table->text('rejection_reason')->nullable();
+                // Review notes
+                $table->text('bursar_notes')->nullable();
+                $table->text('committee_notes')->nullable();
+                $table->text('rejection_reason')->nullable();
 
-            // Budget totals
-            $table->decimal('total_budgeted', 15, 2)->default(0);
-            $table->decimal('total_actual', 15, 2)->default(0);
-            $table->decimal('total_variance', 15, 2)->default(0);
-        });
+                // Budget totals
+                $table->decimal('total_budgeted', 15, 2)->default(0);
+                $table->decimal('total_actual', 15, 2)->default(0);
+                $table->decimal('total_variance', 15, 2)->default(0);
+            });
+        }
 
         /*
          * MySQL-safe budget workflow migration.
