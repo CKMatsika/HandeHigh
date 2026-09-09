@@ -40,13 +40,16 @@ RUN composer install \
     --no-dev \
     --no-interaction \
     --prefer-dist \
-    --optimize-autoloader
+    --optimize-autoloader \
+    --no-scripts
+
+COPY . .
+
+RUN composer dump-autoload --optimize
 
 COPY package.json package-lock.json ./
 
 RUN npm ci
-
-COPY . .
 
 RUN npm run build
 
