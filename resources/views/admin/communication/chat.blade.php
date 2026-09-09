@@ -289,7 +289,7 @@
     const pollUrl = '{{ route("admin.communication.poll", $conversation) }}';
     const sendUrl = '{{ route("admin.communication.message.send", $conversation) }}';
     const voiceUrl = '{{ route("admin.communication.voice-note", $conversation) }}';
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     const messagesContainer = document.getElementById('messagesContainer');
     const messageForm = document.getElementById('messageForm');

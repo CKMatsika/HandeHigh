@@ -112,6 +112,16 @@ class School extends Model
         return $this->hasMany(Enrollment::class);
     }
 
+    public function gradeSchemes()
+    {
+        return $this->hasMany(GradeScheme::class);
+    }
+
+    public function performanceReports()
+    {
+        return $this->hasMany(PerformanceReport::class);
+    }
+
     public function attendances()
     {
         return $this->hasMany(Attendance::class);

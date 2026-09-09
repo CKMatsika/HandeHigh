@@ -20,6 +20,12 @@ use App\Models\StudentPosition;
 use App\Models\StudentClub;
 use App\Models\StudentSport;
 use App\Models\Guardian;
+use App\Models\Invoice;
+use App\Models\Payment;
+use App\Models\CreditNote;
+use App\Models\LedgerEntry;
+use App\Models\JournalEntry;
+use App\Services\Finance\FinanceReportingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -84,7 +90,102 @@ class StudentController extends Controller
         $dormitories = Dormitory::where('school_id', $school->id)->where('is_active', true)->get();
         $schoolAssets = \App\Models\SchoolAsset::where('school_id', $school->id)->where('is_active', true)->where('available_quantity', '>', 0)->get();
 
-        return view('admin.students.show', compact('school', 'student', 'activeTab', 'currentYear', 'currentTerm', 'allSubjects', 'dormitories', 'schoolAssets'));
+        // Prepare Finance Data
+        $invoices = Invoice::where('school_id', $school->id)
+            ->where('student_id', $student->id)
+            ->with(['items.feeStructure', 'allocations.payment', 'ledgerEntries'])
+            ->orderByDesc('issued_at')
+            ->get();
+
+        $payments = Payment::where('school_id', $school->id)
+            ->where('student_id', $student->id)
+            ->with(['allocations.invoice'])
+            ->orderByDesc('paid_at')
+            ->get();
+
+        $creditNotes = CreditNote::where('school_id', $school->id)
+            ->where('student_id', $student->id)
+            ->whereIn('status', ['applied', 'issued'])
+            ->orderByDesc('credit_note_date')
+            ->get();
+
+        $totalInvoiced = (float) $invoices->whereNotIn('status', ['cancelled'])->sum('total_amount');
+        $totalPaid = (float) $payments->where('status', 'completed')->sum('amount');
+        $totalCredits = (float) $creditNotes->sum('applied_amount');
+        $outstandingBalance = (float) ($totalInvoiced - $totalPaid - $totalCredits);
+
+        $unpaidInvoicesCount = $invoices->whereIn('status', ['unpaid', 'partial', 'overdue'])->count();
+
+        $financeSummary = [
+            'total_invoiced' => $totalInvoiced,
+            'total_paid' => $totalPaid,
+            'total_credits' => $totalCredits,
+            'outstanding_balance' => $outstandingBalance,
+            'invoices_count' => $invoices->count(),
+            'payments_count' => $payments->count(),
+            'unpaid_count' => $unpaidInvoicesCount,
+        ];
+
+        // Statement Data
+        $reportingService = app(FinanceReportingService::class);
+        $statementFilter = [
+            'academic_year' => request('statement_year', request('academic_year')),
+            'term' => request('statement_term', request('term')),
+            'start_date' => request('start_date'),
+            'end_date' => request('end_date'),
+        ];
+        $statementData = $reportingService->getStudentStatement($school, $student, array_filter($statementFilter));
+
+        $statementYears = $invoices->pluck('academic_year')->filter()->unique()->sortDesc()->values();
+        if ($statementYears->isEmpty()) {
+            $statementYears = collect([date('Y'), (string)(date('Y') - 1)]);
+        }
+
+        // Student General Ledger Entries
+        $invoiceNumbers = $invoices->pluck('number')->toArray();
+        $paymentRefs = $payments->pluck('reference')->filter()->toArray();
+
+        $glEntries = JournalEntry::with(['account', 'batch'])
+            ->whereHas('batch', function ($q) use ($school, $invoiceNumbers, $paymentRefs, $student) {
+                $q->where('school_id', $school->id)
+                  ->where(function ($bq) use ($invoiceNumbers, $paymentRefs, $student) {
+                      $hasCondition = false;
+                      if (!empty($invoiceNumbers)) {
+                          $bq->whereIn('reference_number', $invoiceNumbers);
+                          $hasCondition = true;
+                      }
+                      if (!empty($paymentRefs)) {
+                          if ($hasCondition) {
+                              $bq->orWhereIn('reference_number', $paymentRefs);
+                          } else {
+                              $bq->whereIn('reference_number', $paymentRefs);
+                              $hasCondition = true;
+                          }
+                      }
+                      if ($hasCondition) {
+                          $bq->orWhere('description', 'like', "%{$student->first_name}%{$student->last_name}%")
+                             ->orWhere('description', 'like', "%{$student->admission_number}%");
+                      } else {
+                          $bq->where('description', 'like', "%{$student->first_name}%{$student->last_name}%")
+                             ->orWhere('description', 'like', "%{$student->admission_number}%");
+                      }
+                  });
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $studentLedgerEntries = LedgerEntry::where('school_id', $school->id)
+            ->where('student_id', $student->id)
+            ->with('invoice')
+            ->orderBy('entry_date', 'desc')
+            ->get();
+
+        return view('admin.students.show', compact(
+            'school', 'student', 'activeTab', 'currentYear', 'currentTerm', 
+            'allSubjects', 'dormitories', 'schoolAssets',
+            'financeSummary', 'invoices', 'payments', 'creditNotes', 
+            'statementData', 'statementYears', 'glEntries', 'studentLedgerEntries'
+        ));
     }
 
     public function create()
@@ -212,19 +313,7 @@ class StudentController extends Controller
 
     public function manageSubjects(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load(['subjects' => function ($q) {
-            $q->wherePivot('is_active', true);
-        }]);
-
-        $allSubjects = Subject::where('school_id', $school->id)->get();
-        $currentYear = date('Y');
-        $currentTerm = '1';
-
-        return view('admin.students.manage-subjects', compact('school', 'student', 'allSubjects', 'currentYear', 'currentTerm'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'subjects']);
     }
 
     public function addSubject(Request $request, Student $student)
@@ -247,7 +336,7 @@ class StudentController extends Controller
             ],
         ]);
 
-        return redirect()->route('admin.students.manage-subjects', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'subjects'])
             ->with('success', 'Subject added successfully.');
     }
 
@@ -259,7 +348,7 @@ class StudentController extends Controller
 
         $student->subjects()->detach($subject->id);
 
-        return redirect()->route('admin.students.manage-subjects', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'subjects'])
             ->with('success', 'Subject removed successfully.');
     }
 
@@ -453,16 +542,7 @@ class StudentController extends Controller
 
     public function manageBoarding(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load('currentBedAssignment.bed.dormitory');
-        $dormitories = Dormitory::where('school_id', $school->id)->where('is_active', true)->get();
-        $currentYear = date('Y');
-        $currentTerm = '1';
-
-        return view('admin.students.manage-boarding', compact('school', 'student', 'dormitories', 'currentYear', 'currentTerm'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'boarding']);
     }
 
     public function assignBed(Request $request, Student $student)
@@ -472,7 +552,17 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'bed_id' => ['required', TenantExists::make('beds')],
+            'bed_id' => [
+                'required',
+                function ($attribute, $value, $fail) use ($school) {
+                    $exists = Bed::where('id', $value)
+                        ->whereHas('dormitory', fn ($q) => $q->where('school_id', $school->id))
+                        ->exists();
+                    if (! $exists) {
+                        $fail('The selected bed is invalid.');
+                    }
+                },
+            ],
             'academic_year' => 'required|string',
             'term' => 'required|string',
             'notes' => 'nullable|string|max:255',
@@ -490,11 +580,11 @@ class StudentController extends Controller
                 $validated['notes'] ?? null
             );
         } catch (\InvalidArgumentException $e) {
-            return redirect()->route('admin.students.manage-boarding', $student)
+            return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'boarding'])
                 ->withErrors(['bed_id' => $e->getMessage()]);
         }
 
-        return redirect()->route('admin.students.manage-boarding', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'boarding'])
             ->with('success', 'Bed assigned successfully.');
     }
 
@@ -507,7 +597,7 @@ class StudentController extends Controller
         $allocationService = app(\App\Services\Residency\BedAllocationService::class);
         $allocationService->releaseBed($student);
 
-        return redirect()->route('admin.students.manage-boarding', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'boarding'])
             ->with('success', 'Bed released successfully.');
     }
 
@@ -556,13 +646,7 @@ class StudentController extends Controller
 
     public function manageClubs(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load('studentClubs');
-
-        return view('admin.students.manage-clubs', compact('school', 'student'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'clubs']);
     }
 
     public function addClub(Request $request, Student $student)
@@ -579,12 +663,12 @@ class StudentController extends Controller
             'joined_date' => 'required|date',
         ]);
 
-        $validated['student_id'] = $student->user_id;
+        $validated['student_id'] = $student->id;
         $validated['is_active'] = true;
 
         StudentClub::create($validated);
 
-        return redirect()->route('admin.students.manage-clubs', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'clubs'])
             ->with('success', 'Club added successfully.');
     }
 
@@ -592,11 +676,11 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id || $club->student_id !== $student->user_id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $club->student_id !== $student->id) abort(403);
 
         $club->update(['is_active' => false, 'left_date' => now()]);
 
-        return redirect()->route('admin.students.manage-clubs', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'clubs'])
             ->with('success', 'Club removed successfully.');
     }
 
@@ -604,13 +688,7 @@ class StudentController extends Controller
 
     public function manageSports(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load('studentSports');
-
-        return view('admin.students.manage-sports', compact('school', 'student'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'sports']);
     }
 
     public function addSport(Request $request, Student $student)
@@ -628,12 +706,12 @@ class StudentController extends Controller
             'started_date' => 'required|date',
         ]);
 
-        $validated['student_id'] = $student->user_id;
+        $validated['student_id'] = $student->id;
         $validated['is_active'] = true;
 
         StudentSport::create($validated);
 
-        return redirect()->route('admin.students.manage-sports', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'sports'])
             ->with('success', 'Sport added successfully.');
     }
 
@@ -641,11 +719,11 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id || $sport->student_id !== $student->user_id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $sport->student_id !== $student->id) abort(403);
 
         $sport->update(['is_active' => false, 'ended_date' => now()]);
 
-        return redirect()->route('admin.students.manage-sports', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'sports'])
             ->with('success', 'Sport removed successfully.');
     }
 
@@ -653,13 +731,7 @@ class StudentController extends Controller
 
     public function managePositions(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load('studentPositions');
-
-        return view('admin.students.manage-positions', compact('school', 'student'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'positions']);
     }
 
     public function addPosition(Request $request, Student $student)
@@ -676,12 +748,12 @@ class StudentController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
-        $validated['student_id'] = $student->user_id;
+        $validated['student_id'] = $student->id;
         $validated['is_active'] = true;
 
         StudentPosition::create($validated);
 
-        return redirect()->route('admin.students.manage-positions', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'positions'])
             ->with('success', 'Position added successfully.');
     }
 
@@ -689,11 +761,11 @@ class StudentController extends Controller
     {
         $user = Auth::user();
         $school = $user->school;
-        if (!$school || $student->school_id !== $school->id || $position->student_id !== $student->user_id) abort(403);
+        if (!$school || $student->school_id !== $school->id || $position->student_id !== $student->id) abort(403);
 
         $position->update(['is_active' => false, 'end_date' => now()]);
 
-        return redirect()->route('admin.students.manage-positions', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'positions'])
             ->with('success', 'Position removed successfully.');
     }
 
@@ -701,17 +773,7 @@ class StudentController extends Controller
 
     public function manageAssets(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load('allocatedAssets.schoolAsset');
-        $schoolAssets = SchoolAsset::where('school_id', $school->id)
-            ->where('is_active', true)
-            ->where('available_quantity', '>', 0)
-            ->get();
-
-        return view('admin.students.manage-assets', compact('school', 'student', 'schoolAssets'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'assets']);
     }
 
     public function allocateAsset(Request $request, Student $student)
@@ -747,7 +809,7 @@ class StudentController extends Controller
             $asset->decrement('available_quantity', $validated['quantity']);
         });
 
-        return redirect()->route('admin.students.manage-assets', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'assets'])
             ->with('success', 'Asset allocated successfully.');
     }
 
@@ -770,7 +832,7 @@ class StudentController extends Controller
             $asset->schoolAsset?->increment('available_quantity', $asset->quantity);
         });
 
-        return redirect()->route('admin.students.manage-assets', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'assets'])
             ->with('success', 'Asset returned successfully.');
     }
 
@@ -778,13 +840,7 @@ class StudentController extends Controller
 
     public function manageLibrary(Student $student)
     {
-        $user = Auth::user();
-        $school = $user->school;
-        if (!$school || $student->school_id !== $school->id) abort(403);
-
-        $student->load('libraryAccess');
-
-        return view('admin.students.manage-library', compact('school', 'student'));
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'library']);
     }
 
     public function updateLibrary(Request $request, Student $student)
@@ -811,7 +867,7 @@ class StudentController extends Controller
             StudentLibraryAccess::create($validated);
         }
 
-        return redirect()->route('admin.students.manage-library', $student)
+        return redirect()->route('admin.students.show', ['student' => $student, 'tab' => 'library'])
             ->with('success', 'Library access updated successfully.');
     }
 }

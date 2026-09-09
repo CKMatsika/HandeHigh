@@ -296,7 +296,7 @@
     // Poll for unread counts
     setInterval(function() {
         fetch('{{ route("admin.communication.unread-count") }}', {
-            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+            headers: { 'Accept': 'application/json' }
         })
         .then(r => r.json())
         .then(data => {

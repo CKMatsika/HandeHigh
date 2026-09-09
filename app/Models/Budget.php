@@ -54,6 +54,11 @@ class Budget extends Model
         return $this->hasMany(BudgetLine::class);
     }
 
+    public function budgetLines()
+    {
+        return $this->hasMany(BudgetLine::class);
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -211,9 +216,10 @@ class Budget extends Model
 
     public function recalculateTotals()
     {
-        $this->total_budgeted = $this->lines()->sum('budgeted_amount');
-        $this->total_actual = $this->lines()->sum('actual_amount');
-        $this->total_variance = $this->total_budgeted - $this->total_actual;
+        $lines = $this->lines()->with('account')->get();
+        $this->total_budgeted = (float) $lines->sum('budgeted_amount');
+        $this->total_actual = (float) $lines->sum(fn ($l) => $l->actual_amount);
+        $this->total_variance = (float) $lines->sum(fn ($l) => $l->variance);
         $this->save();
     }
 }

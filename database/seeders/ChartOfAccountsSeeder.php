@@ -25,12 +25,6 @@ class ChartOfAccountsSeeder extends Seeder
      */
     public function seedAccountsForSchool(School $school): void
     {
-        // Check if accounts already exist
-        if (Account::where('school_id', $school->id)->exists()) {
-            $this->command?->warn("Accounts already exist for school: {$school->name}. Skipping...");
-            return;
-        }
-        
         $accounts = [
             // ASSETS
             ['code' => '1000', 'name' => 'ASSETS', 'type' => 'asset', 'category' => 'current_asset', 'parent_id' => null, 'sort_order' => 1],
@@ -177,19 +171,23 @@ class ChartOfAccountsSeeder extends Seeder
             
             $isPostable = $accountData['is_postable'] ?? (! in_array($accountData['code'], $nonPostableCodes));
 
-            $account = Account::create([
-                'school_id' => $school->id,
-                'code' => $accountData['code'],
-                'name' => $accountData['name'],
-                'type' => $accountData['type'],
-                'category' => $accountData['category'],
-                'parent_id' => $parentId,
-                'opening_balance' => 0,
-                'currency' => 'USD',
-                'is_active' => true,
-                'is_postable' => $isPostable,
-                'sort_order' => $accountData['sort_order'],
-            ]);
+            $account = Account::firstOrCreate(
+                [
+                    'school_id' => $school->id,
+                    'code' => $accountData['code'],
+                ],
+                [
+                    'name' => $accountData['name'],
+                    'type' => $accountData['type'],
+                    'category' => $accountData['category'],
+                    'parent_id' => $parentId,
+                    'opening_balance' => 0,
+                    'currency' => 'USD',
+                    'is_active' => true,
+                    'is_postable' => $isPostable,
+                    'sort_order' => $accountData['sort_order'],
+                ]
+            );
             
             $parentMap[$accountData['code']] = $account->id;
         }

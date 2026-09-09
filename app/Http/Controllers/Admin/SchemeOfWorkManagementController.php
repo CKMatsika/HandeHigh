@@ -153,4 +153,22 @@ class SchemeOfWorkManagementController extends Controller
         return redirect()->back()
             ->with('status', 'Scheme of work rejected with feedback.');
     }
+
+    public function print(SchemeOfWork $schemeOfWork)
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (! $school || $schemeOfWork->school_id !== $school->id) {
+            abort(403);
+        }
+
+        $schemeOfWork->load(['subject', 'schoolClass', 'items', 'teacher', 'reviewer']);
+
+        return view('portal.teacher.schemes-of-work.print', [
+            'school' => $school,
+            'user' => $user,
+            'scheme' => $schemeOfWork,
+        ]);
+    }
 }

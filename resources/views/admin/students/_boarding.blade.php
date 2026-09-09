@@ -80,7 +80,7 @@
     <div class="mt-6">
         <h4 class="text-sm font-medium text-slate-300 mb-3">Bed History</h4>
         <div class="space-y-2">
-            @foreach($student->bedAssignments->orderByDesc('assigned_date')->get() as $assignment)
+            @foreach($student->bedAssignments()->with('bed.dormitory')->orderByDesc('assigned_date')->get() as $assignment)
                 <div class="flex items-center justify-between bg-slate-800/30 rounded-lg px-4 py-2 border border-slate-700/30">
                     <div class="text-sm">
                         <span class="text-slate-300">{{ $assignment->bed->dormitory->name ?? '—' }}</span>

@@ -49,7 +49,17 @@
                     <label class="block text-slate-400 text-xs mb-1">Total Amount</label>
                     <input type="number" step="0.01" name="total_amount" value="{{ old('total_amount', $bill->total_amount) }}" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100" required />
                 </div>
-                <div></div>
+                <div>
+                    <label class="block text-slate-400 text-xs mb-1">Expense Account (Chart of Accounts)</label>
+                    <select name="expense_account_id" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100">
+                        <option value="">-- Auto-resolve / Default Expense --</option>
+                        @foreach($expenseAccounts ?? [] as $acc)
+                            <option value="{{ $acc->id }}" {{ old('expense_account_id', $bill->expense_account_id) == $acc->id ? 'selected' : '' }}>
+                                {{ $acc->code }} - {{ $acc->name }} ({{ ucfirst(str_replace('_', ' ', $acc->category ?? 'expense')) }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
 
             <div>

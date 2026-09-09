@@ -12,19 +12,26 @@ class SchemeOfWorkItem extends Model
     protected $fillable = [
         'scheme_of_work_id',
         'week_number',
+        'week_ending',
         'day_of_week',
         'topic',
         'sub_topic',
         'objectives',
+        'competencies_skills',
+        'som_media',
+        'facility_equipment',
+        'methods_activities',
         'teaching_methods',
         'resources',
         'assessment',
+        'evaluation',
         'remarks',
         'sort_order',
     ];
 
     protected $casts = [
         'week_number' => 'integer',
+        'week_ending' => 'date',
         'sort_order' => 'integer',
     ];
 

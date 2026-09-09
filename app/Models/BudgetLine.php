@@ -46,16 +46,25 @@ class BudgetLine extends Model
 
     public function getActualAmountAttribute()
     {
-        // Calculate actual spending for this account/period
-        $query = JournalEntry::whereHas('batch', function($q) {
-            $q->where('status', 'posted')
-              ->whereYear('transaction_date', $this->budget->fiscal_year);
-        })
-        ->where('account_id', $this->account_id)
-        ->where('entry_type', 'debit');
+        $account = $this->account;
+        if (! $account) {
+            return 0.0;
+        }
 
-        if ($this->budget->budget_type === 'monthly' && $this->period) {
-            $query->whereMonth('transaction_date', $this->period);
+        $isRevenue = ($account->type === 'revenue' || str_starts_with($account->code, '5'));
+
+        $query = JournalEntry::whereHas('batch', function ($q) {
+            $q->where('status', 'posted');
+            if ($this->budget && $this->budget->fiscal_year) {
+                $q->whereYear('transaction_date', $this->budget->fiscal_year);
+            }
+        })
+        ->where('account_id', $this->account_id);
+
+        if ($this->budget && $this->budget->budget_type === 'monthly' && $this->period) {
+            $query->whereHas('batch', function ($q) {
+                $q->whereMonth('transaction_date', $this->period);
+            });
         }
 
         if ($this->cost_center_id) {
@@ -66,12 +75,29 @@ class BudgetLine extends Model
             $query->where('project_id', $this->project_id);
         }
 
-        return $query->sum('amount');
+        if ($isRevenue) {
+            $credits = (float) (clone $query)->where('entry_type', 'credit')->sum('amount');
+            $debits = (float) (clone $query)->where('entry_type', 'debit')->sum('amount');
+            return max(0, $credits - $debits);
+        } else {
+            $debits = (float) (clone $query)->where('entry_type', 'debit')->sum('amount');
+            $credits = (float) (clone $query)->where('entry_type', 'credit')->sum('amount');
+            return max(0, $debits - $credits);
+        }
     }
 
     public function getVarianceAttribute()
     {
-        return $this->budgeted_amount - $this->actual_amount;
+        $account = $this->account;
+        $isRevenue = $account && ($account->type === 'revenue' || str_starts_with($account->code, '5'));
+        
+        if ($isRevenue) {
+            // For revenue, actual - budgeted (positive means surplus / above budget)
+            return (float) $this->actual_amount - (float) $this->budgeted_amount;
+        }
+        
+        // For expenditure, budgeted - actual (positive means under budget / savings)
+        return (float) $this->budgeted_amount - (float) $this->actual_amount;
     }
 
     public function getVariancePercentageAttribute()

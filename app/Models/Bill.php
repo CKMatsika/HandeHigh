@@ -12,6 +12,7 @@ class Bill extends Model
     protected $fillable = [
         'school_id',
         'vendor_id',
+        'expense_account_id',
         'bill_number',
         'vendor_bill_number',
         'bill_date',
@@ -41,6 +42,11 @@ class Bill extends Model
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function expenseAccount()
+    {
+        return $this->belongsTo(Account::class, 'expense_account_id');
     }
 
     public function items()

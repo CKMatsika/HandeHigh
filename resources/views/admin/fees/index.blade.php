@@ -99,6 +99,19 @@
                     <option value="transport" {{ old('service_type') === 'transport' ? 'selected' : '' }}>Transport</option>
                 </select>
             </div>
+            <div class="md:col-span-2">
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="new_revenue_account_id">Revenue Account (Chart of Accounts)</label>
+                <select id="new_revenue_account_id" name="revenue_account_id" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">-- Auto-Map by Category / Default --</option>
+                    @foreach($revenueAccounts ?? [] as $revAcc)
+                        @if($revAcc->type === 'revenue' || str_starts_with($revAcc->code, '5'))
+                            <option value="{{ $revAcc->id }}" {{ old('revenue_account_id') == $revAcc->id ? 'selected' : '' }}>
+                                {{ $revAcc->code }} - {{ $revAcc->name }}
+                            </option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
             <div class="flex items-center mt-5">
                 <label class="inline-flex items-center gap-2 text-[11px] text-slate-300">
                     <input type="checkbox" name="is_optional" value="1" {{ old('is_optional') ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
@@ -125,6 +138,7 @@
                         <th class="text-left py-2 font-medium">Code</th>
                         <th class="text-left py-2 font-medium">Label</th>
                         <th class="text-left py-2 font-medium">Amount</th>
+                        <th class="text-left py-2 font-medium">Revenue Account</th>
                         <th class="text-left py-2 font-medium">Service</th>
                         <th class="text-left py-2 font-medium">Optional</th>
                         <th class="text-left py-2 font-medium">Actions</th>
@@ -141,7 +155,18 @@
                             <td class="py-2 align-middle capitalize">{{ $fee->category }}</td>
                             <td class="py-2 align-middle">{{ $fee->code }}</td>
                             <td class="py-2 align-middle">{{ $fee->label }}</td>
-                            <td class="py-2 align-middle">{{ number_format($fee->amount, 2) }}</td>
+                            <td class="py-2 align-middle font-semibold text-emerald-400">${{ number_format($fee->amount, 2) }}</td>
+                            <td class="py-2 align-middle">
+                                @if($fee->revenueAccount)
+                                    <span class="inline-flex items-center rounded-md bg-blue-950/60 border border-blue-700/50 px-2 py-0.5 text-[11px] text-blue-300 font-mono">
+                                        {{ $fee->revenueAccount->code }} - {{ $fee->revenueAccount->name }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center rounded-md bg-slate-800/60 border border-slate-700 px-2 py-0.5 text-[11px] text-slate-400 font-mono">
+                                        Auto ({{ ucfirst($fee->category) }})
+                                    </span>
+                                @endif
+                            </td>
                             <td class="py-2 align-middle">
                                 @if($fee->service_type)
                                     <span class="inline-flex items-center rounded-full border border-slate-700 bg-slate-950/70 px-2 py-0.5 text-[11px]">{{ ucfirst($fee->service_type) }}</span>
@@ -159,7 +184,7 @@
                             <td class="py-2 align-middle">
                                 <div class="flex flex-wrap gap-2">
                                     <a href="{{ route('admin.fees.show', $fee) }}" class="rounded-full bg-slate-800 px-3 py-1 text-[11px] font-medium text-slate-100 hover:bg-slate-700 transition">View</a>
-                                    <form method="POST" action="{{ route('admin.fees.update', $fee) }}" class="flex flex-wrap gap-1">
+                                    <form method="POST" action="{{ route('admin.fees.update', $fee) }}" class="flex flex-wrap items-center gap-1">
                                         @csrf
                                         @method('PUT')
                                         <input type="hidden" name="academic_year" value="{{ $fee->academic_year }}">
@@ -167,13 +192,23 @@
                                         <input type="hidden" name="grade" value="{{ $fee->grade }}">
                                         <input type="hidden" name="category" value="{{ $fee->category }}">
                                         <input type="text" name="code" value="{{ $fee->code }}" class="w-24 rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px]">
-                                        <input type="text" name="label" value="{{ $fee->label }}" class="w-40 rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px]">
+                                        <input type="text" name="label" value="{{ $fee->label }}" class="w-36 rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px]">
                                         <input type="number" step="0.01" min="0" name="amount" value="{{ $fee->amount }}" class="w-20 rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px]">
+                                        <select name="revenue_account_id" class="w-32 rounded border border-slate-700 bg-slate-950/70 px-1 py-1 text-[11px]">
+                                            <option value="">Auto GL</option>
+                                            @foreach($revenueAccounts ?? [] as $revAcc)
+                                                @if($revAcc->type === 'revenue' || str_starts_with($revAcc->code, '5'))
+                                                    <option value="{{ $revAcc->id }}" {{ $fee->revenue_account_id == $revAcc->id ? 'selected' : '' }}>
+                                                        {{ $revAcc->code }}
+                                                    </option>
+                                                @endif
+                                            @endforeach
+                                        </select>
                                         <input type="hidden" name="subject_name" value="{{ $fee->subject_name }}">
                                         <input type="hidden" name="service_type" value="{{ $fee->service_type }}">
                                         <label class="inline-flex items-center gap-1 text-[11px] text-slate-300 ml-1">
                                             <input type="checkbox" name="is_optional" value="1" {{ $fee->is_optional ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
-                                            <span>Optional</span>
+                                            <span>Opt</span>
                                         </label>
                                         <button type="submit" class="rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-medium text-white hover:bg-indigo-600 transition ml-1">Save</button>
                                     </form>

@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\JournalBatch;
 use App\Models\JournalEntry;
 use App\Models\AccountBalance;
+use App\Models\School;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -529,12 +530,54 @@ class AccountingService
             ->where('code', $cashAccountCode)
             ->first();
         
+        if (!$cashAccount) {
+            $cashAccount = Account::where('school_id', $school->id)
+                ->whereIn('code', ['1101', '1102', '1100', '1301', '1300'])
+                ->first();
+        }
+
+        if (!$cashAccount) {
+            $cashAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => $cashAccountCode,
+                'name' => match($payment->method) {
+                    'bank' => 'Main Operating Account',
+                    'mobile_money' => 'Mobile Money Account',
+                    default => 'Petty Cash',
+                },
+                'type' => 'asset',
+                'category' => match($payment->method) {
+                    'bank', 'mobile_money' => 'bank',
+                    default => 'cash',
+                },
+                'currency' => 'USD',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
+        }
+        
         $feesReceivableAccount = Account::where('school_id', $school->id)
             ->whereIn('code', ['1201', '1200'])
             ->first();
         
-        if (!$cashAccount || !$feesReceivableAccount) {
-            throw new \Exception('Required accounts not found.');
+        if (!$feesReceivableAccount) {
+            $feesReceivableAccount = Account::where('school_id', $school->id)
+                ->where('type', 'asset')
+                ->where('category', 'receivable')
+                ->first();
+        }
+
+        if (!$feesReceivableAccount) {
+            $feesReceivableAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => '1201',
+                'name' => 'Student Fees Receivable',
+                'type' => 'asset',
+                'category' => 'receivable',
+                'currency' => 'USD',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
         }
         
         // Create journal batch
@@ -914,12 +957,108 @@ class AccountingService
     }
     
     /**
+     * Ensure chart of accounts exist for the given school.
+     */
+    public function ensureChartOfAccountsExist(School|int $school): void
+    {
+        $schoolModel = $school instanceof School ? $school : School::find($school);
+        if (! $schoolModel) {
+            return;
+        }
+
+        $accountCount = Account::where('school_id', $schoolModel->id)->count();
+        if ($accountCount === 0) {
+            app(\Database\Seeders\ChartOfAccountsSeeder::class)->seedAccountsForSchool($schoolModel);
+        }
+    }
+
+    /**
+     * Retroactively sync and post any unposted financial transactions for a school.
+     */
+    public function syncExistingTransactions(School|int $school): array
+    {
+        $schoolModel = $school instanceof School ? $school : School::find($school);
+        if (! $schoolModel) {
+            return ['invoices_posted' => 0, 'bills_posted' => 0, 'payments_posted' => 0];
+        }
+
+        $this->ensureChartOfAccountsExist($schoolModel);
+
+        $invoicesPosted = 0;
+        $billsPosted = 0;
+        $paymentsPosted = 0;
+
+        // 1. Sync Invoices
+        $invoices = \App\Models\Invoice::where('school_id', $schoolModel->id)->with(['items', 'student'])->get();
+        foreach ($invoices as $invoice) {
+            $hasBatch = JournalBatch::where('school_id', $schoolModel->id)
+                ->where('source_type', 'invoice')
+                ->where('source_id', $invoice->id)
+                ->exists();
+
+            if (! $hasBatch && (float) $invoice->total_amount > 0) {
+                try {
+                    $this->postInvoice($invoice);
+                    $invoicesPosted++;
+                } catch (\Throwable $e) {
+                    Log::warning("Could not auto-post invoice #{$invoice->number}: " . $e->getMessage());
+                }
+            }
+        }
+
+        // 2. Sync Bills
+        $bills = \App\Models\Bill::where('school_id', $schoolModel->id)->with(['items', 'vendor', 'expenseAccount'])->get();
+        foreach ($bills as $bill) {
+            $hasBatch = JournalBatch::where('school_id', $schoolModel->id)
+                ->where('source_type', 'bill')
+                ->where('source_id', $bill->id)
+                ->exists();
+
+            if (! $hasBatch && (float) $bill->total_amount > 0) {
+                try {
+                    $this->postBill($bill);
+                    $billsPosted++;
+                } catch (\Throwable $e) {
+                    Log::warning("Could not auto-post bill #{$bill->bill_number}: " . $e->getMessage());
+                }
+            }
+        }
+
+        // 3. Sync Payments
+        $payments = \App\Models\Payment::where('school_id', $schoolModel->id)->with('invoice')->get();
+        foreach ($payments as $payment) {
+            if ($payment->invoice) {
+                $hasBatch = JournalBatch::where('school_id', $schoolModel->id)
+                    ->where('source_type', 'payment')
+                    ->where('source_id', $payment->id)
+                    ->exists();
+
+                if (! $hasBatch && (float) $payment->amount > 0) {
+                    try {
+                        $this->postPayment($payment, $payment->invoice);
+                        $paymentsPosted++;
+                    } catch (\Throwable $e) {
+                        Log::warning("Could not auto-post payment #{$payment->id}: " . $e->getMessage());
+                    }
+                }
+            }
+        }
+
+        return [
+            'invoices_posted' => $invoicesPosted,
+            'bills_posted' => $billsPosted,
+            'payments_posted' => $paymentsPosted,
+        ];
+    }
+
+    /**
      * Post a vendor bill to the general ledger
      * Debit: Expense/Asset account, Credit: Accounts Payable
      */
     public function postBill($bill): JournalBatch
     {
         $school = $bill->school;
+        $this->ensureChartOfAccountsExist($school);
 
         $existingBatch = JournalBatch::where('school_id', $school->id)
             ->where('source_type', 'bill')
@@ -931,41 +1070,131 @@ class AccountingService
         }
 
         $accountsPayable = Account::where('school_id', $school->id)
-            ->whereIn('code', ['2100', '2101'])
+            ->whereIn('code', ['3100', '3101'])
+            ->first() ?? Account::where('school_id', $school->id)
+            ->where('type', 'liability')
+            ->where('category', 'payable')
             ->first();
 
-        $expenseAccount = Account::where('school_id', $school->id)
-            ->where('type', 'expense')
-            ->orderBy('code')
-            ->first();
-
-        if (!$accountsPayable || !$expenseAccount) {
-            throw new \Exception('Required accounts not found. Please ensure Chart of Accounts has Accounts Payable and Expense accounts.');
+        if (! $accountsPayable) {
+            $accountsPayable = Account::create([
+                'school_id' => $school->id,
+                'code' => '3100',
+                'name' => 'Accounts Payable',
+                'type' => 'liability',
+                'category' => 'payable',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
         }
+
+        $debitEntries = [];
+        $bill->loadMissing(['items.expenseAccount', 'expenseAccount', 'vendor']);
+        $totalItemizedDebits = 0.0;
+
+        if ($bill->items && $bill->items->count() > 0) {
+            $accountGroups = [];
+            foreach ($bill->items as $item) {
+                $expAcc = $item->expenseAccount ?? $bill->expenseAccount;
+                if (! $expAcc && $item->category) {
+                    $code = match (strtolower(trim($item->category))) {
+                        'salaries', 'salary' => '6100',
+                        'utilities', 'utility' => '6300',
+                        'maintenance', 'repairs' => '6400',
+                        'supplies', 'supply' => '6500',
+                        'operations', 'operating', 'rent' => '6600',
+                        'professional_services', 'services' => '6800',
+                        default => '7200',
+                    };
+                    $expAcc = Account::where('school_id', $school->id)->where('code', $code)->first();
+                }
+
+                if (! $expAcc) {
+                    $expAcc = Account::where('school_id', $school->id)->where('type', 'expense')->orderBy('code')->first();
+                }
+
+                if (! $expAcc) {
+                    $expAcc = Account::create([
+                        'school_id' => $school->id,
+                        'code' => '6500',
+                        'name' => 'General Supplies & Expenses',
+                        'type' => 'expense',
+                        'category' => 'supply_expense',
+                        'is_active' => true,
+                        'is_postable' => true,
+                    ]);
+                }
+
+                $amount = (float) $item->line_total;
+                if (! isset($accountGroups[$expAcc->id])) {
+                    $accountGroups[$expAcc->id] = [
+                        'account' => $expAcc,
+                        'total' => 0.0,
+                    ];
+                }
+                $accountGroups[$expAcc->id]['total'] += $amount;
+            }
+
+            foreach ($accountGroups as $group) {
+                $debitEntries[] = [
+                    'account_id' => $group['account']->id,
+                    'entry_type' => 'debit',
+                    'amount' => $group['total'],
+                    'memo' => 'Bill ' . $bill->bill_number . ' - ' . $group['account']->name,
+                ];
+                $totalItemizedDebits += $group['total'];
+            }
+        }
+
+        if (empty($debitEntries)) {
+            $expenseAccount = $bill->expenseAccount ?? Account::where('school_id', $school->id)->where('type', 'expense')->orderBy('code')->first();
+            if (! $expenseAccount) {
+                $expenseAccount = Account::create([
+                    'school_id' => $school->id,
+                    'code' => '6500',
+                    'name' => 'General Supplies & Expenses',
+                    'type' => 'expense',
+                    'category' => 'supply_expense',
+                    'is_active' => true,
+                    'is_postable' => true,
+                ]);
+            }
+
+            $debitEntries[] = [
+                'account_id' => $expenseAccount->id,
+                'entry_type' => 'debit',
+                'amount' => (float) $bill->total_amount,
+                'memo' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->description ?? $expenseAccount->name),
+            ];
+            $totalItemizedDebits = (float) $bill->total_amount;
+        }
+
+        // Adjust rounding
+        $billTotal = (float) $bill->total_amount;
+        if (abs($billTotal - $totalItemizedDebits) > 0.001) {
+            $diff = $billTotal - $totalItemizedDebits;
+            $debitEntries[0]['amount'] += $diff;
+        }
+
+        $entries = array_merge($debitEntries, [
+            [
+                'account_id' => $accountsPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $billTotal,
+                'memo' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->vendor->name ?? 'Vendor'),
+            ],
+        ]);
 
         return $this->createJournalBatch([
             'school_id' => $school->id,
-            'transaction_date' => $bill->bill_date,
+            'transaction_date' => $bill->bill_date ?? now()->toDateString(),
             'reference_number' => $bill->bill_number,
             'description' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->vendor->name ?? 'Vendor'),
             'source_type' => 'bill',
             'source_id' => $bill->id,
             'status' => 'posted',
             'created_by' => $bill->created_by ?? auth()->id(),
-            'entries' => [
-                [
-                    'account_id' => $expenseAccount->id,
-                    'entry_type' => 'debit',
-                    'amount' => $bill->total_amount,
-                    'memo' => 'Bill ' . $bill->bill_number,
-                ],
-                [
-                    'account_id' => $accountsPayable->id,
-                    'entry_type' => 'credit',
-                    'amount' => $bill->total_amount,
-                    'memo' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->vendor->name ?? 'Vendor'),
-                ],
-            ],
+            'entries' => $entries,
         ]);
     }
 
@@ -977,6 +1206,7 @@ class AccountingService
     {
         $school = $payment->school;
         $bill = $payment->bill;
+        $this->ensureChartOfAccountsExist($school);
 
         $existingBatch = JournalBatch::where('school_id', $school->id)
             ->where('source_type', 'bill_payment')
@@ -989,29 +1219,55 @@ class AccountingService
 
         $cashAccountCode = match($payment->payment_method) {
             'cash' => '1102',
-            'bank_transfer' => '1301',
-            'check' => '1301',
+            'bank_transfer', 'check', 'bank' => '1301',
             'mobile_money' => '1303',
             default => '1102',
         };
 
         $cashAccount = Account::where('school_id', $school->id)
             ->where('code', $cashAccountCode)
-            ->first();
+            ->first() ?? Account::where('school_id', $school->id)->whereIn('code', ['1101', '1102', '1301', '1300'])->first();
+
+        if (! $cashAccount) {
+            $cashAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => $cashAccountCode,
+                'name' => match ($payment->payment_method) {
+                    'bank_transfer', 'check', 'bank' => 'Main Operating Account',
+                    'mobile_money' => 'Mobile Money Account',
+                    default => 'Petty Cash',
+                },
+                'type' => 'asset',
+                'category' => 'cash',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
+        }
 
         $accountsPayable = Account::where('school_id', $school->id)
-            ->whereIn('code', ['2100', '2101'])
+            ->whereIn('code', ['3100', '3101'])
+            ->first() ?? Account::where('school_id', $school->id)
+            ->where('type', 'liability')
+            ->where('category', 'payable')
             ->first();
 
-        if (!$cashAccount || !$accountsPayable) {
-            throw new \Exception('Required accounts not found for bill payment posting.');
+        if (! $accountsPayable) {
+            $accountsPayable = Account::create([
+                'school_id' => $school->id,
+                'code' => '3100',
+                'name' => 'Accounts Payable',
+                'type' => 'liability',
+                'category' => 'payable',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
         }
 
         return $this->createJournalBatch([
             'school_id' => $school->id,
-            'transaction_date' => $payment->payment_date,
+            'transaction_date' => $payment->payment_date ?? now()->toDateString(),
             'reference_number' => $payment->reference ?? 'BPAY-' . $payment->id,
-            'description' => 'Payment for bill ' . $bill->bill_number,
+            'description' => 'Payment for bill ' . ($bill ? $bill->bill_number : $payment->id),
             'source_type' => 'bill_payment',
             'source_id' => $payment->id,
             'status' => 'posted',
@@ -1020,14 +1276,14 @@ class AccountingService
                 [
                     'account_id' => $accountsPayable->id,
                     'entry_type' => 'debit',
-                    'amount' => $payment->amount,
-                    'memo' => 'Payment for bill ' . $bill->bill_number,
+                    'amount' => (float) $payment->amount,
+                    'memo' => 'Payment for bill ' . ($bill ? $bill->bill_number : $payment->id),
                 ],
                 [
                     'account_id' => $cashAccount->id,
                     'entry_type' => 'credit',
-                    'amount' => $payment->amount,
-                    'memo' => 'Payment for bill ' . $bill->bill_number,
+                    'amount' => (float) $payment->amount,
+                    'memo' => 'Payment for bill ' . ($bill ? $bill->bill_number : $payment->id),
                 ],
             ],
         ]);
@@ -1089,9 +1345,229 @@ class AccountingService
     }
 
     /**
+     * Post a completed payroll run to the General Ledger with Statutory Control Accounts.
+     *
+     * @param \App\Models\Payroll $payroll
+     * @return JournalBatch
+     */
+    public function postPayroll(\App\Models\Payroll $payroll): JournalBatch
+    {
+        $school = $payroll->school;
+        $payroll->load(['items', 'school']);
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'payroll')
+            ->where('source_id', $payroll->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
+        // 1. Resolve / Create Expense Accounts (Debits)
+        $salariesExpense = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '6100'],
+            ['name' => 'Salaries & Allowances Expense', 'type' => 'expense', 'category' => 'salary_expense', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $employerNssaExpense = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '6110'],
+            ['name' => 'Employer NSSA Pension Expense', 'type' => 'expense', 'category' => 'salary_expense', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $employerNecExpense = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '6120'],
+            ['name' => 'Employer NEC Contribution Expense', 'type' => 'expense', 'category' => 'salary_expense', 'is_active' => true, 'is_postable' => true]
+        );
+
+        // 2. Resolve / Create Statutory & Liability Control Accounts (Credits)
+        $netSalariesPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2101'],
+            ['name' => 'Net Salaries Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $zimraPayePayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2102'],
+            ['name' => 'ZIMRA PAYE Tax Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $zimraAidsLevyPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2103'],
+            ['name' => 'ZIMRA AIDS Levy Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $nssaTotalPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2104'],
+            ['name' => 'NSSA Social Security Total Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $necTotalPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2105'],
+            ['name' => 'NEC Sector Total Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $tradeUnionPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2106'],
+            ['name' => 'Trade Union Dues Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $medicalAidPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2107'],
+            ['name' => 'Medical Aid Contributions Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $staffLoansClearing = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '1105'],
+            ['name' => 'Staff Loan Repayments Clearing', 'type' => 'asset', 'category' => 'receivable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        $otherDeductionsPayable = Account::firstOrCreate(
+            ['school_id' => $school->id, 'code' => '2108'],
+            ['name' => 'Other Payroll Deductions Payable', 'type' => 'liability', 'category' => 'payable', 'is_active' => true, 'is_postable' => true]
+        );
+
+        // 3. Compute Aggregates across Items
+        $totalGross = (float)($payroll->total_gross_usd + $payroll->total_gross_zwg) ?: (float)$payroll->total_gross;
+        $totalNet = (float)($payroll->total_net_usd + $payroll->total_net_zwg) ?: (float)$payroll->total_net;
+        $totalPaye = (float)($payroll->total_paye_usd + $payroll->total_paye_zwg);
+        $totalAidsLevy = (float)($payroll->total_aids_levy_usd + $payroll->total_aids_levy_zwg);
+
+        $totalEmployeeNssa = (float)($payroll->items->sum('nssa_employee_usd') + $payroll->items->sum('nssa_employee_zwg'));
+        $totalEmployerNssa = (float)($payroll->total_employer_nssa_usd + $payroll->total_employer_nssa_zwg) ?: (float)$payroll->total_employer_nssa;
+        $combinedNssa = round($totalEmployeeNssa + $totalEmployerNssa, 2);
+
+        $totalEmployeeNec = (float)($payroll->items->sum('nec_employee_usd') + $payroll->items->sum('nec_employee_zwg'));
+        $totalEmployerNec = (float)($payroll->total_employer_nec_usd + $payroll->total_employer_nec_zwg);
+        $combinedNec = round($totalEmployeeNec + $totalEmployerNec, 2);
+
+        $totalTradeUnion = (float)($payroll->items->sum('trade_union_usd') + $payroll->items->sum('trade_union_zwg'));
+        $totalMedicalAid = (float)($payroll->items->sum('medical_aid_usd') + $payroll->items->sum('medical_aid_zwg'));
+        $totalLoanRepayment = (float)($payroll->items->sum('loan_repayment_usd') + $payroll->items->sum('loan_repayment_zwg'));
+        $totalOtherDeductions = (float)($payroll->items->sum('other_deductions_usd') + $payroll->items->sum('other_deductions_zwg'));
+
+        $entries = [];
+
+        // --- DEBITS (Expenses) ---
+        if ($totalGross > 0) {
+            $entries[] = [
+                'account_id' => $salariesExpense->id,
+                'entry_type' => 'debit',
+                'amount' => $totalGross,
+                'memo' => "Salaries & Allowances Expense - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalEmployerNssa > 0) {
+            $entries[] = [
+                'account_id' => $employerNssaExpense->id,
+                'entry_type' => 'debit',
+                'amount' => $totalEmployerNssa,
+                'memo' => "Employer NSSA Contribution (4.5%) - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalEmployerNec > 0) {
+            $entries[] = [
+                'account_id' => $employerNecExpense->id,
+                'entry_type' => 'debit',
+                'amount' => $totalEmployerNec,
+                'memo' => "Employer NEC Sector Contribution - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+
+        // --- CREDITS (Payables & Clearings) ---
+        if ($totalNet > 0) {
+            $entries[] = [
+                'account_id' => $netSalariesPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $totalNet,
+                'memo' => "Net Salaries Payable - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalPaye > 0) {
+            $entries[] = [
+                'account_id' => $zimraPayePayable->id,
+                'entry_type' => 'credit',
+                'amount' => $totalPaye,
+                'memo' => "ZIMRA PAYE Tax Payable - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalAidsLevy > 0) {
+            $entries[] = [
+                'account_id' => $zimraAidsLevyPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $totalAidsLevy,
+                'memo' => "ZIMRA AIDS Levy Payable (3%) - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($combinedNssa > 0) {
+            $entries[] = [
+                'account_id' => $nssaTotalPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $combinedNssa,
+                'memo' => "NSSA Social Security Total Payable (Employee + Employer) - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($combinedNec > 0) {
+            $entries[] = [
+                'account_id' => $necTotalPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $combinedNec,
+                'memo' => "NEC Council Total Payable (Employee + Employer) - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalTradeUnion > 0) {
+            $entries[] = [
+                'account_id' => $tradeUnionPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $totalTradeUnion,
+                'memo' => "Trade Union Dues Payable - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalMedicalAid > 0) {
+            $entries[] = [
+                'account_id' => $medicalAidPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $totalMedicalAid,
+                'memo' => "Medical Aid Contributions Payable - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalLoanRepayment > 0) {
+            $entries[] = [
+                'account_id' => $staffLoansClearing->id,
+                'entry_type' => 'credit',
+                'amount' => $totalLoanRepayment,
+                'memo' => "Staff Loan Repayments Payroll Recovery - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+        if ($totalOtherDeductions > 0) {
+            $entries[] = [
+                'account_id' => $otherDeductionsPayable->id,
+                'entry_type' => 'credit',
+                'amount' => $totalOtherDeductions,
+                'memo' => "Other Payroll Deductions Payable - {$payroll->period_year}/{$payroll->period_month}",
+            ];
+        }
+
+        $batch = $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $payroll->processed_date ?? now()->toDateString(),
+            'reference_number' => "PAY-{$payroll->period_year}-{$payroll->period_month}",
+            'description' => "Monthly Staff Payroll Run & Statutory Remittance - {$payroll->period_year}/" . sprintf('%02d', $payroll->period_month),
+            'source_type' => 'payroll',
+            'source_id' => $payroll->id,
+            'status' => 'posted',
+            'created_by' => $payroll->created_by ?? auth()->id(),
+            'entries' => $entries,
+        ]);
+
+        $payroll->update(['journal_batch_id' => $batch->id]);
+
+        return $batch;
+    }
+
+    /**
      * Determine the offsite ledger account based on cashbook category and type
      */
-    protected function determineOffsetAccount(int $schoolId, string $category, string $type): ?Account
+    public function determineOffsetAccount(int $schoolId, string $category, string $type): ?Account
     {
         $code = match($category) {
             'salaries' => '6100',       // Salaries Expense
@@ -1109,4 +1585,5 @@ class AccountingService
             ->first() ?? Account::where('school_id', $schoolId)->where('type', $type === 'expense' ? 'expense' : 'revenue')->first();
     }
 }
+
 

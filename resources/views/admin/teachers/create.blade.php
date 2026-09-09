@@ -16,19 +16,31 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">First Name *</label>
-                            <input type="text" name="first_name" value="{{ old('first_name') }}" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs">
+                            <input type="text" name="first_name" value="{{ old('first_name') }}" required class="w-full px-3 py-2 bg-slate-800 border {{ $errors->has('first_name') ? 'border-rose-500' : 'border-slate-700' }} rounded-lg text-slate-50 text-xs">
+                            @error('first_name')
+                                <p class="text-rose-400 text-[11px] mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Last Name *</label>
-                            <input type="text" name="last_name" value="{{ old('last_name') }}" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs">
+                            <input type="text" name="last_name" value="{{ old('last_name') }}" required class="w-full px-3 py-2 bg-slate-800 border {{ $errors->has('last_name') ? 'border-rose-500' : 'border-slate-700' }} rounded-lg text-slate-50 text-xs">
+                            @error('last_name')
+                                <p class="text-rose-400 text-[11px] mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Email *</label>
-                            <input type="email" name="email" value="{{ old('email') }}" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs">
+                            <input type="email" name="email" value="{{ old('email') }}" required class="w-full px-3 py-2 bg-slate-800 border {{ $errors->has('email') ? 'border-rose-500' : 'border-slate-700' }} rounded-lg text-slate-50 text-xs">
+                            @error('email')
+                                <p class="text-rose-400 text-[11px] mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Phone</label>
-                            <input type="text" name="phone" value="{{ old('phone') }}" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs">
+                            <input type="text" name="phone" value="{{ old('phone') }}" class="w-full px-3 py-2 bg-slate-800 border {{ $errors->has('phone') ? 'border-rose-500' : 'border-slate-700' }} rounded-lg text-slate-50 text-xs">
+                            @error('phone')
+                                <p class="text-rose-400 text-[11px] mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Gender</label>
@@ -55,7 +67,10 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Employee ID</label>
-                            <input type="text" name="employee_id" value="{{ old('employee_id') }}" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs" placeholder="Auto-generated if blank">
+                            <input type="text" name="employee_id" value="{{ old('employee_id') }}" class="w-full px-3 py-2 bg-slate-800 border {{ $errors->has('employee_id') ? 'border-rose-500' : 'border-slate-700' }} rounded-lg text-slate-50 text-xs" placeholder="Auto-generated if blank">
+                            @error('employee_id')
+                                <p class="text-rose-400 text-[11px] mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-400 mb-1">Specialization</label>
@@ -84,8 +99,11 @@
                     <h3 class="text-sm font-semibold text-slate-50 mb-4">User Account</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-medium text-slate-400 mb-1">Password *</label>
-                            <input type="password" name="password" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs">
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Password * <span class="text-[10px] text-slate-500">(Min. 6 characters)</span></label>
+                            <input type="password" name="password" required class="w-full px-3 py-2 bg-slate-800 border {{ $errors->has('password') ? 'border-rose-500' : 'border-slate-700' }} rounded-lg text-slate-50 text-xs">
+                            @error('password')
+                                <p class="text-rose-400 text-[11px] mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
                 </div>

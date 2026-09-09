@@ -3,8 +3,14 @@
 @section('content')
 <div class="flex items-center justify-between mb-4">
     <div>
-        <h1 class="text-lg font-semibold text-slate-50">Schemes of Work</h1>
-        <p class="text-xs text-slate-400 mt-1">View teacher schemes by department</p>
+        <h1 class="text-lg font-semibold text-slate-50">Schemes of Work (MoPSE Zimbabwe Standard)</h1>
+        <p class="text-xs text-slate-400 mt-1">Supervise and review teacher Scheme-Cum Plans across all departments</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <a href="{{ route('teacher.schemes-of-work.create') }}" class="inline-flex items-center gap-1.5 rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 shadow-md shadow-indigo-500/20 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            + Create New Scheme
+        </a>
     </div>
 </div>
 

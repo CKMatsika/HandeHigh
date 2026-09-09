@@ -17,7 +17,11 @@ class SchemeOfWork extends Model
         'subject_id',
         'school_class_id',
         'title',
+        'general_topic',
         'description',
+        'aims',
+        'syllabus_reference',
+        'cross_cutting_themes',
         'academic_year',
         'term',
         'status',
@@ -30,6 +34,7 @@ class SchemeOfWork extends Model
     protected $casts = [
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'cross_cutting_themes' => 'array',
     ];
 
     public function school()

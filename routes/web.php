@@ -37,6 +37,8 @@ use App\Http\Controllers\Portal\StudentController;
 use App\Http\Controllers\Admin\TeacherController as AdminTeacherController;
 use App\Http\Controllers\Admin\CurrencyController;
 use App\Http\Controllers\Admin\StudentController as AdminStudentController;
+use App\Http\Controllers\Admin\YearEndProcessController;
+use App\Http\Controllers\Admin\PerformanceReportController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -184,11 +186,28 @@ Route::middleware(['auth'])->group(function () {
             Route::post('students/{student}/allocate-asset', [AdminStudentController::class, 'allocateAsset'])->name('students.allocate-asset');
             Route::delete('students/{student}/return-asset/{asset}', [AdminStudentController::class, 'returnAsset'])->name('students.return-asset');
             Route::get('students/{student}/manage-library', [AdminStudentController::class, 'manageLibrary'])->name('students.manage-library');
-            Route::post('students/{student}/update-library', [AdminStudentController::class, 'updateLibrary'])->name('students.update-library');
             Route::resource('students', AdminStudentController::class)->except(['show'])
                 ->middlewareFor(['edit', 'update'], 'can:update,student')
                 ->middlewareFor('destroy', 'can:delete,student');
             Route::get('students/{student}', [AdminStudentController::class, 'show'])->name('students.show')->middleware('can:view,student');
+
+            // Year-End Processes & Bulk Promotions / Graduation Clearance
+            Route::prefix('year-end')->name('year-end.')->group(function () {
+                Route::get('/', [YearEndProcessController::class, 'index'])->name('index');
+                Route::post('/draft', [YearEndProcessController::class, 'createDraft'])->name('draft.create');
+                Route::get('/draft/{process}', [YearEndProcessController::class, 'showDraft'])->name('draft');
+                Route::post('/draft/{process}/update-student', [YearEndProcessController::class, 'updateDraftStudent'])->name('draft.update-student');
+                Route::post('/draft/{process}/execute', [YearEndProcessController::class, 'approveAndExecute'])->name('draft.execute');
+
+                // Clearance Hub
+                Route::get('/clearance', [YearEndProcessController::class, 'clearanceIndex'])->name('clearance.index');
+                Route::get('/clearance/{clearance}', [YearEndProcessController::class, 'clearanceShow'])->name('clearance.show');
+                Route::post('/clearance/{clearance}/department', [YearEndProcessController::class, 'clearDepartment'])->name('clearance.clear-department');
+                Route::post('/clearance/bulk-department', [YearEndProcessController::class, 'bulkClearDepartment'])->name('clearance.bulk-department');
+                Route::post('/clearance/{clearance}/finalize-exit', [YearEndProcessController::class, 'finalizeExit'])->name('clearance.finalize-exit');
+                Route::post('/clearance/bulk-finalize-exit', [YearEndProcessController::class, 'bulkFinalizeExit'])->name('clearance.bulk-finalize-exit');
+                Route::get('/clearance/{clearance}/certificate', [YearEndProcessController::class, 'printCertificate'])->name('clearance.certificate');
+            });
 
             Route::resource('classes', SchoolClassController::class)
                 ->middlewareFor('show', 'can:view,class')
@@ -543,6 +562,12 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/payroll/create', [App\Http\Controllers\Admin\PayrollController::class, 'create'])->name('payrolls.create');
             Route::post('/payroll/process', [App\Http\Controllers\Admin\PayrollController::class, 'process'])->name('payrolls.process');
             Route::get('/payroll/{payroll}', [App\Http\Controllers\Admin\PayrollController::class, 'show'])->name('payrolls.show');
+            Route::get('/payroll/{payroll}/bulk-payslips', [App\Http\Controllers\Admin\PayrollController::class, 'bulkPayslips'])->name('payrolls.bulk-payslips');
+            Route::get('/payroll/{payroll}/payslip/{employee}', [App\Http\Controllers\Admin\PayrollController::class, 'payslip'])->name('payrolls.payslip');
+            Route::post('/payroll/{payroll}/payslip/{employee}/email', [App\Http\Controllers\Admin\PayrollController::class, 'emailPayslip'])->name('payrolls.email-payslip');
+            Route::get('/payroll/{payroll}/statutory-report', [App\Http\Controllers\Admin\PayrollController::class, 'statutoryReport'])->name('payrolls.statutory-report');
+            Route::get('/payroll/{payroll}/export-statutory/{type}', [App\Http\Controllers\Admin\PayrollController::class, 'exportStatutory'])->name('payrolls.export-statutory');
+            Route::get('/payroll/{payroll}/export-tarms', [App\Http\Controllers\Admin\PayrollController::class, 'exportTarms'])->name('payrolls.export-tarms');
             Route::post('/payroll/{payroll}/approve', [App\Http\Controllers\Admin\PayrollController::class, 'approve'])->name('payrolls.approve');
             Route::post('/payroll/{payroll}/mark-paid', [App\Http\Controllers\Admin\PayrollController::class, 'markPaid'])->name('payrolls.mark-paid');
             Route::delete('/payroll/{payroll}', [App\Http\Controllers\Admin\PayrollController::class, 'destroy'])->name('payrolls.destroy');
@@ -647,9 +672,34 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/schemes-of-work', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'index'])->name('schemes-of-work.index');
             Route::get('/schemes-of-work/teacher/{teacher}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'teacherSchemes'])->name('schemes-of-work.teacher');
             Route::get('/schemes-of-work/{schemeOfWork}', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'show'])->name('schemes-of-work.show');
+            Route::get('/schemes-of-work/{schemeOfWork}/print', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'print'])->name('schemes-of-work.print');
             Route::post('/schemes-of-work/{schemeOfWork}/approve', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'approve'])->name('schemes-of-work.approve');
             Route::post('/schemes-of-work/{schemeOfWork}/reject', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'reject'])->name('schemes-of-work.reject');
         });
+
+        // Academic -> Exams & Assignments -> End-of-Term Performance Reports (Accessible to Teachers and Leadership)
+        Route::middleware(['tenant', 'role:super-admin|school-admin|headmaster|deputy-headmaster|teacher'])
+            ->prefix('admin')
+            ->name('admin.')
+            ->group(function () {
+                Route::prefix('exams/performance-reports')->name('exams.performance-reports.')->group(function () {
+                    Route::get('/', [PerformanceReportController::class, 'index'])->name('index');
+                    Route::get('/my-subjects', [PerformanceReportController::class, 'mySubjects'])->name('my-subjects');
+                    Route::get('/entry/{class}/{subject}', [PerformanceReportController::class, 'teacherEntry'])->name('teacher-entry');
+                    Route::post('/subjects/{subjectItem}/save', [PerformanceReportController::class, 'saveSubjectEvaluation'])->name('save-subject');
+                    Route::post('/calculate-preview', [PerformanceReportController::class, 'calculateGradePreview'])->name('calculate-preview');
+                    Route::get('/{report}', [PerformanceReportController::class, 'show'])->name('show');
+                    Route::post('/{report}/comment', [PerformanceReportController::class, 'saveLeadershipComment'])->name('save-comment');
+                    Route::post('/{report}/sign', [PerformanceReportController::class, 'applySignature'])->name('sign');
+                    Route::post('/{report}/stamp', [PerformanceReportController::class, 'applyStamp'])->name('stamp');
+                    Route::post('/{report}/finalize', [PerformanceReportController::class, 'finalize'])->name('finalize');
+                    Route::post('/{report}/reopen', [PerformanceReportController::class, 'reopen'])->name('reopen');
+                    Route::get('/{report}/pdf', [PerformanceReportController::class, 'exportPdf'])->name('pdf');
+                    Route::get('/{report}/stream-pdf', [PerformanceReportController::class, 'streamPdf'])->name('stream-pdf');
+                    Route::post('/release-policy', [PerformanceReportController::class, 'updateReleasePolicy'])->name('update-release-policy');
+                    Route::post('/initialize', [PerformanceReportController::class, 'initializeReports'])->name('initialize');
+                });
+            });
 
         Route::middleware(['auth', 'tenant', 'role:teacher|super-admin'])
             ->prefix('teacher')
@@ -664,6 +714,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/schemes-of-work/create', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'create'])->name('schemes-of-work.create');
                 Route::post('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'store'])->name('schemes-of-work.store');
                 Route::get('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'show'])->name('schemes-of-work.show');
+                Route::get('/schemes-of-work/{schemeOfWork}/print', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'print'])->name('schemes-of-work.print');
                 Route::get('/schemes-of-work/{schemeOfWork}/edit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'edit'])->name('schemes-of-work.edit');
                 Route::put('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'update'])->name('schemes-of-work.update');
                 Route::get('/schemes-of-work/{schemeOfWork}/preview', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'preview'])->name('schemes-of-work.preview');

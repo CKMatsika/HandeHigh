@@ -32,6 +32,7 @@
     @php
         $tabs = [
             'overview' => 'Overview',
+            'finance' => 'Finance',
             'subjects' => 'Subjects',
             'positions' => 'Leadership',
             'clubs' => 'Clubs',
@@ -53,6 +54,8 @@
     <!-- Tab Content -->
     @if($activeTab === 'overview')
         @include('admin.students._overview')
+    @elseif($activeTab === 'finance')
+        @include('admin.students._finance')
     @elseif($activeTab === 'subjects')
         @include('admin.students._subjects')
     @elseif($activeTab === 'positions')
