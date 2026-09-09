@@ -23,8 +23,8 @@ return new class extends Migration
             $table->date('transaction_date');
             $table->string('reference_number')->nullable();
             $table->string('payment_method')->nullable(); // cash, bank, mobile_money, check
-            $table->foreignId('related_invoice_id')->nullable()->constrained()->onDelete('set null');
-            $table->foreignId('related_payment_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('related_invoice_id')->nullable()->constrained('invoices')->onDelete('set null');
+            $table->unsignedBigInteger('related_payment_id')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');
             $table->text('notes')->nullable();
             $table->timestamps();
