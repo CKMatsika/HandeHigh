@@ -13,17 +13,19 @@ class ResolveTenant
     {
         $user = $request->user();
 
-        if (! $user || ! $user->school_id) {
+        if (! $user || (! $user->school_id && ! $user->hasRole('super-admin'))) {
             abort(403);
         }
 
-        $school = School::find($user->school_id);
+        if ($user->school_id) {
+            $school = School::find($user->school_id);
 
-        if (! $school) {
-            abort(403);
+            if (! $school) {
+                abort(403);
+            }
+
+            app(TenantContext::class)->set($school);
         }
-
-        app(TenantContext::class)->set($school);
 
         return $next($request);
     }
