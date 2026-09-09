@@ -1,8 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,42 +10,41 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('cashbook', function (Blueprint $table) {
-            // SQLite doesn't support dropping foreign keys easily in Schema builder sometimes, 
-            // but Laravel abstract this. However, we might need to be careful.
-            // Since the original constraints point to non-existent tables, we just need to drop them if they exist?
-            // Actually, we can just assume we need to fix them.
-            
-            // To be safe and since we know the table names were inferred wrongly:
-            // "cashbook_related_invoice_id_foreign" -> inferred
-            
-            try {
-                $table->dropForeign(['related_invoice_id']);
-            } catch (\Exception $e) {
-                // Ignore if it doesn't exist or fails
-            }
-            
-            try {
-                $table->dropForeign(['related_payment_id']);
-            } catch (\Exception $e) {
-                // Ignore if it doesn't exist or fails
-            }
+        /*
+         * PostgreSQL-safe Cashbook foreign-key correction.
+         *
+         * The original migration attempted to drop inferred Laravel
+         * constraints that may not exist. PostgreSQL's IF EXISTS
+         * prevents the migration from failing in that situation.
+         */
 
-            // Now re-add them correctly pointing to 'invoices' and 'payments'
-            
-            // Note: constraint name needs to be potentially different or explicitly re-added.
-            // Using constrained('invoices')
-            
-            $table->foreign('related_invoice_id')
-                  ->references('id')
-                  ->on('invoices')
-                  ->onDelete('set null');
+        // Remove incorrect/inferred constraints if they exist.
+        DB::statement('
+            ALTER TABLE cashbook
+            DROP CONSTRAINT IF EXISTS cashbook_related_invoice_id_foreign
+        ');
 
-            $table->foreign('related_payment_id')
-                  ->references('id')
-                  ->on('payments')
-                  ->onDelete('set null');
-        });
+        DB::statement('
+            ALTER TABLE cashbook
+            DROP CONSTRAINT IF EXISTS cashbook_related_payment_id_foreign
+        ');
+
+        // Re-add the correct foreign keys.
+        DB::statement('
+            ALTER TABLE cashbook
+            ADD CONSTRAINT cashbook_related_invoice_id_foreign
+            FOREIGN KEY (related_invoice_id)
+            REFERENCES invoices (id)
+            ON DELETE SET NULL
+        ');
+
+        DB::statement('
+            ALTER TABLE cashbook
+            ADD CONSTRAINT cashbook_related_payment_id_foreign
+            FOREIGN KEY (related_payment_id)
+            REFERENCES payments (id)
+            ON DELETE SET NULL
+        ');
     }
 
     /**
@@ -54,10 +52,14 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('cashbook', function (Blueprint $table) {
-            $table->dropForeign(['related_invoice_id']);
-            $table->dropForeign(['related_payment_id']);
-            // We can't really restore the "broken" state easily or meaningfully
-        });
+        DB::statement('
+            ALTER TABLE cashbook
+            DROP CONSTRAINT IF EXISTS cashbook_related_invoice_id_foreign
+        ');
+
+        DB::statement('
+            ALTER TABLE cashbook
+            DROP CONSTRAINT IF EXISTS cashbook_related_payment_id_foreign
+        ');
     }
 };
