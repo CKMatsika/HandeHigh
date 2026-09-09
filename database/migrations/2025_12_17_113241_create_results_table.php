@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('student_id')->constrained()->onDelete('cascade');
             $table->foreignId('class_id')->constrained()->onDelete('cascade');
             $table->foreignId('subject_id')->constrained()->onDelete('cascade');
-            $table->foreignId('academic_year')->constrained('academic_years')->onDelete('cascade');
+            $table->string('academic_year', 20);
             $table->string('term')->nullable();
             $table->decimal('total_score', 8, 2);
             $table->decimal('max_total_score', 8, 2);
