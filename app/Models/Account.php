@@ -88,6 +88,11 @@ class Account extends Model
         return $this->hasMany(KioskProduct::class, 'revenue_account_id');
     }
 
+    public function bills()
+    {
+        return $this->hasMany(Bill::class, 'expense_account_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

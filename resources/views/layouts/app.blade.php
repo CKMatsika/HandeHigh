@@ -4,6 +4,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>{{ config('app.name', 'School ERP') }}</title>
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -25,14 +26,14 @@
     </head>
     <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
         <div class="min-h-screen flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-            <aside class="hidden md:flex w-64 flex-col border-r border-slate-800 bg-slate-950/80 backdrop-blur-xl">
+            <aside class="hidden md:flex w-64 shrink-0 h-screen sticky top-0 flex-col border-r border-slate-800 bg-slate-950/80 backdrop-blur-xl">
                 <div class="h-16 flex items-center px-6 border-b border-slate-800">
                     <span class="inline-flex items-center gap-2">
                         <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500 text-xs font-bold tracking-tight">SE</span>
                         <span class="text-sm font-semibold tracking-tight">School ERP</span>
                     </span>
                 </div>
-                <nav class="flex-1 px-3 py-4 space-y-1 text-sm">
+                <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm">
                     <a href="{{ route('dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('dashboard') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                         <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                         <span>Dashboard</span>
@@ -106,13 +107,67 @@
                                     <span class="h-2 w-2 rounded-full bg-pink-400"></span>
                                     <span>Timetable</span>
                                 </a>
+                                <a href="{{ route('admin.exams.performance-reports.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.exams.performance-reports.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span>End-of-Term Reports</span>
+                                </a>
                                 <a href="{{ route('admin.attendance.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.attendance.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-lime-400"></span>
                                     <span>Attendance</span>
                                 </a>
-                                <a href="{{ route('admin.schemes-of-work.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.schemes-of-work.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <a href="{{ route('admin.hostels.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.hostels.*') || request()->routeIs('admin.dormitories.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Hostels & Dormitories</span>
+                                </a>
+                                <a href="{{ route('admin.year-end.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.year-end.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
-                                    <span>Schemes of Work</span>
+                                    <span>Year-End Processes</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Year-End Processes -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('yearend')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span class="text-[10px] font-medium">YEAR-END PROCESSES</span>
+                                </div>
+                                <svg id="yearend-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="yearend-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.year-end.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.year-end.index') || request()->routeIs('admin.year-end.draft*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Year-End Transition</span>
+                                </a>
+                                <a href="{{ route('admin.year-end.clearance.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.year-end.clearance*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Graduation Clearance</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Hostel & Boarding Management -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('hostels')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span class="text-[10px] font-medium">HOSTELS & BOARDING</span>
+                                </div>
+                                <svg id="hostels-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="hostels-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.hostels.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.hostels.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Hostels</span>
+                                </a>
+                                <a href="{{ route('admin.dormitories.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dormitories.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Dormitories & Beds</span>
                                 </a>
                             </div>
                         </div>
@@ -447,6 +502,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </button>
+                            <div id="system-menu" class="hidden space-y-1 pl-6">
                                 <a href="{{ route('admin.school.profile') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.school.profile') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                                     <span>School Profile & Branding</span>
@@ -480,6 +536,10 @@
                                     <a href="{{ route('teacher.flash-cards.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.flash-cards.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                         <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                                         <span>Flash Cards</span>
+                                    </a>
+                                    <a href="{{ route('admin.exams.performance-reports.my-subjects') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.exams.performance-reports.my-subjects') || request()->routeIs('admin.exams.performance-reports.teacher-entry') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                        <span>End-of-Term Reports</span>
                                     </a>
                                 </div>
                             </div>
@@ -554,7 +614,7 @@
                 @endif
             </aside>
 
-            <div class="flex-1 flex flex-col">
+            <div class="flex-1 flex flex-col min-w-0 min-h-screen">
                 <header class="h-16 border-b border-slate-800 flex items-center justify-between px-4 lg:px-8 bg-slate-950/70 backdrop-blur-xl">
                     <div class="flex flex-col">
                         <span class="text-xs uppercase tracking-[0.2em] text-slate-500">Control Center</span>
@@ -579,8 +639,43 @@
                 <main class="flex-1 overflow-y-auto">
                     <div class="max-w-6xl mx-auto py-8 px-4 lg:px-8 space-y-4">
                         @if (session('status'))
-                            <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                                {{ session('status') }}
+                            <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 flex items-center justify-between">
+                                <span>{{ session('status') }}</span>
+                            </div>
+                        @endif
+
+                        @if (session('success'))
+                            <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                <span>{{ session('success') }}</span>
+                            </div>
+                        @endif
+
+                        @if (session('error'))
+                            <div class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>{{ session('error') }}</span>
+                            </div>
+                        @endif
+
+                        @if (session('warning'))
+                            <div class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <span>{{ session('warning') }}</span>
+                            </div>
+                        @endif
+
+                        @if (isset($errors) && $errors->any())
+                            <div class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                                <div class="font-semibold flex items-center gap-2 mb-1 text-rose-300">
+                                    <svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <span>Please correct the errors below:</span>
+                                </div>
+                                <ul class="list-disc list-inside space-y-0.5 text-xs text-rose-300 pl-2">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
                             </div>
                         @endif
 
@@ -639,9 +734,13 @@
                 if (currentRoute.includes('/enrollments') || currentRoute.includes('/classes') || 
                     currentRoute.includes('/subjects') || currentRoute.includes('/curricula') || 
                     currentRoute.includes('/timetables') || 
-                    currentRoute.includes('/attendance') || currentRoute.includes('/schemes-of-work') ||
+                    currentRoute.includes('/attendance') ||
                     currentRoute.includes('/students')) {
                     toggleMenu('academic');
+                } else if (currentRoute.includes('/hostels') || currentRoute.includes('/dormitories')) {
+                    toggleMenu('hostels');
+                } else if (currentRoute.includes('/year-end')) {
+                    toggleMenu('yearend');
                 } else if (currentRoute.includes('/career-guidance')) {
                     toggleMenu('career');
                 } else if (currentRoute.includes('/employees') || currentRoute.includes('/departments') || 
@@ -665,7 +764,7 @@
                     toggleMenu('reports');
                 } else if (currentRoute.includes('/schools')) {
                     toggleMenu('system');
-                } else if (currentRoute.includes('/teacher/schemes-of-work') || currentRoute.includes('/teacher/flash-cards')) {
+                } else if (currentRoute.includes('/schemes-of-work') || currentRoute.includes('/teacher/flash-cards')) {
                     toggleMenu('teacher-portal');
                 }
             });
@@ -676,10 +775,16 @@
             (function() {
                 function pollUnread() {
                     fetch('/admin/communication/unread-count', {
-                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+                        headers: { 
+                            'Accept': 'application/json'
+                        }
                     })
-                    .then(function(r) { return r.json(); })
+                    .then(function(r) { 
+                        if (!r.ok) return null;
+                        return r.json(); 
+                    })
                     .then(function(data) {
+                        if (!data) return;
                         var badge = document.getElementById('sidebarUnreadBadge');
                         if (!badge) return;
                         if (data.count > 0) {
@@ -691,7 +796,9 @@
                             document.title = document.title.replace(/^\(\d+\)\s*/, '');
                         }
                     })
-                    .catch(function() {});
+                    .catch(function(err) {
+                        // Suppress network/aborted polling errors quietly
+                    });
                 }
                 pollUnread();
                 setInterval(pollUnread, 8000);

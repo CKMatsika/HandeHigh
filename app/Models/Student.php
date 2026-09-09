@@ -276,4 +276,30 @@ class Student extends Model
     {
         return $this->hasOne(\App\Models\StudentCareerInterest::class, 'student_id');
     }
+
+    public function clearances()
+    {
+        return $this->hasMany(\App\Models\StudentClearance::class, 'student_id');
+    }
+
+    public function latestClearance()
+    {
+        return $this->hasOne(\App\Models\StudentClearance::class, 'student_id')->latestOfMany();
+    }
+
+    public function activeClearance()
+    {
+        return $this->hasOne(\App\Models\StudentClearance::class, 'student_id')
+            ->whereIn('status', ['pending_clearance', 'fully_cleared']);
+    }
+
+    public function borrowRecords()
+    {
+        return $this->hasMany(\App\Models\BorrowRecord::class, 'student_id');
+    }
+
+    public function studentAssets()
+    {
+        return $this->hasMany(\App\Models\StudentAsset::class, 'student_id');
+    }
 }

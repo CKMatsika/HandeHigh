@@ -37,17 +37,28 @@ class InvoiceController extends Controller
             ->orderBy('first_name')
             ->get();
 
+        $feeStructures = FeeStructure::where('school_id', $school->id)
+            ->orderBy('grade')
+            ->orderBy('category')
+            ->orderBy('label')
+            ->get();
+
         $academicYears = $school->enrollments()
             ->distinct()
             ->pluck('academic_year')
             ->sort()
             ->values();
 
+        if ($academicYears->isEmpty()) {
+            $academicYears = collect([date('Y'), (string)(date('Y') + 1)]);
+        }
+
         $terms = ['Term 1', 'Term 2', 'Term 3'];
 
         return view('admin.invoices.create', [
             'school' => $school,
             'students' => $students,
+            'feeStructures' => $feeStructures,
             'academicYears' => $academicYears,
             'terms' => $terms,
         ]);
@@ -69,6 +80,7 @@ class InvoiceController extends Controller
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.fee_structure_id' => ['nullable', 'integer'],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.category' => ['nullable', 'string', 'max:50'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -124,9 +136,8 @@ class InvoiceController extends Controller
                 $totalAmount += $lineTotal;
 
                 InvoiceItem::create([
-                    'school_id' => $school->id,
                     'invoice_id' => $invoice->id,
-                    'fee_structure_id' => null,
+                    'fee_structure_id' => !empty($item['fee_structure_id']) ? (int)$item['fee_structure_id'] : null,
                     'description' => $item['description'],
                     'category' => $item['category'] ?? 'fees',
                     'quantity' => (int) $item['quantity'],

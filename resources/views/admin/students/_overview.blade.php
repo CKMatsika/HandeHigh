@@ -100,6 +100,40 @@
             @endforelse
         </div>
 
+        <!-- Finance & Debtor Overview -->
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-slate-300">Finance & Account</h3>
+                @php
+                    $bal = $financeSummary['outstanding_balance'] ?? 0;
+                    $balColor = $bal > 0 ? 'rose' : ($bal < 0 ? 'amber' : 'emerald');
+                @endphp
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-{{ $balColor }}-500/20 text-{{ $balColor }}-400 font-semibold uppercase">
+                    {{ $bal > 0 ? 'Balance Due' : ($bal < 0 ? 'Credit' : 'Cleared') }}
+                </span>
+            </div>
+            <div class="space-y-2">
+                <div class="flex justify-between">
+                    <span class="text-slate-400 text-sm">Debtor Balance</span>
+                    <span class="text-slate-100 text-sm font-mono font-bold">
+                        ${{ number_format(abs($bal), 2) }}
+                        @if($bal < 0) <span class="text-xs text-amber-400 font-sans">(CR)</span> @endif
+                    </span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400 text-sm">Total Invoiced</span>
+                    <span class="text-slate-200 text-sm font-mono">${{ number_format($financeSummary['total_invoiced'] ?? 0, 2) }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400 text-sm">Total Paid</span>
+                    <span class="text-emerald-400 text-sm font-mono">${{ number_format($financeSummary['total_paid'] ?? 0, 2) }}</span>
+                </div>
+            </div>
+            <a href="{{ route('admin.students.show', ['student' => $student, 'tab' => 'finance']) }}" class="block text-center mt-3 text-xs text-indigo-400 hover:text-indigo-300 font-medium transition">
+                View Full Finance History & Statement &rarr;
+            </a>
+        </div>
+
         <!-- Boarding -->
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
             <h3 class="text-sm font-semibold text-slate-300 mb-3">Boarding</h3>

@@ -97,6 +97,24 @@
                 View all schemes &rarr;
             </div>
         </a>
+
+        <a href="{{ route('admin.exams.performance-reports.my-subjects') }}" class="rounded-2xl border border-slate-800 bg-gradient-to-br from-purple-500/20 via-slate-900 to-slate-950 px-4 py-4 block transition-all duration-200 hover:border-purple-500 hover:bg-slate-800 hover:shadow-lg hover:shadow-purple-500/10 group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400">Student Reports</p>
+                    <p class="text-lg font-semibold text-slate-50">End-of-Term</p>
+                    <div class="flex gap-2 mt-1">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">Marks & Remarks</span>
+                    </div>
+                </div>
+                <span class="h-8 w-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                </span>
+            </div>
+            <div class="mt-2 text-xs text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                Enter student marks &rarr;
+            </div>
+        </a>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -375,63 +375,148 @@ class FinancialReportController extends Controller
             abort(403);
         }
 
-        $fiscalYear = $request->input('fiscal_year', now()->year);
+        $fiscalYear = (int) $request->input('fiscal_year', now()->year);
         
+        // Auto-sync Chart of Accounts and unposted transactions into General Ledger
+        try {
+            app(\App\Services\AccountingService::class)->ensureChartOfAccountsExist($school);
+            app(\App\Services\AccountingService::class)->syncExistingTransactions($school);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Budget vs Actual sync: " . $e->getMessage());
+        }
+
         $budgets = Budget::where('school_id', $school->id)
             ->where('fiscal_year', $fiscalYear)
-            ->with('budgetLines')
+            ->with(['lines.account', 'lines.costCenter'])
             ->get();
 
+        $budgetLinesByAccount = $budgets->flatMap->lines->groupBy('account_id');
+
+        // Fetch all active postable revenue and expense accounts
+        $accounts = Account::where('school_id', $school->id)
+            ->where('is_active', true)
+            ->where('is_postable', true)
+            ->whereIn('type', ['revenue', 'expense'])
+            ->orderBy('code')
+            ->get();
+
+        $revenueComparison = [];
+        $expenseComparison = [];
         $budgetComparison = [];
-        $totalBudget = 0;
-        $totalActual = 0;
-        $totalVariance = 0;
 
-        foreach ($budgets as $budget) {
-            foreach ($budget->budgetLines ?? [] as $line) {
-                $actualAmount = $this->getActualExpense($school->id, $line->account_id, $fiscalYear);
-                $variance = $line->budgeted_amount - $actualAmount;
-                $variancePercent = $line->budgeted_amount > 0 ? ($variance / $line->budgeted_amount) * 100 : 0;
+        $totalBudgetedRevenue = 0.0;
+        $totalActualRevenue = 0.0;
+        $totalBudgetedExpense = 0.0;
+        $totalActualExpense = 0.0;
 
-                $budgetComparison[] = [
-                    'budget_name' => $budget->name,
-                    'account' => $line->account,
-                    'budgeted' => $line->budgeted_amount,
+        foreach ($accounts as $account) {
+            $isRevenue = ($account->type === 'revenue' || str_starts_with($account->code, '5'));
+            $actualAmount = $this->getActualAccountBalance($school->id, $account->id, $fiscalYear, $isRevenue);
+            
+            $lines = $budgetLinesByAccount->get($account->id, collect());
+            $budgetedAmount = (float) $lines->sum('budgeted_amount');
+            $budgetName = $lines->first()?->budget?->name ?? ($budgets->first()?->name ?? 'General Budget');
+
+            // Skip accounts with zero budget and zero actual unless it is a standard primary account
+            if ($budgetedAmount == 0 && $actualAmount == 0 && !in_array($account->code, ['5100', '5200', '5300', '6100', '6300', '6400', '6500', '6600'])) {
+                continue;
+            }
+
+            if ($isRevenue) {
+                // For Revenue: Positive variance means actual exceeded budget (favorable)
+                $variance = $actualAmount - $budgetedAmount;
+                $variancePercent = $budgetedAmount > 0 ? ($variance / $budgetedAmount) * 100 : ($actualAmount > 0 ? 100 : 0);
+                $status = ($actualAmount >= $budgetedAmount && $actualAmount > 0) ? 'Target Met' : 'In Progress';
+
+                $item = [
+                    'budget_name' => $budgetName,
+                    'account' => $account,
+                    'type' => 'revenue',
+                    'budgeted' => $budgetedAmount,
                     'actual' => $actualAmount,
                     'variance' => $variance,
                     'variance_percent' => $variancePercent,
+                    'status' => $status,
                 ];
 
-                $totalBudget += $line->budgeted_amount;
-                $totalActual += $actualAmount;
-                $totalVariance += $variance;
+                $revenueComparison[] = $item;
+                $budgetComparison[] = $item;
+                $totalBudgetedRevenue += $budgetedAmount;
+                $totalActualRevenue += $actualAmount;
+            } else {
+                // For Expense: Positive variance means actual was below budget (savings/under budget)
+                $variance = $budgetedAmount - $actualAmount;
+                $variancePercent = $budgetedAmount > 0 ? ($variance / $budgetedAmount) * 100 : 0;
+                $status = ($actualAmount <= $budgetedAmount || $budgetedAmount == 0 && $actualAmount == 0) ? 'Under Budget' : 'Over Budget';
+
+                $item = [
+                    'budget_name' => $budgetName,
+                    'account' => $account,
+                    'type' => 'expense',
+                    'budgeted' => $budgetedAmount,
+                    'actual' => $actualAmount,
+                    'variance' => $variance,
+                    'variance_percent' => $variancePercent,
+                    'status' => $status,
+                ];
+
+                $expenseComparison[] = $item;
+                $budgetComparison[] = $item;
+                $totalBudgetedExpense += $budgetedAmount;
+                $totalActualExpense += $actualAmount;
             }
         }
 
+        $totalBudget = $totalBudgetedRevenue + $totalBudgetedExpense;
+        $totalActual = $totalActualRevenue + $totalActualExpense;
+        $totalVariance = ($totalActualRevenue - $totalBudgetedRevenue) + ($totalBudgetedExpense - $totalActualExpense);
         $totalVariancePercent = $totalBudget > 0 ? ($totalVariance / $totalBudget) * 100 : 0;
+        $netOperatingSurplus = $totalActualRevenue - $totalActualExpense;
 
         return view('admin.reports.budget-vs-actual', compact(
             'budgetComparison',
+            'revenueComparison',
+            'expenseComparison',
             'totalBudget',
             'totalActual',
             'totalVariance',
             'totalVariancePercent',
-            'fiscalYear'
+            'totalBudgetedRevenue',
+            'totalActualRevenue',
+            'totalBudgetedExpense',
+            'totalActualExpense',
+            'netOperatingSurplus',
+            'fiscalYear',
+            'budgets'
         ));
     }
 
-    protected function getActualExpense(int $schoolId, int $accountId, int $fiscalYear): float
+    protected function getActualAccountBalance(int $schoolId, int $accountId, int $fiscalYear, bool $isRevenue = false): float
     {
-        return JournalEntry::whereHas('account', function ($q) use ($schoolId, $accountId) {
+        $query = JournalEntry::whereHas('account', function ($q) use ($schoolId, $accountId) {
                 $q->where('school_id', $schoolId)
                   ->where('id', $accountId);
             })
             ->whereHas('batch', function ($q) use ($schoolId, $fiscalYear) {
                 $q->where('school_id', $schoolId)
+                  ->where('status', 'posted')
                   ->whereYear('transaction_date', $fiscalYear);
-            })
-            ->where('entry_type', 'debit')
-            ->sum('amount');
+            });
+
+        if ($isRevenue) {
+            $credits = (float) (clone $query)->where('entry_type', 'credit')->sum('amount');
+            $debits = (float) (clone $query)->where('entry_type', 'debit')->sum('amount');
+            return max(0, $credits - $debits);
+        } else {
+            $debits = (float) (clone $query)->where('entry_type', 'debit')->sum('amount');
+            $credits = (float) (clone $query)->where('entry_type', 'credit')->sum('amount');
+            return max(0, $debits - $credits);
+        }
+    }
+
+    protected function getActualExpense(int $schoolId, int $accountId, int $fiscalYear): float
+    {
+        return $this->getActualAccountBalance($schoolId, $accountId, $fiscalYear, false);
     }
 
     public function departmentalPerformance(Request $request)
@@ -615,9 +700,10 @@ class FinancialReportController extends Controller
             abort(403);
         }
 
-        $start = $request->input('start_date', now()->startOfMonth()->toDateString());
+        $start = $request->input('start_date', $request->filled('search') ? now()->subYears(2)->toDateString() : now()->startOfMonth()->toDateString());
         $end = $request->input('end_date', now()->toDateString());
         $accountId = $request->input('account_id');
+        $search = $request->input('search');
 
         $query = JournalEntry::with(['account', 'batch'])
             ->whereHas('batch', function ($q) use ($school, $start, $end) {
@@ -629,7 +715,18 @@ class FinancialReportController extends Controller
             $query->where('account_id', $accountId);
         }
 
-        $entries = $query->orderBy('created_at', 'desc')->paginate(50);
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('memo', 'like', "%{$search}%")
+                  ->orWhereHas('batch', function ($bq) use ($search) {
+                      $bq->where('reference_number', 'like', "%{$search}%")
+                         ->orWhere('description', 'like', "%{$search}%")
+                         ->orWhere('batch_number', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $entries = $query->orderBy('created_at', 'desc')->paginate(50)->withQueryString();
 
         $accounts = Account::where('school_id', $school->id)
             ->orderBy('code')
@@ -640,7 +737,8 @@ class FinancialReportController extends Controller
             'accounts',
             'accountId',
             'start',
-            'end'
+            'end',
+            'search'
         ));
     }
 

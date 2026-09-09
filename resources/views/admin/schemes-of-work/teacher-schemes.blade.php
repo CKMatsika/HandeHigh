@@ -4,11 +4,16 @@
 <div class="flex items-center justify-between mb-4">
     <div>
         <h1 class="text-lg font-semibold text-slate-50">{{ $teacher->full_name }} - Schemes of Work</h1>
-        <p class="text-xs text-slate-400 mt-1">{{ $teacher->specialization ?? '' }}</p>
+        <p class="text-xs text-slate-400 mt-1">{{ $teacher->specialization ?? '' }} &bull; MoPSE Zimbabwe Standard</p>
     </div>
-    <a href="{{ route('admin.schemes-of-work.index') }}" class="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition">
-        Back to Teachers
-    </a>
+    <div class="flex items-center gap-2">
+        <a href="{{ route('teacher.schemes-of-work.create') }}" class="inline-flex items-center gap-1.5 rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
+            + Create New Scheme
+        </a>
+        <a href="{{ route('admin.schemes-of-work.index') }}" class="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition">
+            Back to Teachers
+        </a>
+    </div>
 </div>
 
 <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">
@@ -46,9 +51,14 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3">
-                                <a href="{{ route('admin.schemes-of-work.show', $scheme) }}" class="rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-medium text-white hover:bg-indigo-600 transition">
-                                    View Details
-                                </a>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('admin.schemes-of-work.show', $scheme) }}" class="rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-medium text-white hover:bg-indigo-600 transition">
+                                        View Details
+                                    </a>
+                                    <a href="{{ route('admin.schemes-of-work.print', $scheme) }}" target="_blank" class="rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition">
+                                        Print
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     @endforeach

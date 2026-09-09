@@ -4,7 +4,7 @@ namespace App\Services\Finance;
 
 use App\Models\Account;
 use App\Models\School;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 

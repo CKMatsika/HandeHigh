@@ -47,6 +47,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap gap-2">
                                     <a href="{{ route('teacher.schemes-of-work.show', $scheme) }}" class="rounded-full bg-slate-800 px-3 py-1 text-[11px] font-medium text-slate-100 hover:bg-slate-700 transition">View</a>
+                                    <a href="{{ route('teacher.schemes-of-work.print', $scheme) }}" target="_blank" class="rounded-full bg-slate-800 border border-slate-700 px-3 py-1 text-[11px] font-medium text-indigo-300 hover:bg-slate-700 hover:text-white transition">Print</a>
                                     @if(in_array($scheme->status, ['draft', 'rejected']))
                                         <a href="{{ route('teacher.schemes-of-work.edit', $scheme) }}" class="rounded-full bg-indigo-500 px-3 py-1 text-[11px] font-medium text-white hover:bg-indigo-600 transition">Edit</a>
                                     @endif

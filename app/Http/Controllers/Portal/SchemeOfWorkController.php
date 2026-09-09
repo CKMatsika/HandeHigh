@@ -85,20 +85,31 @@ class SchemeOfWorkController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
+            'general_topic' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'aims' => 'nullable|string',
+            'syllabus_reference' => 'nullable|string|max:255',
+            'cross_cutting_themes' => 'nullable|array',
+            'cross_cutting_themes.*' => 'string',
             'subject_id' => ['required', TenantExists::make('subjects')],
             'school_class_id' => ['required', TenantExists::make('classes')],
             'academic_year' => 'required|string',
             'term' => 'required|string',
             'items' => 'required|array|min:1',
             'items.*.week_number' => 'required|integer|min:1',
-            'items.*.day_of_week' => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'items.*.week_ending' => 'nullable|date',
+            'items.*.day_of_week' => 'nullable|string',
             'items.*.topic' => 'required|string|max:255',
             'items.*.sub_topic' => 'nullable|string|max:255',
             'items.*.objectives' => 'required|string',
+            'items.*.competencies_skills' => 'nullable|string',
+            'items.*.som_media' => 'nullable|string',
+            'items.*.facility_equipment' => 'nullable|string',
+            'items.*.methods_activities' => 'nullable|string',
             'items.*.teaching_methods' => 'nullable|string',
             'items.*.resources' => 'nullable|string',
             'items.*.assessment' => 'nullable|string',
+            'items.*.evaluation' => 'nullable|string',
             'items.*.remarks' => 'nullable|string',
         ]);
 
@@ -109,7 +120,11 @@ class SchemeOfWorkController extends Controller
                 'subject_id' => $validated['subject_id'],
                 'school_class_id' => $validated['school_class_id'],
                 'title' => $validated['title'],
-                'description' => $validated['description'],
+                'general_topic' => $validated['general_topic'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'aims' => $validated['aims'] ?? null,
+                'syllabus_reference' => $validated['syllabus_reference'] ?? null,
+                'cross_cutting_themes' => $validated['cross_cutting_themes'] ?? null,
                 'academic_year' => $validated['academic_year'],
                 'term' => $validated['term'],
                 'status' => $request->input('action') === 'preview' ? 'preview' : 'draft',
@@ -118,14 +133,20 @@ class SchemeOfWorkController extends Controller
             foreach ($validated['items'] as $index => $item) {
                 $scheme->items()->create([
                     'week_number' => $item['week_number'],
-                    'day_of_week' => $item['day_of_week'],
+                    'week_ending' => $item['week_ending'] ?? null,
+                    'day_of_week' => $item['day_of_week'] ?? 'Friday',
                     'topic' => $item['topic'],
-                    'sub_topic' => $item['sub_topic'],
+                    'sub_topic' => $item['sub_topic'] ?? null,
                     'objectives' => $item['objectives'],
-                    'teaching_methods' => $item['teaching_methods'],
-                    'resources' => $item['resources'],
-                    'assessment' => $item['assessment'],
-                    'remarks' => $item['remarks'],
+                    'competencies_skills' => $item['competencies_skills'] ?? null,
+                    'som_media' => $item['som_media'] ?? $item['resources'] ?? null,
+                    'facility_equipment' => $item['facility_equipment'] ?? null,
+                    'methods_activities' => $item['methods_activities'] ?? $item['teaching_methods'] ?? null,
+                    'teaching_methods' => $item['teaching_methods'] ?? $item['methods_activities'] ?? null,
+                    'resources' => $item['resources'] ?? $item['som_media'] ?? null,
+                    'assessment' => $item['assessment'] ?? null,
+                    'evaluation' => $item['evaluation'] ?? $item['remarks'] ?? null,
+                    'remarks' => $item['remarks'] ?? $item['evaluation'] ?? null,
                     'sort_order' => $index,
                 ]);
             }
@@ -205,27 +226,42 @@ class SchemeOfWorkController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
+            'general_topic' => 'nullable|string|max:255',
             'description' => 'nullable|string',
+            'aims' => 'nullable|string',
+            'syllabus_reference' => 'nullable|string|max:255',
+            'cross_cutting_themes' => 'nullable|array',
+            'cross_cutting_themes.*' => 'string',
             'subject_id' => ['required', TenantExists::make('subjects')],
             'school_class_id' => ['required', TenantExists::make('classes')],
             'academic_year' => 'required|string',
             'term' => 'required|string',
             'items' => 'required|array|min:1',
             'items.*.week_number' => 'required|integer|min:1',
-            'items.*.day_of_week' => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'items.*.week_ending' => 'nullable|date',
+            'items.*.day_of_week' => 'nullable|string',
             'items.*.topic' => 'required|string|max:255',
             'items.*.sub_topic' => 'nullable|string|max:255',
             'items.*.objectives' => 'required|string',
+            'items.*.competencies_skills' => 'nullable|string',
+            'items.*.som_media' => 'nullable|string',
+            'items.*.facility_equipment' => 'nullable|string',
+            'items.*.methods_activities' => 'nullable|string',
             'items.*.teaching_methods' => 'nullable|string',
             'items.*.resources' => 'nullable|string',
             'items.*.assessment' => 'nullable|string',
+            'items.*.evaluation' => 'nullable|string',
             'items.*.remarks' => 'nullable|string',
         ]);
 
         DB::transaction(function () use ($validated, $schemeOfWork, $request) {
             $schemeOfWork->update([
                 'title' => $validated['title'],
-                'description' => $validated['description'],
+                'general_topic' => $validated['general_topic'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'aims' => $validated['aims'] ?? null,
+                'syllabus_reference' => $validated['syllabus_reference'] ?? null,
+                'cross_cutting_themes' => $validated['cross_cutting_themes'] ?? null,
                 'subject_id' => $validated['subject_id'],
                 'school_class_id' => $validated['school_class_id'],
                 'academic_year' => $validated['academic_year'],
@@ -238,14 +274,20 @@ class SchemeOfWorkController extends Controller
             foreach ($validated['items'] as $index => $item) {
                 $schemeOfWork->items()->create([
                     'week_number' => $item['week_number'],
-                    'day_of_week' => $item['day_of_week'],
+                    'week_ending' => $item['week_ending'] ?? null,
+                    'day_of_week' => $item['day_of_week'] ?? 'Friday',
                     'topic' => $item['topic'],
-                    'sub_topic' => $item['sub_topic'],
+                    'sub_topic' => $item['sub_topic'] ?? null,
                     'objectives' => $item['objectives'],
-                    'teaching_methods' => $item['teaching_methods'],
-                    'resources' => $item['resources'],
-                    'assessment' => $item['assessment'],
-                    'remarks' => $item['remarks'],
+                    'competencies_skills' => $item['competencies_skills'] ?? null,
+                    'som_media' => $item['som_media'] ?? $item['resources'] ?? null,
+                    'facility_equipment' => $item['facility_equipment'] ?? null,
+                    'methods_activities' => $item['methods_activities'] ?? $item['teaching_methods'] ?? null,
+                    'teaching_methods' => $item['teaching_methods'] ?? $item['methods_activities'] ?? null,
+                    'resources' => $item['resources'] ?? $item['som_media'] ?? null,
+                    'assessment' => $item['assessment'] ?? null,
+                    'evaluation' => $item['evaluation'] ?? $item['remarks'] ?? null,
+                    'remarks' => $item['remarks'] ?? $item['evaluation'] ?? null,
                     'sort_order' => $index,
                 ]);
             }
@@ -273,6 +315,24 @@ class SchemeOfWorkController extends Controller
         $schemeOfWork->load(['subject', 'schoolClass', 'items', 'teacher']);
 
         return view('portal.teacher.schemes-of-work.preview', [
+            'school' => $school,
+            'user' => $user,
+            'scheme' => $schemeOfWork,
+        ]);
+    }
+
+    public function print(SchemeOfWork $schemeOfWork)
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (! $school || $schemeOfWork->school_id !== $school->id) {
+            abort(403);
+        }
+
+        $schemeOfWork->load(['subject', 'schoolClass', 'items', 'teacher', 'reviewer']);
+
+        return view('portal.teacher.schemes-of-work.print', [
             'school' => $school,
             'user' => $user,
             'scheme' => $schemeOfWork,

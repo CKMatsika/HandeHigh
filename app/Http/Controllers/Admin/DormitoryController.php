@@ -128,7 +128,12 @@ class DormitoryController extends Controller
         }
 
         $validated = $request->validate([
-            'bed_number' => ['required', 'string', 'max:50'],
+            'bed_number' => [
+                'required',
+                'string',
+                'max:50',
+                \Illuminate\Validation\Rule::unique('beds')->where('dormitory_id', $dormitory->id),
+            ],
             'description' => ['nullable', 'string', 'max:255'],
         ]);
 

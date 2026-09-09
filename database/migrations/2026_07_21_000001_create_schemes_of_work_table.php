@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('school_id')->constrained()->onDelete('cascade');
             $table->foreignId('teacher_id')->constrained()->onDelete('cascade');
             $table->foreignId('subject_id')->constrained()->onDelete('cascade');
-            $table->foreignId('school_class_id')->constrained()->onDelete('cascade');
+            $table->foreignId('school_class_id')->constrained('classes')->onDelete('cascade');
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('academic_year');
@@ -32,7 +32,7 @@ return new class extends Migration
 
         Schema::create('scheme_of_work_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('scheme_of_work_id')->constrained()->onDelete('cascade');
+            $table->foreignId('scheme_of_work_id')->constrained('schemes_of_work')->onDelete('cascade');
             $table->integer('week_number');
             $table->string('day_of_week');
             $table->string('topic');

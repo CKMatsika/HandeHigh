@@ -33,6 +33,18 @@ class Employee extends Model
         'emergency_contact',
         'emergency_phone',
         'profile_photo',
+        'national_id',
+        'zimra_tin',
+        'nssa_number',
+        'nec_sector_code',
+        'trade_union_member',
+        'trade_union_rate',
+        'trade_union_flat_amount',
+        'medical_aid_usd',
+        'medical_aid_zwg',
+        'leave_days_accrued',
+        'leave_days_taken',
+        'leave_balance',
     ];
 
     protected $casts = [
@@ -40,6 +52,14 @@ class Employee extends Model
         'hire_date' => 'date',
         'termination_date' => 'date',
         'salary' => 'decimal:2',
+        'trade_union_member' => 'boolean',
+        'trade_union_rate' => 'decimal:4',
+        'trade_union_flat_amount' => 'decimal:2',
+        'medical_aid_usd' => 'decimal:2',
+        'medical_aid_zwg' => 'decimal:2',
+        'leave_days_accrued' => 'decimal:2',
+        'leave_days_taken' => 'decimal:2',
+        'leave_balance' => 'decimal:2',
         'employment_status' => 'string',
         'employment_type' => 'string',
     ];

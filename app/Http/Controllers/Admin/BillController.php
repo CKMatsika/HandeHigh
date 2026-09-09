@@ -46,8 +46,17 @@ class BillController extends Controller
             abort(403);
         }
 
+        app(\App\Services\AccountingService::class)->ensureChartOfAccountsExist($school);
+
         $vendors = Vendor::where('school_id', $school->id)->get();
-        return view('admin.bills.create', compact('vendors'));
+        $expenseAccounts = Account::where('school_id', $school->id)
+            ->where('type', 'expense')
+            ->where('is_active', true)
+            ->where('is_postable', true)
+            ->orderBy('code')
+            ->get();
+
+        return view('admin.bills.create', compact('vendors', 'expenseAccounts'));
     }
 
     public function store(Request $request)
@@ -61,6 +70,7 @@ class BillController extends Controller
 
         $validated = $request->validate([
             'vendor_id' => ['required', TenantExists::make('vendors')],
+            'expense_account_id' => ['nullable', 'integer'],
             'bill_number' => ['required', 'string', 'max:255'],
             'vendor_bill_number' => ['nullable', 'string', 'max:255'],
             'bill_date' => ['required', 'date'],
@@ -73,6 +83,7 @@ class BillController extends Controller
         $bill = Bill::create([
             'school_id' => $school->id,
             'vendor_id' => $validated['vendor_id'],
+            'expense_account_id' => !empty($validated['expense_account_id']) ? (int) $validated['expense_account_id'] : null,
             'bill_number' => $validated['bill_number'],
             'vendor_bill_number' => $validated['vendor_bill_number'] ?? null,
             'bill_date' => $validated['bill_date'],
@@ -101,7 +112,7 @@ class BillController extends Controller
     {
         $this->authorizeSchoolAccess($bill);
         
-        $bill->load(['vendor', 'items', 'payments']);
+        $bill->load(['vendor', 'items', 'payments', 'expenseAccount']);
         return view('admin.bills.show', compact('bill'));
     }
 
@@ -113,7 +124,14 @@ class BillController extends Controller
         $school = $user?->school;
 
         $vendors = Vendor::where('school_id', $school->id)->get();
-        return view('admin.bills.edit', compact('bill', 'vendors'));
+        $expenseAccounts = Account::where('school_id', $school->id)
+            ->where('type', 'expense')
+            ->where('is_active', true)
+            ->where('is_postable', true)
+            ->orderBy('code')
+            ->get();
+
+        return view('admin.bills.edit', compact('bill', 'vendors', 'expenseAccounts'));
     }
 
     public function update(Request $request, Bill $bill)
@@ -122,6 +140,7 @@ class BillController extends Controller
 
         $validated = $request->validate([
             'vendor_id' => ['required', TenantExists::make('vendors')],
+            'expense_account_id' => ['nullable', 'integer'],
             'bill_number' => ['required', 'string', 'max:255'],
             'vendor_bill_number' => ['nullable', 'string', 'max:255'],
             'bill_date' => ['required', 'date'],
@@ -131,7 +150,15 @@ class BillController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $validated['expense_account_id'] = !empty($validated['expense_account_id']) ? (int) $validated['expense_account_id'] : null;
+
         $bill->update($validated);
+
+        try {
+            app(\App\Services\AccountingService::class)->postBill($bill);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to update bill in accounting: ' . $e->getMessage());
+        }
 
         return redirect()
             ->route('admin.bills.index')

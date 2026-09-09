@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Teacher;
 use App\Models\School;
+use App\Services\AuditService;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Http\Request;
@@ -103,6 +105,26 @@ class UserManagementController extends Controller
             $user->assignRole($role);
         }
 
+        // Synchronize Teacher profile if teacher role was assigned
+        if ($user->hasRole('teacher') && !Teacher::where('user_id', $user->id)->exists()) {
+            $nameParts = explode(' ', trim($user->name), 2);
+            $firstName = $nameParts[0] ?? 'Teacher';
+            $lastName = $nameParts[1] ?? '';
+            Teacher::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'employee_id' => 'TCH-' . strtoupper(\Illuminate\Support\Str::random(6)),
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'address' => $user->address,
+                'gender' => $user->gender,
+                'date_of_birth' => $user->date_of_birth,
+                'status' => true,
+            ]);
+        }
+
         // Assign additional permissions
         if ($request->filled('permissions')) {
             $permissions = Permission::whereIn('id', $request->permissions)->get();
@@ -183,6 +205,40 @@ class UserManagementController extends Controller
 
         // Update roles
         $user->syncRoles($request->roles);
+
+        // Synchronize Teacher profile if teacher role is active
+        if ($user->hasRole('teacher')) {
+            $teacher = Teacher::where('user_id', $user->id)->first();
+            $nameParts = explode(' ', trim($user->name), 2);
+            $firstName = $nameParts[0] ?? 'Teacher';
+            $lastName = $nameParts[1] ?? '';
+            if (!$teacher) {
+                Teacher::create([
+                    'school_id' => $user->school_id,
+                    'user_id' => $user->id,
+                    'employee_id' => 'TCH-' . strtoupper(\Illuminate\Support\Str::random(6)),
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'address' => $user->address,
+                    'gender' => $user->gender,
+                    'date_of_birth' => $user->date_of_birth,
+                    'status' => $user->is_active,
+                ]);
+            } else {
+                $teacher->update([
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'address' => $user->address,
+                    'gender' => $user->gender,
+                    'date_of_birth' => $user->date_of_birth,
+                    'status' => $user->is_active,
+                ]);
+            }
+        }
 
         // Update permissions
         if ($request->filled('permissions')) {

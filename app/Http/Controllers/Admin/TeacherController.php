@@ -82,7 +82,7 @@ class TeacherController extends Controller
             'hire_date' => ['nullable', 'date'],
             'salary' => ['nullable', 'numeric', 'min:0'],
             'employee_id' => ['nullable', 'string', 'max:50', 'unique:teachers,employee_id'],
-            'password' => ['required', Password::defaults()],
+            'password' => ['required', 'string', 'min:6'],
             'subjects' => ['nullable', 'array'],
             'subjects.*' => [TenantExists::make('subjects')],
             'positions' => ['nullable', 'array'],
@@ -101,6 +101,8 @@ class TeacherController extends Controller
                 'address' => $validated['address'] ?? null,
                 'school_id' => $school->id,
                 'password' => Hash::make($validated['password']),
+                'is_active' => true,
+                'email_verified_at' => now(),
             ]);
             $user->assignRole('teacher');
 
@@ -215,7 +217,7 @@ class TeacherController extends Controller
             'hire_date' => ['nullable', 'date'],
             'salary' => ['nullable', 'numeric', 'min:0'],
             'employee_id' => ['nullable', 'string', 'max:50', 'unique:teachers,employee_id,' . $teacher->id],
-            'password' => ['nullable', Password::defaults()],
+            'password' => ['nullable', 'string', 'min:6'],
             'subjects' => ['nullable', 'array'],
             'subjects.*' => [TenantExists::make('subjects')],
         ]);
