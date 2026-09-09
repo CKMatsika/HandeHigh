@@ -11,6 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        Schema::dropIfExists('timetable_fixed_activities');
+        
         Schema::create('timetable_fixed_activities', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained()->onDelete('cascade');
@@ -35,7 +37,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->timestamps();
 
-            $table->index(['school_id', 'day_of_week', 'start_time']);
+            $table->index(['school_id', 'day_of_week', 'start_time'], 'tt_fixed_acts_school_day_time_idx');
             $table->index(['timetable_id', 'day_of_week']);
             $table->index(['school_id', 'activity_type']);
         });
