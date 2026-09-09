@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             SchoolSeeder::class,
             StaffPositionSeeder::class,
+            SuperAdminSeeder::class,
         ]);
     }
 }
