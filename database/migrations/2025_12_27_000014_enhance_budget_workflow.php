@@ -62,41 +62,22 @@ return new class extends Migration
         });
 
         /*
-         * PostgreSQL CHECK constraint for the enhanced workflow.
-         *
-         * This replaces Laravel's enum()->change() operation.
+         * MySQL-safe budget workflow migration.
+         * We alter the column directly to add the new enum values.
          */
         DB::statement("
-            ALTER TABLE budgets
-            DROP CONSTRAINT IF EXISTS budgets_status_check
-        ");
-
-        DB::statement("
-            ALTER TABLE budgets
-            ADD CONSTRAINT budgets_status_check
-            CHECK (
-                status IN (
-                    'draft',
-                    'submitted',
-                    'bursar_review',
-                    'finance_committee',
-                    'committee_review',
-                    'approved',
-                    'active',
-                    'closed',
-                    'rejected'
-                )
-            )
-        ");
-
-        DB::statement("
-            ALTER TABLE budgets
-            ALTER COLUMN status SET DEFAULT 'draft'
-        ");
-
-        DB::statement("
-            ALTER TABLE budgets
-            ALTER COLUMN status SET NOT NULL
+            ALTER TABLE budgets 
+            MODIFY status ENUM(
+                'draft', 
+                'submitted', 
+                'bursar_review', 
+                'finance_committee', 
+                'committee_review', 
+                'approved', 
+                'active', 
+                'closed', 
+                'rejected'
+            ) NOT NULL DEFAULT 'draft'
         ");
     }
 
@@ -106,8 +87,8 @@ return new class extends Migration
     public function down(): void
     {
         DB::statement("
-            ALTER TABLE budgets
-            DROP CONSTRAINT IF EXISTS budgets_status_check
+            ALTER TABLE budgets 
+            MODIFY status ENUM('draft', 'approved', 'active', 'closed') NOT NULL DEFAULT 'draft'
         ");
 
         Schema::table('budgets', function (Blueprint $table) {
@@ -130,16 +111,5 @@ return new class extends Migration
                 'total_variance'
             ]);
         });
-
-        DB::statement("
-            ALTER TABLE budgets
-            ADD CONSTRAINT budgets_status_check
-            CHECK (status IN ('draft', 'approved', 'active', 'closed'))
-        ");
-
-        DB::statement("
-            ALTER TABLE budgets
-            ALTER COLUMN status SET DEFAULT 'draft'
-        ");
     }
 };
