@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,38 +12,92 @@ return new class extends Migration
      */
     public function up(): void
     {
+        /*
+         * PostgreSQL-safe budget workflow migration.
+         *
+         * We do not use ->enum()->change() here because Laravel's
+         * PostgreSQL grammar generates invalid SQL for that operation.
+         */
+
+        // First make sure existing budget statuses remain valid.
+        DB::statement("
+            UPDATE budgets
+            SET status = 'draft'
+            WHERE status IS NULL
+               OR status NOT IN ('draft', 'approved', 'active', 'closed')
+        ");
+
+        // Add workflow tracking fields.
         Schema::table('budgets', function (Blueprint $table) {
-            // Enhanced workflow fields
-            $table->enum('status', [
-                'draft',           // Accounts Clerk creates
-                'submitted',        // Submitted to Bursar
-                'bursar_review',   // Bursar reviewing
-                'finance_committee', // Sent to Finance Committee
-                'committee_review', // Finance Committee reviewing
-                'approved',         // Fully approved
-                'active',          // Budget is active
-                'closed',          // Budget period closed
-                'rejected'         // Budget rejected
-            ])->default('draft')->change();
-            
-            // Workflow tracking
-            $table->foreignId('submitted_by')->nullable()->after('created_by')->constrained('users')->onDelete('set null');
-            $table->timestamp('submitted_at')->nullable()->after('submitted_by');
-            $table->foreignId('bursar_reviewed_by')->nullable()->after('submitted_at')->constrained('users')->onDelete('set null');
-            $table->timestamp('bursar_reviewed_at')->nullable()->after('bursar_reviewed_by');
-            $table->foreignId('committee_reviewed_by')->nullable()->after('bursar_reviewed_at')->constrained('users')->onDelete('set null');
-            $table->timestamp('committee_reviewed_at')->nullable()->after('committee_reviewed_by');
-            
+            $table->foreignId('submitted_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->timestamp('submitted_at')->nullable();
+
+            $table->foreignId('bursar_reviewed_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->timestamp('bursar_reviewed_at')->nullable();
+
+            $table->foreignId('committee_reviewed_by')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->timestamp('committee_reviewed_at')->nullable();
+
             // Review notes
-            $table->text('bursar_notes')->nullable()->after('committee_reviewed_at');
-            $table->text('committee_notes')->nullable()->after('bursar_notes');
-            $table->text('rejection_reason')->nullable()->after('committee_notes');
-            
+            $table->text('bursar_notes')->nullable();
+            $table->text('committee_notes')->nullable();
+            $table->text('rejection_reason')->nullable();
+
             // Budget totals
-            $table->decimal('total_budgeted', 15, 2)->default(0)->after('rejection_reason');
-            $table->decimal('total_actual', 15, 2)->default(0)->after('total_budgeted');
-            $table->decimal('total_variance', 15, 2)->default(0)->after('total_actual');
+            $table->decimal('total_budgeted', 15, 2)->default(0);
+            $table->decimal('total_actual', 15, 2)->default(0);
+            $table->decimal('total_variance', 15, 2)->default(0);
         });
+
+        /*
+         * PostgreSQL CHECK constraint for the enhanced workflow.
+         *
+         * This replaces Laravel's enum()->change() operation.
+         */
+        DB::statement("
+            ALTER TABLE budgets
+            DROP CONSTRAINT IF EXISTS budgets_status_check
+        ");
+
+        DB::statement("
+            ALTER TABLE budgets
+            ADD CONSTRAINT budgets_status_check
+            CHECK (
+                status IN (
+                    'draft',
+                    'submitted',
+                    'bursar_review',
+                    'finance_committee',
+                    'committee_review',
+                    'approved',
+                    'active',
+                    'closed',
+                    'rejected'
+                )
+            )
+        ");
+
+        DB::statement("
+            ALTER TABLE budgets
+            ALTER COLUMN status SET DEFAULT 'draft'
+        ");
+
+        DB::statement("
+            ALTER TABLE budgets
+            ALTER COLUMN status SET NOT NULL
+        ");
     }
 
     /**
@@ -50,8 +105,16 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::statement("
+            ALTER TABLE budgets
+            DROP CONSTRAINT IF EXISTS budgets_status_check
+        ");
+
         Schema::table('budgets', function (Blueprint $table) {
-            // Drop new columns
+            $table->dropForeign(['submitted_by']);
+            $table->dropForeign(['bursar_reviewed_by']);
+            $table->dropForeign(['committee_reviewed_by']);
+
             $table->dropColumn([
                 'submitted_by',
                 'submitted_at',
@@ -66,9 +129,17 @@ return new class extends Migration
                 'total_actual',
                 'total_variance'
             ]);
-            
-            // Revert status enum
-            $table->enum('status', ['draft', 'approved', 'active', 'closed'])->default('draft')->change();
         });
+
+        DB::statement("
+            ALTER TABLE budgets
+            ADD CONSTRAINT budgets_status_check
+            CHECK (status IN ('draft', 'approved', 'active', 'closed'))
+        ");
+
+        DB::statement("
+            ALTER TABLE budgets
+            ALTER COLUMN status SET DEFAULT 'draft'
+        ");
     }
 };
