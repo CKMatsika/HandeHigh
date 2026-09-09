@@ -11,18 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('cashbook', function (Blueprint $table) {
+        $foreignKeys = collect(Schema::getForeignKeys('cashbook'))->pluck('name');
+
+        Schema::table('cashbook', function (Blueprint $table) use ($foreignKeys) {
             // Attempt to drop the existing constraints if they exist
-            try {
+            if ($foreignKeys->contains('cashbook_related_invoice_id_foreign')) {
                 $table->dropForeign('cashbook_related_invoice_id_foreign');
-            } catch (\Exception $e) {
-                // Ignore if it doesn't exist
             }
 
-            try {
+            if ($foreignKeys->contains('cashbook_related_payment_id_foreign')) {
                 $table->dropForeign('cashbook_related_payment_id_foreign');
-            } catch (\Exception $e) {
-                // Ignore if it doesn't exist
             }
 
             // Re-add the correct foreign keys
@@ -41,17 +39,15 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('cashbook', function (Blueprint $table) {
-            try {
+        $foreignKeys = collect(Schema::getForeignKeys('cashbook'))->pluck('name');
+
+        Schema::table('cashbook', function (Blueprint $table) use ($foreignKeys) {
+            if ($foreignKeys->contains('cashbook_related_invoice_id_foreign')) {
                 $table->dropForeign('cashbook_related_invoice_id_foreign');
-            } catch (\Exception $e) {
-                // Ignore
             }
 
-            try {
+            if ($foreignKeys->contains('cashbook_related_payment_id_foreign')) {
                 $table->dropForeign('cashbook_related_payment_id_foreign');
-            } catch (\Exception $e) {
-                // Ignore
             }
         });
     }
