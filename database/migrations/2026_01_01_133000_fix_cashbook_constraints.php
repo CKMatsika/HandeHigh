@@ -10,41 +10,29 @@ return new class extends Migration
      */
     public function up(): void
     {
-        /*
-         * PostgreSQL-safe Cashbook foreign-key correction.
-         *
-         * The original migration attempted to drop inferred Laravel
-         * constraints that may not exist. PostgreSQL's IF EXISTS
-         * prevents the migration from failing in that situation.
-         */
+        Schema::table('cashbook', function (Blueprint $table) {
+            // Attempt to drop the existing constraints if they exist
+            try {
+                $table->dropForeign('cashbook_related_invoice_id_foreign');
+            } catch (\Exception $e) {
+                // Ignore if it doesn't exist
+            }
 
-        // Remove incorrect/inferred constraints if they exist.
-        DB::statement('
-            ALTER TABLE cashbook
-            DROP CONSTRAINT IF EXISTS cashbook_related_invoice_id_foreign
-        ');
+            try {
+                $table->dropForeign('cashbook_related_payment_id_foreign');
+            } catch (\Exception $e) {
+                // Ignore if it doesn't exist
+            }
 
-        DB::statement('
-            ALTER TABLE cashbook
-            DROP CONSTRAINT IF EXISTS cashbook_related_payment_id_foreign
-        ');
+            // Re-add the correct foreign keys
+            $table->foreign('related_invoice_id', 'cashbook_related_invoice_id_foreign')
+                  ->references('id')->on('invoices')
+                  ->onDelete('set null');
 
-        // Re-add the correct foreign keys.
-        DB::statement('
-            ALTER TABLE cashbook
-            ADD CONSTRAINT cashbook_related_invoice_id_foreign
-            FOREIGN KEY (related_invoice_id)
-            REFERENCES invoices (id)
-            ON DELETE SET NULL
-        ');
-
-        DB::statement('
-            ALTER TABLE cashbook
-            ADD CONSTRAINT cashbook_related_payment_id_foreign
-            FOREIGN KEY (related_payment_id)
-            REFERENCES payments (id)
-            ON DELETE SET NULL
-        ');
+            $table->foreign('related_payment_id', 'cashbook_related_payment_id_foreign')
+                  ->references('id')->on('payments')
+                  ->onDelete('set null');
+        });
     }
 
     /**
@@ -52,14 +40,18 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement('
-            ALTER TABLE cashbook
-            DROP CONSTRAINT IF EXISTS cashbook_related_invoice_id_foreign
-        ');
+        Schema::table('cashbook', function (Blueprint $table) {
+            try {
+                $table->dropForeign('cashbook_related_invoice_id_foreign');
+            } catch (\Exception $e) {
+                // Ignore
+            }
 
-        DB::statement('
-            ALTER TABLE cashbook
-            DROP CONSTRAINT IF EXISTS cashbook_related_payment_id_foreign
-        ');
+            try {
+                $table->dropForeign('cashbook_related_payment_id_foreign');
+            } catch (\Exception $e) {
+                // Ignore
+            }
+        });
     }
 };
