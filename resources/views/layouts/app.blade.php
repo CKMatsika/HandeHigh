@@ -516,34 +516,7 @@
                             </div>
                         </div>
                         
-                        @if($user && $user->hasRole(['teacher', 'super-admin']))
-                            <!-- Teacher Portal -->
-                            <div class="space-y-1">
-                                <button onclick="toggleMenu('teacher-portal')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
-                                    <div class="flex items-center gap-2">
-                                        <span class="h-2 w-2 rounded-full bg-violet-400"></span>
-                                        <span class="text-[10px] font-medium">TEACHING</span>
-                                    </div>
-                                    <svg id="teacher-portal-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </button>
-                                <div id="teacher-portal-menu" class="hidden space-y-1 pl-6">
-                                    <a href="{{ route('teacher.schemes-of-work.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.schemes-of-work.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
-                                        <span>Schemes of Work</span>
-                                    </a>
-                                    <a href="{{ route('teacher.flash-cards.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.flash-cards.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-                                        <span>Flash Cards</span>
-                                    </a>
-                                    <a href="{{ route('admin.exams.performance-reports.my-subjects') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.exams.performance-reports.my-subjects') || request()->routeIs('admin.exams.performance-reports.teacher-entry') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
-                                        <span class="h-2 w-2 rounded-full bg-purple-400"></span>
-                                        <span>End-of-Term Reports</span>
-                                    </a>
-                                </div>
-                            </div>
-                        @endif
+
                         
                         @if($user && $user->hasRole('super-admin'))
                             <!-- Portal Testing -->
@@ -604,6 +577,43 @@
                                 </div>
                             </div>
                         @endif
+                    @endif
+
+                    @if($user && $user->hasRole(['teacher', 'super-admin']))
+                        <!-- Teacher Portal -->
+                        <div class="space-y-1">
+                            <a href="{{ route('teacher.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.dashboard') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                <span>Teacher Dashboard</span>
+                            </a>
+                            <button onclick="toggleMenu('teacher-portal')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                    <span class="text-[10px] font-medium">TEACHING</span>
+                                </div>
+                                <svg id="teacher-portal-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="teacher-portal-menu" class="{{ request()->routeIs('teacher.*') ? '' : 'hidden' }} space-y-1 pl-6">
+                                <a href="{{ route('teacher.schemes-of-work.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.schemes-of-work.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Schemes of Work</span>
+                                </a>
+                                <a href="{{ route('teacher.timetable.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.timetable.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-pink-400"></span>
+                                    <span>My Timetable</span>
+                                </a>
+                                <a href="{{ route('teacher.flash-cards.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('teacher.flash-cards.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Flash Cards</span>
+                                </a>
+                                <a href="{{ route('admin.exams.performance-reports.my-subjects') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.exams.performance-reports.my-subjects') || request()->routeIs('admin.exams.performance-reports.teacher-entry') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span>End-of-Term Reports</span>
+                                </a>
+                            </div>
+                        </div>
                     @endif
                 </nav>
                 @if($user)

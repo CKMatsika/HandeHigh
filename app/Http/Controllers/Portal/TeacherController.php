@@ -9,6 +9,9 @@ use App\Models\SchemeOfWork;
 use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class TeacherController extends Controller
 {
@@ -77,7 +80,7 @@ class TeacherController extends Controller
             $students = (clone $studentsQuery)->limit(12)->get();
             
             // Get teacher record and schemes of work
-            $teacher = Teacher::where('school_id', $school->id)->where('user_id', $user->id)->first();
+            $teacher = $this->getOrCreateTeacherRecord($user, $school);
             $schemesCount = 0;
             $draftSchemesCount = 0;
             $submittedSchemesCount = 0;
@@ -98,13 +101,25 @@ class TeacherController extends Controller
                     ->get();
             }
             
-            // Get projects where teacher is involved
-            $teacherProjects = Project::where('school_id', $school->id)
-                ->where(function($query) use ($user) {
-                    $query->where('project_manager_id', $user->id)
-                          ->orWhere('team_lead_id', $user->id)
-                          ->orWhereJsonContains('team_members', $user->id);
-                })->get();
+            // Get projects where teacher is involved (schema-safe and exception-resilient)
+            $teacherProjects = collect();
+            try {
+                if (Schema::hasColumn('projects', 'project_manager_id')) {
+                    $teacherProjects = Project::where('school_id', $school->id)
+                        ->where(function($query) use ($user) {
+                            $query->where('project_manager_id', $user->id);
+                            if (Schema::hasColumn('projects', 'team_lead_id')) {
+                                $query->orWhere('team_lead_id', $user->id);
+                            }
+                            if (Schema::hasColumn('projects', 'team_members')) {
+                                $query->orWhereJsonContains('team_members', $user->id);
+                            }
+                        })->get();
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Could not load teacher projects: ' . $e->getMessage());
+                $teacherProjects = collect();
+            }
             
             // Sample assignments
             $assignments = collect([
@@ -126,11 +141,19 @@ class TeacherController extends Controller
             ]);
             
             // Career guidance stats for teacher's students
-            $allClassStudentIds = (clone $studentsQuery)->pluck('id');
-            $careerStudentTotal = $allClassStudentIds->count();
-            $careerAssessmentsCount = CareerGuidanceAssessment::whereIn('student_id', $allClassStudentIds)
-                ->where('status', 'published')->count();
-            $careerAssessedStudents = $careerAssessmentsCount;
+            try {
+                $allClassStudentIds = (clone $studentsQuery)->pluck('id');
+                $careerStudentTotal = $allClassStudentIds->count();
+                $careerAssessmentsCount = $careerStudentTotal > 0
+                    ? CareerGuidanceAssessment::whereIn('student_id', $allClassStudentIds)->where('status', 'published')->count()
+                    : 0;
+                $careerAssessedStudents = $careerAssessmentsCount;
+            } catch (\Throwable $e) {
+                Log::warning('Could not query career guidance stats: ' . $e->getMessage());
+                $careerStudentTotal = 0;
+                $careerAssessmentsCount = 0;
+                $careerAssessedStudents = 0;
+            }
             
             // Sample daily schedule
             $schedule = collect([
@@ -146,7 +169,12 @@ class TeacherController extends Controller
             $teacherClasses = $managedClasses;
             $curricula = $school->curricula()->with(['class', 'subject'])->limit(5)->get();
             $students = $school->students()->limit(5)->get();
-            $teacherProjects = Project::where('school_id', $school->id)->limit(5)->get();
+            $teacherProjects = collect();
+            try {
+                $teacherProjects = Project::where('school_id', $school->id)->limit(5)->get();
+            } catch (\Throwable $e) {
+                $teacherProjects = collect();
+            }
             
             $schemesCount = SchemeOfWork::where('school_id', $school->id)->count();
             $draftSchemesCount = SchemeOfWork::where('school_id', $school->id)->where('status', 'draft')->count();
@@ -212,5 +240,41 @@ class TeacherController extends Controller
             'school' => $school,
             'user' => $user,
         ]);
+    }
+
+    protected function getOrCreateTeacherRecord($user, $school): ?Teacher
+    {
+        if (! $school || ! $user) {
+            return null;
+        }
+
+        $teacher = Teacher::where('school_id', $school->id)
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->orWhere('email', $user->email);
+            })
+            ->first();
+
+        if ($teacher) {
+            if (! $teacher->user_id) {
+                $teacher->update(['user_id' => $user->id]);
+            }
+            return $teacher;
+        }
+
+        if ($user->hasRole('teacher')) {
+            $nameParts = explode(' ', trim($user->name), 2);
+            return Teacher::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'employee_id' => 'TCH-' . strtoupper(Str::random(6)),
+                'first_name' => $nameParts[0] ?? 'Teacher',
+                'last_name' => $nameParts[1] ?? '',
+                'email' => $user->email,
+                'status' => true,
+            ]);
+        }
+
+        return null;
     }
 }

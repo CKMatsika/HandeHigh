@@ -229,7 +229,7 @@
                                 <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Grade {{ $class->grade }}</span>
                             </div>
                             <p class="text-[10px] text-slate-400 mt-1">
-                                {{ $class->enrollments_count ?? $class->enrollments->count() }} Enrolled Students · Year {{ $class->academic_year }}
+                                {{ $class->enrollments_count ?? ($class->enrollments?->count() ?? 0) }} Enrolled Students · Year {{ $class->academic_year }}
                             </p>
                         </div>
                         <div class="text-right">
@@ -269,7 +269,7 @@
                                 </span>
                             </div>
                             <p class="text-[10px] text-slate-400 mt-0.5">
-                                {{ $curr->weekly_periods }} periods/wk · {{ $curr->class->enrollments->count() ?? 0 }} students · {{ $curr->term ?? 'All Terms' }} ({{ $curr->academic_year }})
+                                {{ $curr->weekly_periods }} periods/wk · {{ $curr->class?->enrollments?->count() ?? 0 }} students · {{ $curr->term ?? 'All Terms' }} ({{ $curr->academic_year }})
                             </p>
                         </div>
                         <div>

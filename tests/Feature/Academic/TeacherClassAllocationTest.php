@@ -253,4 +253,20 @@ class TeacherClassAllocationTest extends TestCase
         $response->assertSee('Tinashe Sibanda');
         $response->assertSee('Chipo Gumbo');
     }
+
+    public function test_newly_created_teacher_can_access_dashboard_with_no_assignments(): void
+    {
+        $newUser = User::create([
+            'school_id' => $this->school->id,
+            'name' => 'Brand New Teacher',
+            'email' => 'newteacher@school.co.zw',
+            'password' => bcrypt('password123'),
+        ]);
+        $newUser->assignRole('teacher');
+
+        $response = $this->actingAs($newUser)
+            ->get(route('teacher.dashboard'));
+
+        $response->assertStatus(200);
+    }
 }

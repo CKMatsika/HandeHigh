@@ -106,23 +106,36 @@ class UserManagementController extends Controller
         }
 
         // Synchronize Teacher profile if teacher role was assigned
-        if ($user->hasRole('teacher') && !Teacher::where('user_id', $user->id)->exists()) {
-            $nameParts = explode(' ', trim($user->name), 2);
-            $firstName = $nameParts[0] ?? 'Teacher';
-            $lastName = $nameParts[1] ?? '';
-            Teacher::create([
-                'school_id' => $school->id,
-                'user_id' => $user->id,
-                'employee_id' => 'TCH-' . strtoupper(\Illuminate\Support\Str::random(6)),
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'email' => $user->email,
-                'phone' => $user->phone,
-                'address' => $user->address,
-                'gender' => $user->gender,
-                'date_of_birth' => $user->date_of_birth,
-                'status' => true,
-            ]);
+        if ($user->hasRole('teacher')) {
+            $existingTeacher = Teacher::where('school_id', $school->id)
+                ->where(function ($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                      ->orWhere('email', $user->email);
+                })
+                ->first();
+
+            if ($existingTeacher) {
+                if (! $existingTeacher->user_id) {
+                    $existingTeacher->update(['user_id' => $user->id]);
+                }
+            } else {
+                $nameParts = explode(' ', trim($user->name), 2);
+                $firstName = $nameParts[0] ?? 'Teacher';
+                $lastName = $nameParts[1] ?? '';
+                Teacher::create([
+                    'school_id' => $school->id,
+                    'user_id' => $user->id,
+                    'employee_id' => 'TCH-' . strtoupper(\Illuminate\Support\Str::random(6)),
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                    'address' => $user->address,
+                    'gender' => $user->gender,
+                    'date_of_birth' => $user->date_of_birth,
+                    'status' => true,
+                ]);
+            }
         }
 
         // Assign additional permissions
