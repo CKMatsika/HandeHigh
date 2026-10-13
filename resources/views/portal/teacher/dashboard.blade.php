@@ -7,9 +7,39 @@
             <p class="text-xs text-slate-400 mt-1">Welcome back, {{ $user->name }}!</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            @if($user->hasRole('ict-coordinator'))
+                <a href="{{ route('ict.dashboard') }}" class="inline-flex items-center rounded-full border border-cyan-500/40 bg-cyan-500/10 px-4 py-1.5 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/20 transition">
+                    ICT Coordinator Desk &rarr;
+                </a>
+            @endif
+            <a href="{{ route('ict.tickets.create') }}" class="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition">
+                + Request ICT Help
+            </a>
             <a href="{{ route('teacher.profile') }}" class="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition">Profile</a>
         </div>
     </div>
+
+    @if($user->hasRole('ict-coordinator'))
+        <div class="mb-6 rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 via-slate-900 to-slate-900/90 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300 shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                </span>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs uppercase tracking-wider font-bold text-cyan-400">ICT Leadership Role</span>
+                        <span class="px-2 py-0.5 text-[10px] rounded-full bg-cyan-500/20 text-cyan-300 font-semibold">School ERP Team Leader</span>
+                    </div>
+                    <p class="text-xs text-slate-300 mt-0.5">You are the school's designated ICT Coordinator & Lead for the School ERP Implementation Project.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <a href="{{ route('ict.dashboard') }}" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/20 transition">
+                    Open Coordinator Desk &rarr;
+                </a>
+            </div>
+        </div>
+    @endif
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">

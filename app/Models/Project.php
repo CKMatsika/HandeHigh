@@ -48,6 +48,32 @@ class Project extends Model
         return $this->hasMany(BudgetLine::class);
     }
 
+    public function tasks()
+    {
+        return $this->hasMany(ProjectTask::class)->orderBy('phase_milestone')->orderBy('created_at');
+    }
+
+    public function getTasksCountAttribute(): int
+    {
+        return $this->tasks()->count();
+    }
+
+    public function getCompletedTasksCountAttribute(): int
+    {
+        return $this->tasks()->where('status', 'completed')->count();
+    }
+
+    public function getProgressPercentageAttribute(): int
+    {
+        $total = $this->tasks()->count();
+        if ($total === 0) {
+            return $this->status === 'completed' ? 100 : 0;
+        }
+
+        $completed = $this->tasks()->where('status', 'completed')->count();
+        return (int) round(($completed / $total) * 100);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

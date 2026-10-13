@@ -20,6 +20,7 @@ class RoleSeeder extends Seeder
             'bursar',
             'procurement-officer',
             'teacher',
+            'ict-coordinator',
             'student',
             'parent',
             'librarian',

@@ -356,9 +356,13 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('bills', BillController::class)->only(['index','create','store','show','edit','update']);
             Route::resource('vendors', VendorController::class)->only(['index','create','store','edit','update']);
             
-            // Projects
+            // Projects & Implementation Tasks
             Route::resource('projects', ProjectController::class)->only(['index','create','store','show','edit','update']);
             Route::post('projects/{project}/income', [ProjectController::class, 'recordIncome'])->name('projects.income');
+            Route::post('projects/{project}/tasks', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'store'])->name('projects.tasks.store');
+            Route::put('projects/{project}/tasks/{task}', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'update'])->name('projects.tasks.update');
+            Route::patch('projects/{project}/tasks/{task}/toggle', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'toggle'])->name('projects.tasks.toggle');
+            Route::delete('projects/{project}/tasks/{task}', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'destroy'])->name('projects.tasks.destroy');
 
             // Kiosk & Canteen Management
             Route::get('kiosk', [\App\Http\Controllers\Admin\KioskController::class, 'index'])->name('kiosk.index');
@@ -808,4 +812,25 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/reports/popular', [LibrarianController::class, 'popularBooksReport'])->name('reports.popular');
                 Route::get('/reports/overdue', [LibrarianController::class, 'overdueBooksReport'])->name('reports.overdue');
             });
+
+        // ICT Coordination & Staff Helpdesk Routes
+        Route::prefix('ict')->name('ict.')->group(function () {
+            // Staff / Teacher ICT Support Requests
+            Route::get('/tickets/create', [\App\Http\Controllers\Ict\IctTicketController::class, 'create'])->name('tickets.create');
+            Route::post('/tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'store'])->name('tickets.store');
+            Route::get('/tickets/my-tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'myTickets'])->name('tickets.my-tickets');
+            Route::get('/tickets/{ticket}', [\App\Http\Controllers\Ict\IctTicketController::class, 'show'])->name('tickets.show');
+
+            // ICT Coordinator Desk (Coordinator, School Admin, Super Admin)
+            Route::middleware(['role:ict-coordinator|super-admin|school-admin'])->group(function () {
+                Route::get('/dashboard', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'dashboard'])->name('dashboard');
+                Route::get('/tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'index'])->name('tickets.index');
+                Route::put('/tickets/{ticket}/status', [\App\Http\Controllers\Ict\IctTicketController::class, 'updateStatus'])->name('tickets.update-status');
+
+                Route::get('/devices', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'devices'])->name('devices.index');
+                Route::post('/devices', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'storeDevice'])->name('devices.store');
+                Route::put('/devices/{device}/condition', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'updateDeviceCondition'])->name('devices.update-condition');
+            });
+        });
 });
+

@@ -302,6 +302,10 @@
                                     <span class="h-2 w-2 rounded-full bg-pink-400"></span>
                                     <span>Budgets</span>
                                 </a>
+                                <a href="{{ route('admin.projects.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.projects.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span>School Projects & ERP</span>
+                                </a>
                                 <a href="{{ route('admin.ai-finance.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.ai-finance.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-violet-400"></span>
                                     <span>AI Finance Advisor</span>
@@ -612,6 +616,55 @@
                                     <span class="h-2 w-2 rounded-full bg-purple-400"></span>
                                     <span>End-of-Term Reports</span>
                                 </a>
+                                @if($user->hasRole('ict-coordinator'))
+                                    <a href="{{ route('ict.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                        <span>ICT Coordinator Desk</span>
+                                    </a>
+                                @endif
+                                <a href="{{ route('ict.tickets.create') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.tickets.create') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span>Request ICT Support</span>
+                                </a>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($user && ($user->hasRole(['ict-coordinator', 'super-admin', 'school-admin']) || $user->hasRole('teacher')))
+                        <!-- ICT Coordination & Helpdesk -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('ict')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span class="text-[10px] font-medium">ICT & HELPDESK</span>
+                                </div>
+                                <svg id="ict-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="ict-menu" class="{{ request()->routeIs('ict.*') ? '' : 'hidden' }} space-y-1 pl-6">
+                                @if($user->hasAnyRole(['ict-coordinator', 'super-admin', 'school-admin']))
+                                    <a href="{{ route('ict.dashboard') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.dashboard') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                        <span>Coordinator Desk</span>
+                                    </a>
+                                    <a href="{{ route('ict.tickets.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.tickets.index') || request()->routeIs('ict.tickets.show') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                        <span>Support Queue</span>
+                                    </a>
+                                    <a href="{{ route('ict.devices.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.devices.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                        <span>Lab Readiness</span>
+                                    </a>
+                                @endif
+                                <a href="{{ route('ict.tickets.create') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.tickets.create') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span>Request Support</span>
+                                </a>
+                                <a href="{{ route('ict.tickets.my-tickets') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('ict.tickets.my-tickets') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span>My Requests</span>
+                                </a>
                             </div>
                         </div>
                     @endif
@@ -776,6 +829,8 @@
                     toggleMenu('system');
                 } else if (currentRoute.includes('/schemes-of-work') || currentRoute.includes('/teacher/flash-cards')) {
                     toggleMenu('teacher-portal');
+                } else if (currentRoute.includes('/ict')) {
+                    toggleMenu('ict');
                 }
             });
         </script>

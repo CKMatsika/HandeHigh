@@ -87,12 +87,17 @@ class ProjectController extends Controller
             ->with('status', 'Project created successfully');
     }
 
-    public function show(Project $project)
+    public function show(Request $request, Project $project)
     {
         $this->authorizeSchoolAccess($project);
         
-        $project->load(['journalEntries', 'budgetLines']);
-        return view('admin.projects.show', compact('project'));
+        $project->load(['journalEntries', 'budgetLines', 'tasks.assignee', 'tasks.creator']);
+        $school = auth()->user()?->school;
+        $staffMembers = $school ? \App\Models\User::where('school_id', $school->id)->where('is_active', true)->orderBy('name')->get() : collect();
+        $activeTab = $request->query('tab', ($project->code === 'PRJ-ERP-2026' || $project->project_type === 'technology') ? 'tasks' : 'overview');
+        $tasksByPhase = $project->tasks->groupBy('phase_milestone');
+
+        return view('admin.projects.show', compact('project', 'staffMembers', 'activeTab', 'tasksByPhase'));
     }
 
     public function edit(Project $project)
