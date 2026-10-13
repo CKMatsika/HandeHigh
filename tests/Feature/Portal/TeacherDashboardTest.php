@@ -9,6 +9,8 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Models\Timetable;
+use App\Models\TimetableSlot;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -304,5 +306,57 @@ class TeacherDashboardTest extends TestCase
         $response->assertSee('Tendai Sibanda');
         $response->assertSee('ADM-2026-099');
         $response->assertSee('Print Roster');
+    }
+
+    public function test_teacher_dashboard_safely_loads_when_timetables_exist(): void
+    {
+        $timetable = Timetable::create([
+            'school_id' => $this->school->id,
+            'name' => 'Term 1 Main Timetable',
+            'academic_year' => '2026',
+            'term' => '1',
+            'status' => 'published',
+            'is_operational' => true,
+        ]);
+
+        $class = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'Form 2A',
+            'grade' => 'Form 2',
+            'academic_year' => '2026',
+        ]);
+
+        $subject = Subject::create([
+            'school_id' => $this->school->id,
+            'name' => 'Mathematics',
+            'code' => 'MTH',
+        ]);
+
+        $teacher = Teacher::create([
+            'school_id' => $this->school->id,
+            'user_id' => $this->teacherUser->id,
+            'employee_id' => 'TCH-009',
+            'first_name' => 'Test',
+            'last_name' => 'Teacher',
+            'email' => $this->teacherUser->email,
+            'status' => true,
+        ]);
+
+        TimetableSlot::create([
+            'timetable_id' => $timetable->id,
+            'school_class_id' => $class->id,
+            'subject_id' => $subject->id,
+            'teacher_id' => $teacher->id,
+            'day_of_week' => strtolower(now()->englishDayOfWeek),
+            'start_time' => '08:00',
+            'end_time' => '09:00',
+        ]);
+
+        $response = $this->actingAs($this->teacherUser)->get('/teacher/dashboard');
+
+        $response->assertStatus(200);
+        $response->assertSee('Teacher Dashboard');
+        $response->assertSee('Mathematics');
+        $response->assertSee('Form 2A');
     }
 }

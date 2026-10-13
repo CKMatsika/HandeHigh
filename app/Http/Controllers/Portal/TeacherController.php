@@ -79,18 +79,28 @@ class TeacherController extends Controller
                 ->get();
 
             // 3. Timetable slots where this teacher is scheduled
-            $activeTimetable = Timetable::where('school_id', $school->id)
-                ->where(function ($q) {
-                    $q->where('status', 'published')->orWhere('is_active', true);
-                })
-                ->latest()
-                ->first();
+            $activeTimetable = null;
+            $timetableSlots = collect();
+            $timetableClassIds = collect();
+            try {
+                $timetableQuery = Timetable::where('school_id', $school->id);
+                if (Schema::hasColumn('timetables', 'is_operational')) {
+                    $timetableQuery->where(function ($q) {
+                        $q->where('status', 'published')->orWhere('is_operational', true);
+                    });
+                } else {
+                    $timetableQuery->where('status', 'published');
+                }
+                $activeTimetable = $timetableQuery->latest('published_at')->latest('id')->first();
 
-            $timetableSlots = TimetableSlot::whereIn('teacher_id', $teacherIds)
-                ->when($activeTimetable, fn($q) => $q->where('timetable_id', $activeTimetable->id))
-                ->with(['schoolClass', 'subject', 'room'])
-                ->get();
-            $timetableClassIds = $timetableSlots->pluck('school_class_id')->filter()->unique()->values();
+                $timetableSlots = TimetableSlot::whereIn('teacher_id', $teacherIds)
+                    ->when($activeTimetable, fn($q) => $q->where('timetable_id', $activeTimetable->id))
+                    ->with(['schoolClass', 'subject', 'room'])
+                    ->get();
+                $timetableClassIds = $timetableSlots->pluck('school_class_id')->filter()->unique()->values();
+            } catch (\Throwable $e) {
+                Log::warning('Could not load active timetable or slots: ' . $e->getMessage());
+            }
 
             // 4. Schemes of work created by or assigned to this teacher
             $schemesOfWork = SchemeOfWork::where('school_id', $school->id)
@@ -318,22 +328,31 @@ class TeacherController extends Controller
             }
 
             // Real schedule for today
-            $todayDay = strtolower(now()->englishDayOfWeek);
-            $todaySlots = TimetableSlot::whereIn('teacher_id', $teacherIds)
-                ->when($activeTimetable, fn($q) => $q->where('timetable_id', $activeTimetable->id))
-                ->where('day_of_week', $todayDay)
-                ->with(['schoolClass', 'subject', 'room'])
-                ->orderBy('start_time')
-                ->get();
+            try {
+                $todayDay = strtolower(now()->englishDayOfWeek);
+                $todaySlots = TimetableSlot::whereIn('teacher_id', $teacherIds)
+                    ->when($activeTimetable, fn($q) => $q->where('timetable_id', $activeTimetable->id))
+                    ->where(function ($q) use ($todayDay) {
+                        $q->where('day_of_week', $todayDay)
+                          ->orWhere('day_of_week', ucfirst($todayDay))
+                          ->orWhere('day_of_week', strtoupper($todayDay));
+                    })
+                    ->with(['schoolClass', 'subject', 'room'])
+                    ->orderBy('start_time')
+                    ->get();
 
-            $schedule = $todaySlots->map(function ($slot) {
-                return (object)[
-                    'time' => substr($slot->start_time, 0, 5) . ' - ' . substr($slot->end_time, 0, 5),
-                    'class' => $slot->schoolClass?->name ?? 'Class',
-                    'subject' => $slot->subject?->name ?? 'Subject',
-                    'room' => $slot->room?->name ?? 'Classroom',
-                ];
-            });
+                $schedule = $todaySlots->map(function ($slot) {
+                    return (object)[
+                        'time' => substr($slot->start_time, 0, 5) . ' - ' . substr($slot->end_time, 0, 5),
+                        'class' => $slot->schoolClass?->name ?? 'Class',
+                        'subject' => $slot->subject?->name ?? 'Subject',
+                        'room' => $slot->room?->name ?? 'Classroom',
+                    ];
+                });
+            } catch (\Throwable $e) {
+                Log::warning('Could not load today schedule: ' . $e->getMessage());
+                $schedule = collect();
+            }
         } else {
             // For super admin
             $managedClasses = $school->classes()->limit(1)->get();
