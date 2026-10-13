@@ -429,4 +429,198 @@ class BulkInvoicingPreviewTest extends TestCase
         // Verify only 1 invoice still exists (no duplicate created!)
         $this->assertEquals(1, Invoice::where('student_id', $student->id)->count());
     }
+
+    public function test_bulk_invoicing_strictly_isolates_form_1_south_from_form_2_south(): void
+    {
+        // Class A: South (legacy single row that had Form 1)
+        $classSouth = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'South',
+            'grade' => 'Form 1',
+            'academic_year' => '2026',
+        ]);
+
+        // Student 1: Form 1 South Boarder (target)
+        $studentForm1 = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'FormOne',
+            'last_name' => 'SouthStudent',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'status' => 'active',
+        ]);
+        Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $studentForm1->id,
+            'class_id' => $classSouth->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'student_type' => 'boarding',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // Student 2: Form 2 South Boarder (points to same South class row, but is Form 2!)
+        $studentForm2 = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'FormTwo',
+            'last_name' => 'SouthStudent',
+            'grade' => 'Form 2',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'status' => 'active',
+        ]);
+        Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $studentForm2->id,
+            'class_id' => $classSouth->id, // points to classSouth
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2', // explicitly Form 2
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'student_type' => 'boarding',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // Act: Filter for Form 1, South, Boarders Only
+        $response = $this->actingAs($this->adminUser)->get(route('admin.invoices.bulk.create', [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'residency' => 'boarding',
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('FormOne SouthStudent');
+        $response->assertDontSee('FormTwo SouthStudent');
+    }
+
+    public function test_bulk_invoicing_preview_deduplicates_students_with_multiple_enrollments(): void
+    {
+        $student = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Kimberly',
+            'last_name' => 'Alifazembe',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'status' => 'active',
+        ]);
+
+        // Two enrollment records for the same student (e.g. duplicate import rows or multi-term rows)
+        $enr1 = Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'student_type' => 'boarding',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+        $enr2 = Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'student_type' => 'boarding',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // Act: Filter for Form 1 South
+        $response = $this->actingAs($this->adminUser)->get(route('admin.invoices.bulk.create', [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'residency' => 'boarding',
+        ]));
+
+        $response->assertStatus(200);
+        $previews = $response->viewData('studentPreviews');
+        $this->assertCount(1, $previews, 'Student with duplicate enrollments must only appear once in preview');
+    }
+
+    public function test_bulk_invoicing_preview_calculates_cohort_breakdown_correctly(): void
+    {
+        // 2 Boarders and 3 Day Scholars in Form 1 South
+        for ($i = 1; $i <= 2; $i++) {
+            $student = Student::create([
+                'school_id' => $this->school->id,
+                'first_name' => "Boarder{$i}",
+                'last_name' => 'South',
+                'grade' => 'Form 1',
+                'class_name' => 'South',
+                'is_boarding' => true,
+                'status' => 'active',
+            ]);
+            Enrollment::create([
+                'school_id' => $this->school->id,
+                'student_id' => $student->id,
+                'academic_year' => '2026',
+                'term' => 'Term 1',
+                'grade' => 'Form 1',
+                'class_name' => 'South',
+                'is_boarding' => true,
+                'student_type' => 'boarding',
+                'enrollment_date' => now(),
+                'status' => 'active',
+            ]);
+        }
+
+        for ($i = 1; $i <= 3; $i++) {
+            $student = Student::create([
+                'school_id' => $this->school->id,
+                'first_name' => "DayScholar{$i}",
+                'last_name' => 'South',
+                'grade' => 'Form 1',
+                'class_name' => 'South',
+                'is_boarding' => false,
+                'status' => 'active',
+            ]);
+            Enrollment::create([
+                'school_id' => $this->school->id,
+                'student_id' => $student->id,
+                'academic_year' => '2026',
+                'term' => 'Term 1',
+                'grade' => 'Form 1',
+                'class_name' => 'South',
+                'is_boarding' => false,
+                'student_type' => 'day',
+                'enrollment_date' => now(),
+                'status' => 'active',
+            ]);
+        }
+
+        // When filtering for Boarders Only:
+        $response = $this->actingAs($this->adminUser)->get(route('admin.invoices.bulk.create', [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'residency' => 'boarding',
+        ]));
+
+        $response->assertStatus(200);
+        // Matching billing preview should have 2 boarders
+        $this->assertEquals(2, $response->viewData('totalBoarders'));
+        $this->assertEquals(0, $response->viewData('totalDayScholars'));
+        // Cohort breakdown should show total class size of 5: 2 boarders and 3 day scholars
+        $this->assertEquals(5, $response->viewData('cohortTotalCount'));
+        $this->assertEquals(2, $response->viewData('cohortBoarderCount'));
+        $this->assertEquals(3, $response->viewData('cohortDayCount'));
+    }
 }

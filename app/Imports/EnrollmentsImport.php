@@ -29,37 +29,44 @@ class EnrollmentsImport implements ToModel, WithHeadingRow, WithValidation
         $rawClassName = trim($row['class_name'] ?? '');
         $rawGrade = trim($row['grade'] ?? '');
 
-        // Resolve class with grade awareness
+        // Standardize grade representation
+        $canonicalGrade = match(strtolower($rawGrade)) {
+            '1', 'form 1', 'form1', 'grade 1' => 'Form 1',
+            '2', 'form 2', 'form2', 'grade 2' => 'Form 2',
+            '3', 'form 3', 'form3', 'grade 3' => 'Form 3',
+            '4', 'form 4', 'form4', 'grade 4' => 'Form 4',
+            '5', 'form 5', 'form5', 'grade 5' => 'Form 5',
+            '6', 'form 6', 'form6', 'grade 6' => 'Form 6',
+            default => $rawGrade,
+        };
+
+        // Resolve class with strict grade and stream awareness
         $class = null;
-        if ($rawGrade !== '') {
+        if ($canonicalGrade !== '' && $rawClassName !== '') {
             $class = SchoolClass::where('school_id', $this->schoolId)
                 ->where('name', $rawClassName)
-                ->where(function ($q) use ($rawGrade) {
-                    $q->where('grade', $rawGrade)
-                      ->orWhere('grade', 'like', "%{$rawGrade}%");
+                ->where(function ($q) use ($canonicalGrade, $rawGrade) {
+                    $q->where('grade', $canonicalGrade)
+                      ->orWhere('grade', $rawGrade)
+                      ->orWhere('grade', 'like', "%{$canonicalGrade}%");
                 })
                 ->first();
+
+            if (! $class) {
+                $class = SchoolClass::firstOrCreate(
+                    [
+                        'school_id' => $this->schoolId,
+                        'name' => $rawClassName,
+                        'grade' => $canonicalGrade,
+                    ],
+                    [
+                        'academic_year' => $row['academic_year'] ?? '2026',
+                    ]
+                );
+            }
         }
 
-        if (! $class) {
-            $class = SchoolClass::where('school_id', $this->schoolId)
-                ->where('name', $rawClassName)
-                ->first();
-        }
-
-        if (! $class && $rawGrade !== '') {
-            $combinedNames = [
-                "Form {$rawGrade} {$rawClassName}",
-                "Form{$rawGrade} {$rawClassName}",
-                "{$rawGrade} {$rawClassName}",
-                "Form {$rawGrade}{$rawClassName}",
-            ];
-            $class = SchoolClass::where('school_id', $this->schoolId)
-                ->whereIn('name', $combinedNames)
-                ->first();
-        }
-
-        $effectiveGrade = ! empty($rawGrade) ? $rawGrade : ($class?->grade ?? 'Form 1');
+        $effectiveGrade = ! empty($canonicalGrade) ? $canonicalGrade : ($class?->grade ?? 'Form 1');
         $effectiveClassName = ! empty($rawClassName) ? $rawClassName : ($class?->name ?? 'General');
         $isBoarding = strtolower($row['is_boarding'] ?? 'no') === 'yes';
         $hasTransport = strtolower($row['has_transport'] ?? 'no') === 'yes';

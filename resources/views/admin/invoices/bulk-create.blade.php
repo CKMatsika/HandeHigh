@@ -226,15 +226,31 @@
             </div>
 
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
-                <div class="text-[11px] font-medium text-slate-400">Boarders vs Day Scholars</div>
+                <div class="text-[11px] font-medium text-slate-400">
+                    @if($selectedResidency === 'boarding')
+                        Target: Boarders Only
+                    @elseif($selectedResidency === 'day')
+                        Target: Day Scholars Only
+                    @else
+                        Boarders vs Day Scholars
+                    @endif
+                </div>
                 <div class="flex items-baseline gap-2 mt-1">
                     <span class="text-2xl font-bold text-purple-400">{{ $totalBoarders }}</span>
-                    <span class="text-xs text-slate-400">Boarders</span>
+                    <span class="text-xs text-slate-400">Boarder{{ $totalBoarders === 1 ? '' : 's' }}</span>
                     <span class="text-slate-600">/</span>
                     <span class="text-xl font-bold text-sky-400">{{ $totalDayScholars }}</span>
                     <span class="text-xs text-slate-400">Day</span>
                 </div>
-                <div class="text-[11px] text-slate-400 mt-1">Automated fee tier allocation</div>
+                <div class="text-[11px] text-slate-400 mt-1">
+                    @if($selectedResidency === 'boarding')
+                        Class Cohort: {{ $cohortBoarderCount ?? $totalBoarders }} Boarders • {{ $cohortDayCount ?? 0 }} Day ({{ $cohortTotalCount ?? $totalBoarders }} total)
+                    @elseif($selectedResidency === 'day')
+                        Class Cohort: {{ $cohortDayCount ?? $totalDayScholars }} Day • {{ $cohortBoarderCount ?? 0 }} Boarders ({{ $cohortTotalCount ?? $totalDayScholars }} total)
+                    @else
+                        Cohort total: {{ $cohortTotalCount ?? count($studentPreviews) }} enrolled students
+                    @endif
+                </div>
             </div>
 
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">

@@ -303,6 +303,32 @@ class InvoiceController extends Controller
         return array_values(array_unique($variations));
     }
 
+    private function getTermVariations(?string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+
+        $cleaned = trim($term);
+        $variations = [$cleaned];
+
+        if (preg_match('/(?:term\s*|first\s*term|1)/i', $cleaned) && (str_contains(strtolower($cleaned), '1') || str_contains(strtolower($cleaned), 'first'))) {
+            $variations[] = 'Term 1';
+            $variations[] = 'First Term';
+            $variations[] = '1';
+        } elseif (preg_match('/(?:term\s*|second\s*term|2)/i', $cleaned) && (str_contains(strtolower($cleaned), '2') || str_contains(strtolower($cleaned), 'second'))) {
+            $variations[] = 'Term 2';
+            $variations[] = 'Second Term';
+            $variations[] = '2';
+        } elseif (preg_match('/(?:term\s*|third\s*term|3)/i', $cleaned) && (str_contains(strtolower($cleaned), '3') || str_contains(strtolower($cleaned), 'third'))) {
+            $variations[] = 'Term 3';
+            $variations[] = 'Third Term';
+            $variations[] = '3';
+        }
+
+        return array_values(array_unique($variations));
+    }
+
     public function bulkCreate(Request $request)
     {
         $user = Auth::user();
@@ -384,20 +410,53 @@ class InvoiceController extends Controller
             });
         }
 
+        if ($term) {
+            $termVars = $this->getTermVariations($term);
+            $enrollmentQuery->where(function ($q) use ($termVars) {
+                $q->whereIn('term', $termVars)
+                  ->orWhereNull('term')
+                  ->orWhere('term', '');
+            });
+        }
+
         if ($grade) {
             $gradeVars = $this->getGradeVariations($grade);
             $enrollmentQuery->where(function ($q) use ($gradeVars) {
-                $q->whereIn('grade', $gradeVars)
-                  ->orWhereHas('student', fn ($sq) => $sq->whereIn('grade', $gradeVars))
-                  ->orWhereHas('class', fn ($cq) => $cq->whereIn('grade', $gradeVars));
+                // Hierarchical matching: enrollment grade > student grade > class grade
+                $q->where(function ($sub) use ($gradeVars) {
+                    $sub->whereNotNull('grade')
+                        ->where('grade', '!=', '')
+                        ->whereIn('grade', $gradeVars);
+                })->orWhere(function ($sub) use ($gradeVars) {
+                    $sub->where(function ($nullGrade) {
+                        $nullGrade->whereNull('grade')->orWhere('grade', '');
+                    })->whereHas('student', fn ($sq) => $sq->whereIn('grade', $gradeVars));
+                })->orWhere(function ($sub) use ($gradeVars) {
+                    $sub->where(function ($nullGrade) {
+                        $nullGrade->whereNull('grade')->orWhere('grade', '');
+                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('grade')->where('grade', '!=', ''))
+                      ->whereHas('class', fn ($cq) => $cq->whereIn('grade', $gradeVars));
+                });
             });
         }
 
         if ($className) {
             $enrollmentQuery->where(function ($q) use ($className) {
-                $q->where('class_name', $className)
-                  ->orWhereHas('student', fn ($sq) => $sq->where('class_name', $className))
-                  ->orWhereHas('class', fn ($cq) => $cq->where('name', $className));
+                // Hierarchical matching: enrollment class_name > student class_name > class name
+                $q->where(function ($sub) use ($className) {
+                    $sub->whereNotNull('class_name')
+                        ->where('class_name', '!=', '')
+                        ->where('class_name', $className);
+                })->orWhere(function ($sub) use ($className) {
+                    $sub->where(function ($nullClass) {
+                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
+                    })->whereHas('student', fn ($sq) => $sq->where('class_name', $className));
+                })->orWhere(function ($sub) use ($className) {
+                    $sub->where(function ($nullClass) {
+                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
+                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('class_name')->where('class_name', '!=', ''))
+                      ->whereHas('class', fn ($cq) => $cq->where('name', $className));
+                });
             });
         }
 
@@ -419,9 +478,75 @@ class InvoiceController extends Controller
             });
         }
 
-        $enrollments = $enrollmentQuery->get()->sortBy(function ($enr) {
-            return ($enr->grade ?? '') . '-' . ($enr->class_name ?? '') . '-' . ($enr->student?->last_name ?? '');
-        });
+        // Deduplicate enrollments by student_id to ensure every student appears exactly once
+        $enrollments = $enrollmentQuery->get()
+            ->unique('student_id')
+            ->sortBy(function ($enr) {
+                return ($enr->grade ?? '') . '-' . ($enr->class_name ?? '') . '-' . ($enr->student?->last_name ?? '');
+            });
+
+        // 3b. Calculate cohort breakdown of the selected class/grade (independent of residency filter)
+        $cohortQuery = Enrollment::with('student')
+            ->where('school_id', $school->id)
+            ->where('status', 'active');
+
+        if ($academicYear) {
+            $cohortQuery->where(function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)->orWhereNull('academic_year');
+            });
+        }
+        if ($term) {
+            $termVars = $this->getTermVariations($term);
+            $cohortQuery->where(function ($q) use ($termVars) {
+                $q->whereIn('term', $termVars)->orWhereNull('term')->orWhere('term', '');
+            });
+        }
+        if ($grade) {
+            $gradeVars = $this->getGradeVariations($grade);
+            $cohortQuery->where(function ($q) use ($gradeVars) {
+                $q->where(function ($sub) use ($gradeVars) {
+                    $sub->whereNotNull('grade')->where('grade', '!=', '')->whereIn('grade', $gradeVars);
+                })->orWhere(function ($sub) use ($gradeVars) {
+                    $sub->where(function ($nullGrade) {
+                        $nullGrade->whereNull('grade')->orWhere('grade', '');
+                    })->whereHas('student', fn ($sq) => $sq->whereIn('grade', $gradeVars));
+                })->orWhere(function ($sub) use ($gradeVars) {
+                    $sub->where(function ($nullGrade) {
+                        $nullGrade->whereNull('grade')->orWhere('grade', '');
+                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('grade')->where('grade', '!=', ''))
+                      ->whereHas('class', fn ($cq) => $cq->whereIn('grade', $gradeVars));
+                });
+            });
+        }
+        if ($className) {
+            $cohortQuery->where(function ($q) use ($className) {
+                $q->where(function ($sub) use ($className) {
+                    $sub->whereNotNull('class_name')->where('class_name', '!=', '')->where('class_name', $className);
+                })->orWhere(function ($sub) use ($className) {
+                    $sub->where(function ($nullClass) {
+                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
+                    })->whereHas('student', fn ($sq) => $sq->where('class_name', $className));
+                })->orWhere(function ($sub) use ($className) {
+                    $sub->where(function ($nullClass) {
+                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
+                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('class_name')->where('class_name', '!=', ''))
+                      ->whereHas('class', fn ($cq) => $cq->where('name', $className));
+                });
+            });
+        }
+
+        $cohortEnrollments = $cohortQuery->get()->unique('student_id');
+        $cohortBoarderCount = 0;
+        $cohortDayCount = 0;
+        foreach ($cohortEnrollments as $cEnr) {
+            $isBrd = $cEnr->isBoarder() || (bool) $cEnr->student?->is_boarding;
+            if ($isBrd) {
+                $cohortBoarderCount++;
+            } else {
+                $cohortDayCount++;
+            }
+        }
+        $cohortTotalCount = $cohortBoarderCount + $cohortDayCount;
 
         // 4. Calculate individual preview for each student
         $studentPreviews = [];
@@ -527,6 +652,9 @@ class InvoiceController extends Controller
             'totalBatchAmount' => $totalBatchAmount,
             'totalBoarders' => $totalBoarders,
             'totalDayScholars' => $totalDayScholars,
+            'cohortTotalCount' => $cohortTotalCount,
+            'cohortBoarderCount' => $cohortBoarderCount,
+            'cohortDayCount' => $cohortDayCount,
             'readyCount' => $readyCount,
             'alreadyInvoicedCount' => $alreadyInvoicedCount,
         ]);
@@ -566,11 +694,12 @@ class InvoiceController extends Controller
         $dueDate = $validated['due_date'] ?? null;
         $includeOptional = $request->boolean('include_optional');
 
-        // Fetch enrollments
+        // Fetch enrollments and deduplicate by student_id to ensure single invoice per student
         $enrollments = Enrollment::with(['student.guardians', 'class'])
             ->where('school_id', $school->id)
             ->whereIn('id', $validated['enrollment_ids'])
-            ->get();
+            ->get()
+            ->unique('student_id');
 
         // Fetch fee structures for this academic year, term, and school
         $grade = $validated['grade'] ?? null;
