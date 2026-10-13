@@ -713,6 +713,7 @@ Route::middleware(['auth'])->group(function () {
             ->group(function () {
                 Route::get('/dashboard', [\App\Http\Controllers\Portal\TeacherController::class, 'dashboard'])->name('dashboard');
                 Route::get('/profile', [\App\Http\Controllers\Portal\TeacherController::class, 'profile'])->name('profile');
+                Route::get('/classes/{class}', [\App\Http\Controllers\Portal\TeacherController::class, 'showClass'])->name('classes.show');
                 Route::get('/timetable', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'index'])->name('timetable.index');
                 Route::get('/timetable/today', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'today'])->name('timetable.today');
 

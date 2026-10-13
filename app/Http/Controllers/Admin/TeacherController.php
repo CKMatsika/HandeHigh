@@ -168,13 +168,15 @@ class TeacherController extends Controller
             'activePositionAssignments.target',
         ]);
 
+        $teacherIds = array_values(array_unique(array_filter([$teacher->id, $teacher->user_id])));
+
         $classes = SchoolClass::where('school_id', $school->id)
-            ->where('teacher_id', $teacher->user_id)
+            ->whereIn('teacher_id', $teacherIds)
             ->with('enrollments')
             ->get();
 
         $subjectCurricula = Curriculum::where('school_id', $school->id)
-            ->where('teacher_id', $teacher->user_id)
+            ->whereIn('teacher_id', $teacherIds)
             ->with(['class.enrollments', 'subject'])
             ->get();
 

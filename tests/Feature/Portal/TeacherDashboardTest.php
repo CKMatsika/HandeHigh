@@ -6,6 +6,7 @@ use App\Models\Curriculum;
 use App\Models\Project;
 use App\Models\School;
 use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\User;
@@ -142,5 +143,166 @@ class TeacherDashboardTest extends TestCase
         $response->assertSee('Teacher Dashboard');
         $response->assertSee('Schemes of Work');
         $response->assertSee('My Timetable');
+    }
+
+    public function test_teacher_with_form_two_classes_filters_students_correctly(): void
+    {
+        $teacher = Teacher::create([
+            'school_id' => $this->school->id,
+            'user_id' => $this->teacherUser->id,
+            'employee_id' => 'TCH-002',
+            'first_name' => 'Sengedza',
+            'last_name' => 'Teacher',
+            'email' => $this->teacherUser->email,
+            'status' => true,
+        ]);
+
+        $mathSubject = Subject::create([
+            'school_id' => $this->school->id,
+            'name' => 'Mathematics',
+            'code' => 'MATH101',
+        ]);
+
+        $form2Classes = [];
+        $streamNames = ['Form 2A', 'Form 2B', 'Form 2C', 'Form 2D'];
+
+        foreach ($streamNames as $stream) {
+            $class = SchoolClass::create([
+                'school_id' => $this->school->id,
+                'name' => $stream,
+                'grade' => 'Form 2',
+                'academic_year' => '2026',
+                'status' => true,
+            ]);
+
+            // Assign via curriculum using teacher's Teacher model ID
+            Curriculum::create([
+                'school_id' => $this->school->id,
+                'class_id' => $class->id,
+                'subject_id' => $mathSubject->id,
+                'teacher_id' => $teacher->id,
+                'academic_year' => '2026',
+                'weekly_periods' => 5,
+            ]);
+
+            // Create student in that class using class_name directly (simulating bulk upload without enrollments row)
+            Student::create([
+                'school_id' => $this->school->id,
+                'first_name' => 'Student',
+                'last_name' => $stream,
+                'class_name' => $stream,
+                'grade' => 'Form 2',
+                'status' => 'active',
+                'admission_number' => 'ADM-' . $stream,
+            ]);
+
+            $form2Classes[] = $class;
+        }
+
+        $response = $this->actingAs($this->teacherUser)->get('/teacher/dashboard');
+
+        $response->assertStatus(200);
+        foreach ($streamNames as $stream) {
+            $response->assertSee($stream);
+            $response->assertSee('Student ' . $stream);
+        }
+        $response->assertSee('4 students');
+    }
+
+    public function test_clicking_class_filters_students_to_that_specific_class(): void
+    {
+        $teacher = Teacher::create([
+            'school_id' => $this->school->id,
+            'user_id' => $this->teacherUser->id,
+            'employee_id' => 'TCH-003',
+            'first_name' => 'Sengedza',
+            'last_name' => 'Teacher',
+            'email' => $this->teacherUser->email,
+            'status' => true,
+        ]);
+
+        $subject = Subject::create([
+            'school_id' => $this->school->id,
+            'name' => 'Mathematics',
+            'code' => 'MTH',
+        ]);
+
+        $class2A = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'Form 2A',
+            'grade' => 'Form 2',
+            'academic_year' => '2026',
+        ]);
+        Curriculum::create([
+            'school_id' => $this->school->id,
+            'class_id' => $class2A->id,
+            'subject_id' => $subject->id,
+            'teacher_id' => $teacher->id,
+            'academic_year' => '2026',
+        ]);
+        Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Farai',
+            'last_name' => 'Moyo',
+            'class_name' => 'Form 2A',
+            'status' => 'active',
+        ]);
+
+        $class2B = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'Form 2B',
+            'grade' => 'Form 2',
+            'academic_year' => '2026',
+        ]);
+        Curriculum::create([
+            'school_id' => $this->school->id,
+            'class_id' => $class2B->id,
+            'subject_id' => $subject->id,
+            'teacher_id' => $teacher->id,
+            'academic_year' => '2026',
+        ]);
+        Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Kudzi',
+            'last_name' => 'Nyathi',
+            'class_name' => 'Form 2B',
+            'status' => 'active',
+        ]);
+
+        // Filter strictly to Form 2A
+        $response = $this->actingAs($this->teacherUser)->get('/teacher/dashboard?class_id=' . $class2A->id);
+
+        $response->assertStatus(200);
+        $response->assertSee('Students in Form 2A');
+        $response->assertSee('Farai Moyo');
+        $response->assertDontSee('Kudzi Nyathi');
+    }
+
+    public function test_teacher_can_view_dedicated_class_roster_page(): void
+    {
+        $class = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'Form 2A',
+            'grade' => 'Form 2',
+            'academic_year' => '2026',
+            'teacher_id' => $this->teacherUser->id,
+        ]);
+
+        Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Tendai',
+            'last_name' => 'Sibanda',
+            'class_name' => 'Form 2A',
+            'status' => 'active',
+            'admission_number' => 'ADM-2026-099',
+        ]);
+
+        $response = $this->actingAs($this->teacherUser)->get('/teacher/classes/' . $class->id);
+
+        $response->assertStatus(200);
+        $response->assertSee('Form 2A');
+        $response->assertSee('Tendai Sibanda');
+        $response->assertSee('ADM-2026-099');
+        $response->assertSee('Print Roster');
     }
 }
