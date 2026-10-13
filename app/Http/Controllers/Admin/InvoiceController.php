@@ -9,6 +9,7 @@ use App\Models\Enrollment;
 use App\Models\FeeStructure;
 use App\Models\Student;
 use App\Models\LedgerEntry;
+use App\Models\SchoolClass;
 use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
@@ -278,7 +279,31 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function bulkCreate()
+    private function getGradeVariations(?string $grade): array
+    {
+        if (empty($grade)) {
+            return [];
+        }
+
+        $cleaned = trim($grade);
+        $variations = [$cleaned];
+
+        if (preg_match('/^form\s*(\d+)/i', $cleaned, $matches)) {
+            $num = $matches[1];
+            $variations[] = $num;
+            $variations[] = "Form {$num}";
+            $variations[] = "Form{$num}";
+            $variations[] = "Grade {$num}";
+        } elseif (is_numeric($cleaned)) {
+            $variations[] = "Form {$cleaned}";
+            $variations[] = "Form{$cleaned}";
+            $variations[] = "Grade {$cleaned}";
+        }
+
+        return array_values(array_unique($variations));
+    }
+
+    public function bulkCreate(Request $request)
     {
         $user = Auth::user();
         $school = $user?->school;
@@ -287,21 +312,223 @@ class InvoiceController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
-        $enrollments = Enrollment::with(['student', 'class'])
-            ->where('school_id', $school->id)
-            ->where('status', 'active')
-            ->orderBy('academic_year')
-            ->orderBy('term')
-            ->get();
+        $academicYear = $request->input('academic_year', now()->format('Y'));
+        $term = $request->input('term', 'Term 1');
+        $grade = $request->input('grade');
+        $className = $request->input('class_name');
+        $residency = $request->input('residency', 'all'); // 'all', 'boarding', 'day'
+        $includeOptional = $request->boolean('include_optional', false);
+        $issuedAt = $request->input('issued_at', now()->format('Y-m-d'));
+        $dueDate = $request->input('due_date', now()->addDays(30)->format('Y-m-d'));
 
-        $academicYears = $enrollments->pluck('academic_year')->unique()->sort()->values();
+        // 1. Available dropdown options
+        $academicYears = $school->enrollments()->distinct()->pluck('academic_year')
+            ->merge(FeeStructure::where('school_id', $school->id)->distinct()->pluck('academic_year'))
+            ->merge([now()->format('Y'), (string) (now()->year + 1)])
+            ->filter()->unique()->sort()->values();
+
         $terms = ['Term 1', 'Term 2', 'Term 3'];
+
+        $grades = SchoolClass::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade')
+            ->merge(Student::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
+            ->merge(FeeStructure::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
+            ->filter()->unique()->values();
+
+        if ($grades->isEmpty()) {
+            $grades = collect(['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6']);
+        }
+
+        $classesQuery = SchoolClass::where('school_id', $school->id);
+        if ($grade) {
+            $gradeVars = $this->getGradeVariations($grade);
+            $classesQuery->whereIn('grade', $gradeVars);
+        }
+        $classes = $classesQuery->distinct()->pluck('name')->filter()->unique()->values();
+        if ($classes->isEmpty()) {
+            $classes = SchoolClass::where('school_id', $school->id)->distinct()->pluck('name')->filter()->unique()->values();
+        }
+
+        // 2. Fetch fee structures for this academic year, term, and grade
+        $feeStructureQuery = FeeStructure::where('school_id', $school->id)
+            ->where('academic_year', $academicYear)
+            ->where('term', $term);
+
+        if ($grade) {
+            $gradeVars = $this->getGradeVariations($grade);
+            $feeStructureQuery->where(function ($q) use ($gradeVars) {
+                $q->whereIn('grade', $gradeVars)
+                  ->orWhereNull('grade')
+                  ->orWhere('grade', '');
+            });
+        }
+
+        $feeStructures = $feeStructureQuery->orderBy('category')->orderBy('code')->get();
+
+        // 3. Query matching active enrollments & students
+        $enrollmentQuery = Enrollment::with([
+            'student.guardians',
+            'student.invoices' => function ($q) use ($academicYear, $term) {
+                $q->where('academic_year', $academicYear)
+                  ->where('term', $term)
+                  ->where('status', '!=', 'cancelled');
+            },
+            'class',
+        ])
+        ->where('school_id', $school->id)
+        ->where('status', 'active');
+
+        if ($academicYear) {
+            $enrollmentQuery->where(function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)
+                  ->orWhereNull('academic_year');
+            });
+        }
+
+        if ($grade) {
+            $gradeVars = $this->getGradeVariations($grade);
+            $enrollmentQuery->where(function ($q) use ($gradeVars) {
+                $q->whereIn('grade', $gradeVars)
+                  ->orWhereHas('student', fn ($sq) => $sq->whereIn('grade', $gradeVars))
+                  ->orWhereHas('class', fn ($cq) => $cq->whereIn('grade', $gradeVars));
+            });
+        }
+
+        if ($className) {
+            $enrollmentQuery->where(function ($q) use ($className) {
+                $q->where('class_name', $className)
+                  ->orWhereHas('student', fn ($sq) => $sq->where('class_name', $className))
+                  ->orWhereHas('class', fn ($cq) => $cq->where('name', $className));
+            });
+        }
+
+        if ($residency === 'boarding') {
+            $enrollmentQuery->where(function ($q) {
+                $q->where('is_boarding', true)
+                  ->orWhere('student_type', 'boarding')
+                  ->orWhereHas('student', fn ($sq) => $sq->where('is_boarding', true));
+            });
+        } elseif ($residency === 'day') {
+            $enrollmentQuery->where(function ($q) {
+                $q->where(function ($sub) {
+                    $sub->where('is_boarding', false)->orWhereNull('is_boarding');
+                })->where(function ($sub) {
+                    $sub->where('student_type', '!=', 'boarding')->orWhereNull('student_type');
+                })->whereHas('student', function ($sq) {
+                    $sq->where('is_boarding', false)->orWhereNull('is_boarding');
+                });
+            });
+        }
+
+        $enrollments = $enrollmentQuery->get()->sortBy(function ($enr) {
+            return ($enr->grade ?? '') . '-' . ($enr->class_name ?? '') . '-' . ($enr->student?->last_name ?? '');
+        });
+
+        // 4. Calculate individual preview for each student
+        $studentPreviews = [];
+        $totalBatchAmount = 0.0;
+        $totalBoarders = 0;
+        $totalDayScholars = 0;
+        $readyCount = 0;
+        $alreadyInvoicedCount = 0;
+
+        foreach ($enrollments as $enrollment) {
+            $student = $enrollment->student;
+            if (! $student) {
+                continue;
+            }
+
+            $isBoarder = $enrollment->isBoarder() || (bool) $student->is_boarding;
+            $hasTransport = (bool) $enrollment->has_transport || (bool) $student->has_transport;
+            $existingInvoice = $student->invoices?->first();
+
+            if ($isBoarder) {
+                $totalBoarders++;
+            } else {
+                $totalDayScholars++;
+            }
+
+            if ($existingInvoice) {
+                $alreadyInvoicedCount++;
+            } else {
+                $readyCount++;
+            }
+
+            // Determine applicable fee items for this student
+            $appliedItems = [];
+            $studentTotal = 0.0;
+
+            foreach ($feeStructures as $fee) {
+                $isBoardingFee = str_contains(strtolower($fee->category ?? ''), 'boarding') 
+                    || $fee->service_type === 'boarding' 
+                    || str_contains(strtolower($fee->label ?? ''), 'boarding');
+
+                $isTransportFee = str_contains(strtolower($fee->category ?? ''), 'transport') 
+                    || $fee->service_type === 'transport' 
+                    || str_contains(strtolower($fee->label ?? ''), 'transport');
+
+                // Boarding fee only applies to boarders
+                if ($isBoardingFee && ! $isBoarder) {
+                    continue;
+                }
+
+                // Transport fee only applies to students with transport
+                if ($isTransportFee && ! $hasTransport) {
+                    continue;
+                }
+
+                // Optional fees apply only if toggle is enabled
+                if ($fee->is_optional && ! $includeOptional) {
+                    continue;
+                }
+
+                $amount = (float) $fee->amount;
+                $studentTotal += $amount;
+                $appliedItems[] = [
+                    'id' => $fee->id,
+                    'label' => $fee->label,
+                    'category' => $fee->category ?? 'fees',
+                    'amount' => $amount,
+                ];
+            }
+
+            if (! $existingInvoice) {
+                $totalBatchAmount += $studentTotal;
+            }
+
+            $studentPreviews[] = [
+                'enrollment' => $enrollment,
+                'student' => $student,
+                'grade' => $enrollment->grade ?? $student->grade ?? '—',
+                'class_name' => $enrollment->class_name ?? $student->class_name ?? '—',
+                'is_boarder' => $isBoarder,
+                'has_transport' => $hasTransport,
+                'existing_invoice' => $existingInvoice,
+                'applied_items' => $appliedItems,
+                'total_amount' => $studentTotal,
+            ];
+        }
 
         return view('admin.invoices.bulk-create', [
             'school' => $school,
-            'enrollments' => $enrollments,
             'academicYears' => $academicYears,
             'terms' => $terms,
+            'grades' => $grades,
+            'classes' => $classes,
+            'feeStructures' => $feeStructures,
+            'selectedYear' => $academicYear,
+            'selectedTerm' => $term,
+            'selectedGrade' => $grade,
+            'selectedClass' => $className,
+            'selectedResidency' => $residency,
+            'includeOptional' => $includeOptional,
+            'issuedAt' => $issuedAt,
+            'dueDate' => $dueDate,
+            'studentPreviews' => $studentPreviews,
+            'totalBatchAmount' => $totalBatchAmount,
+            'totalBoarders' => $totalBoarders,
+            'totalDayScholars' => $totalDayScholars,
+            'readyCount' => $readyCount,
+            'alreadyInvoicedCount' => $alreadyInvoicedCount,
         ]);
     }
 
@@ -321,88 +548,220 @@ class InvoiceController extends Controller
             'enrollment_ids.*' => ['integer', TenantExists::make('enrollments')],
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
-            'fee_items' => ['required', 'array', 'min:1'],
-            'fee_items.*.description' => ['required', 'string', 'max:255'],
+            'grade' => ['nullable', 'string'],
+            'include_optional' => ['nullable', 'boolean'],
+            'custom_fee_items' => ['nullable', 'array'],
+            'custom_fee_items.*.description' => ['required_with:custom_fee_items', 'string', 'max:255'],
+            'custom_fee_items.*.category' => ['nullable', 'string', 'max:50'],
+            'custom_fee_items.*.amount' => ['required_with:custom_fee_items', 'numeric', 'min:0'],
+            'fee_items' => ['nullable', 'array'],
+            'fee_items.*.description' => ['required_with:fee_items', 'string', 'max:255'],
             'fee_items.*.category' => ['nullable', 'string', 'max:50'],
-            'fee_items.*.amount' => ['required', 'numeric', 'min:0'],
+            'fee_items.*.amount' => ['required_with:fee_items', 'numeric', 'min:0'],
         ]);
 
-        $enrollments = Enrollment::with(['student', 'guardian'])
+        $academicYear = $validated['academic_year'];
+        $term = $validated['term'];
+        $issuedAt = $validated['issued_at'];
+        $dueDate = $validated['due_date'] ?? null;
+        $includeOptional = $request->boolean('include_optional');
+
+        // Fetch enrollments
+        $enrollments = Enrollment::with(['student.guardians', 'class'])
             ->where('school_id', $school->id)
             ->whereIn('id', $validated['enrollment_ids'])
             ->get();
 
-        $createdInvoices = [];
-        $errors = [];
+        // Fetch fee structures for this academic year, term, and school
+        $grade = $validated['grade'] ?? null;
+        $feeStructureQuery = FeeStructure::where('school_id', $school->id)
+            ->where('academic_year', $academicYear)
+            ->where('term', $term);
 
-        DB::transaction(function () use ($validated, $enrollments, &$createdInvoices, &$errors) {
+        if ($grade) {
+            $gradeVars = $this->getGradeVariations($grade);
+            $feeStructureQuery->where(function ($q) use ($gradeVars) {
+                $q->whereIn('grade', $gradeVars)
+                  ->orWhereNull('grade')
+                  ->orWhere('grade', '');
+            });
+        }
+        $feeStructures = $feeStructureQuery->get();
+
+        $customItems = $validated['custom_fee_items'] ?? $validated['fee_items'] ?? [];
+
+        $createdInvoices = [];
+        $skippedCount = 0;
+        $errors = [];
+        $totalGeneratedAmount = 0.0;
+
+        DB::transaction(function () use (
+            $school,
+            $enrollments,
+            $academicYear,
+            $term,
+            $issuedAt,
+            $dueDate,
+            $feeStructures,
+            $customItems,
+            $includeOptional,
+            &$createdInvoices,
+            &$skippedCount,
+            &$errors,
+            &$totalGeneratedAmount
+        ) {
             foreach ($enrollments as $enrollment) {
                 try {
-                    // Check if invoice already exists
-                    $existingInvoice = Invoice::where('school_id', $enrollment->school_id)
-                        ->where('student_id', $enrollment->student_id)
-                        ->where('academic_year', $validated['academic_year'])
-                        ->where('term', $validated['term'])
-                        ->first();
-
-                    if ($existingInvoice) {
-                        $errors[] = "Invoice already exists for {$enrollment->student->first_name} {$enrollment->student->last_name}";
+                    $student = $enrollment->student;
+                    if (! $student) {
                         continue;
                     }
 
-                    $invoiceNumber = Invoice::generateNextNumber($enrollment->school_id);
+                    // Check if invoice already exists for this student, year, and term
+                    $existingInvoice = Invoice::where('school_id', $school->id)
+                        ->where('student_id', $student->id)
+                        ->where('academic_year', $academicYear)
+                        ->where('term', $term)
+                        ->where('status', '!=', 'cancelled')
+                        ->first();
+
+                    if ($existingInvoice) {
+                        $skippedCount++;
+                        continue;
+                    }
+
+                    $isBoarder = $enrollment->isBoarder() || (bool) $student->is_boarding;
+                    $hasTransport = (bool) $enrollment->has_transport || (bool) $student->has_transport;
+
+                    // Resolve items for this student
+                    $itemsToCreate = [];
+                    $studentTotal = 0.0;
+
+                    // 1. From Fee Structures
+                    $studentGrade = $enrollment->grade ?? $student->grade;
+                    $studentGradeVars = $this->getGradeVariations($studentGrade);
+
+                    $applicableFees = $feeStructures->filter(function ($fee) use ($studentGradeVars) {
+                        if (empty($fee->grade)) {
+                            return true;
+                        }
+                        return empty($studentGradeVars) || in_array($fee->grade, $studentGradeVars);
+                    });
+
+                    if ($applicableFees->isEmpty() && $feeStructures->isNotEmpty()) {
+                        $applicableFees = $feeStructures;
+                    }
+
+                    foreach ($applicableFees as $fee) {
+                        $isBoardingFee = str_contains(strtolower($fee->category ?? ''), 'boarding') 
+                            || $fee->service_type === 'boarding' 
+                            || str_contains(strtolower($fee->label ?? ''), 'boarding');
+
+                        $isTransportFee = str_contains(strtolower($fee->category ?? ''), 'transport') 
+                            || $fee->service_type === 'transport' 
+                            || str_contains(strtolower($fee->label ?? ''), 'transport');
+
+                        if ($isBoardingFee && ! $isBoarder) {
+                            continue;
+                        }
+                        if ($isTransportFee && ! $hasTransport) {
+                            continue;
+                        }
+                        if ($fee->is_optional && ! $includeOptional) {
+                            continue;
+                        }
+
+                        $amount = (float) $fee->amount;
+                        $studentTotal += $amount;
+                        $itemsToCreate[] = [
+                            'fee_structure_id' => $fee->id,
+                            'description' => $fee->label,
+                            'category' => $fee->category ?? 'fees',
+                            'quantity' => 1,
+                            'unit_amount' => $amount,
+                            'line_total' => $amount,
+                        ];
+                    }
+
+                    // 2. Custom fee items (if entered)
+                    foreach ($customItems as $cItem) {
+                        $isBoardingItem = str_contains(strtolower($cItem['category'] ?? ''), 'boarding')
+                            || str_contains(strtolower($cItem['description'] ?? ''), 'boarding');
+
+                        if ($isBoardingItem && ! $isBoarder) {
+                            continue;
+                        }
+
+                        $amount = (float) $cItem['amount'];
+                        $studentTotal += $amount;
+                        $itemsToCreate[] = [
+                            'fee_structure_id' => null,
+                            'description' => $cItem['description'],
+                            'category' => $cItem['category'] ?? 'fees',
+                            'quantity' => 1,
+                            'unit_amount' => $amount,
+                            'line_total' => $amount,
+                        ];
+                    }
+
+                    if (empty($itemsToCreate)) {
+                        continue;
+                    }
+
+                    $invoiceNumber = Invoice::generateNextNumber($school->id, $academicYear);
+                    $primaryGuardian = $student->guardians?->first();
 
                     $invoice = Invoice::create([
-                        'school_id' => $enrollment->school_id,
-                        'student_id' => $enrollment->student_id,
-                        'guardian_id' => $enrollment->student->guardian_id,
+                        'school_id' => $school->id,
+                        'student_id' => $student->id,
+                        'guardian_id' => $primaryGuardian?->id,
                         'enrollment_id' => $enrollment->id,
                         'number' => $invoiceNumber,
                         'type' => 'fees',
-                        'academic_year' => $validated['academic_year'],
-                        'term' => $validated['term'],
-                        'total_amount' => 0,
-                        'balance' => 0,
-                        'issued_at' => $validated['issued_at'],
-                        'due_date' => $validated['due_date'] ?? null,
+                        'academic_year' => $academicYear,
+                        'term' => $term,
+                        'total_amount' => $studentTotal,
+                        'balance' => $studentTotal,
+                        'issued_at' => $issuedAt,
+                        'due_date' => $dueDate,
                         'status' => 'unpaid',
                     ]);
 
-                    $totalAmount = 0;
-                    foreach ($validated['fee_items'] as $feeItem) {
-                        $lineTotal = (float) $feeItem['amount'];
-                        $totalAmount += $lineTotal;
-
+                    foreach ($itemsToCreate as $itemData) {
                         InvoiceItem::create([
-                            'school_id' => $enrollment->school_id,
+                            'school_id' => $school->id,
                             'invoice_id' => $invoice->id,
-                            'fee_structure_id' => null,
-                            'description' => $feeItem['description'],
-                            'category' => $feeItem['category'] ?? 'fees',
-                            'quantity' => 1,
-                            'unit_amount' => (float) $feeItem['amount'],
-                            'line_total' => $lineTotal,
+                            'fee_structure_id' => $itemData['fee_structure_id'],
+                            'description' => $itemData['description'],
+                            'category' => $itemData['category'],
+                            'quantity' => $itemData['quantity'],
+                            'unit_amount' => $itemData['unit_amount'],
+                            'line_total' => $itemData['line_total'],
                         ]);
                     }
-
-                    $invoice->update([
-                        'total_amount' => $totalAmount,
-                        'balance' => $totalAmount,
-                    ]);
 
                     $this->accountingService->postInvoice($invoice);
 
                     $createdInvoices[] = $invoice;
+                    $totalGeneratedAmount += $studentTotal;
                 } catch (\Exception $e) {
-                    Log::error('Bulk invoice creation failed for enrollment ' . $enrollment->id . ': ' . $e->getMessage());
-                    $errors[] = "Failed to create invoice for {$enrollment->student->first_name} {$enrollment->student->last_name}: " . $e->getMessage();
+                    Log::error('Bulk invoice creation error for enrollment ' . $enrollment->id . ': ' . $e->getMessage());
+                    $errors[] = "Error for {$enrollment->student?->first_name} {$enrollment->student?->last_name}: " . $e->getMessage();
                 }
             }
         });
 
+        $message = count($createdInvoices) . ' invoices created successfully (Total: $' . number_format($totalGeneratedAmount, 2) . ').';
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} students skipped because an invoice already exists.";
+        }
+        if (count($errors) > 0) {
+            $message .= ' ' . implode('; ', array_slice($errors, 0, 3));
+        }
+
         return redirect()
             ->route('admin.invoices.index')
-            ->with('status', count($createdInvoices) . ' invoices created successfully.' . (count($errors) > 0 ? ' Errors: ' . implode('; ', $errors) : ''));
+            ->with('status', $message);
     }
 
     public function autoGenerate()
