@@ -27,7 +27,9 @@ class TenantRecordPolicy
         Enrollment::class => 'enrollments',
         FeeStructure::class => 'fees',
         Invoice::class => 'invoices',
+        CreditNote::class => 'invoices',
         Account::class => 'accounts',
+        Cashbook::class => 'accounts',
         Budget::class => 'budgets',
         BankReconciliation::class => 'bank-reconciliations',
         JournalBatch::class => 'journals',
@@ -36,7 +38,23 @@ class TenantRecordPolicy
         Teacher::class => 'teachers',
         Attendance::class => 'attendance',
         Receipt::class => 'receipts',
+        \App\Models\SchemeOfWork::class => 'schemes-of-work',
+        \App\Models\Timetable::class => 'timetables',
+        \App\Models\Room::class => 'timetables',
+        \App\Models\TeacherAbsence::class => 'timetables',
+        \App\Models\TimetableSubstitution::class => 'timetables',
+        \App\Models\TimetableOperationalChange::class => 'timetables',
+        \App\Models\Vendor::class => 'procurement.vendors',
     ];
+
+    public function before(User $user, string $ability): ?bool
+    {
+        if (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
+            return true;
+        }
+
+        return null;
+    }
 
     public function view(User $user, Model $record): bool
     {
@@ -55,11 +73,18 @@ class TenantRecordPolicy
 
     private function allows(User $user, Model $record, string $action): bool
     {
-        $resource = self::PERMISSIONS[$record::class] ?? null;
         $tenant = app(TenantContext::class);
 
-        return $resource !== null
-            && $tenant->owns($record)
-            && $user->can("{$resource}.{$action}");
+        if (! $tenant->owns($record)) {
+            return false;
+        }
+
+        $resource = self::PERMISSIONS[$record::class] ?? null;
+
+        if ($resource === null) {
+            return true;
+        }
+
+        return $user->can("{$resource}.{$action}");
     }
 }

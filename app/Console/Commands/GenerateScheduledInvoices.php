@@ -160,8 +160,7 @@ class GenerateScheduledInvoices extends Command
                     }
 
                     // Generate invoice number
-                    $invoiceNumber = 'INV-' . str_replace('-', '', $academicYear) . '-' . 
-                                   str_pad(Invoice::where('school_id', $enrollment->school_id)->count() + 1, 6, '0', STR_PAD_LEFT);
+                    $invoiceNumber = Invoice::generateNextNumber($enrollment->school_id, $academicYear);
 
                     // Create invoice
                     $invoice = Invoice::create([

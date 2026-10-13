@@ -210,4 +210,25 @@ class SdaResolutionController extends Controller
             ->route('sda.resolutions.show', $resolution)
             ->with('success', 'Resolution seconded successfully.');
     }
+
+    /**
+     * Mark resolution as implemented.
+     */
+    public function implement(Request $request, SdaResolution $resolution)
+    {
+        $user = Auth::user();
+        $belongs = $resolution->meeting->committee->members()->where('user_id', $user->id)->exists();
+
+        if (!$belongs) {
+            abort(403, 'You are not authorized to implement this resolution.');
+        }
+
+        if (!$resolution->isPassed()) {
+            return back()->with('error', 'Only passed resolutions can be implemented.');
+        }
+
+        $resolution->markAsImplemented($request->input('implementation_notes'));
+
+        return back()->with('success', 'Resolution marked as implemented.');
+    }
 }

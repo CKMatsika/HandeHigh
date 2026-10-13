@@ -86,4 +86,27 @@ class Receipt extends Model
     {
         return $this->hasOne(JournalBatch::class, 'source_id')->where('source_type', 'receipt');
     }
+
+    /**
+     * Generate the next sequential receipt number with pessimistic concurrency safety.
+     */
+    public static function generateNextNumber(int $schoolId): string
+    {
+        $prefix = 'RC-' . date('Ymd') . '-';
+
+        $latestNumber = static::where('school_id', $schoolId)
+            ->where('receipt_number', 'like', "{$prefix}%")
+            ->orderByRaw('LENGTH(receipt_number) DESC, receipt_number DESC')
+            ->lockForUpdate()
+            ->value('receipt_number');
+
+        $nextSeq = 1;
+        if ($latestNumber && preg_match('/-(\d+)$/', $latestNumber, $matches)) {
+            $nextSeq = (int) $matches[1] + 1;
+        } else {
+            $nextSeq = static::where('school_id', $schoolId)->whereDate('created_at', today())->count() + 1;
+        }
+
+        return $prefix . str_pad($nextSeq, 5, '0', STR_PAD_LEFT);
+    }
 }

@@ -76,6 +76,7 @@ Route::middleware(['auth'])->group(function () {
         // SDA Resolutions
         Route::resource('resolutions', App\Http\Controllers\Sda\SdaResolutionController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
         Route::post('resolutions/{resolution}/second', [App\Http\Controllers\Sda\SdaResolutionController::class, 'second'])->name('resolutions.second');
+        Route::post('resolutions/{resolution}/implement', [App\Http\Controllers\Sda\SdaResolutionController::class, 'implement'])->name('resolutions.implement');
         
         // SDA Reports
         Route::resource('reports', App\Http\Controllers\Sda\SdaReportController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
@@ -186,6 +187,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('students/{student}/allocate-asset', [AdminStudentController::class, 'allocateAsset'])->name('students.allocate-asset');
             Route::delete('students/{student}/return-asset/{asset}', [AdminStudentController::class, 'returnAsset'])->name('students.return-asset');
             Route::get('students/{student}/manage-library', [AdminStudentController::class, 'manageLibrary'])->name('students.manage-library');
+            Route::post('students/{student}/update-library', [AdminStudentController::class, 'updateLibrary'])->name('students.update-library');
             Route::resource('students', AdminStudentController::class)->except(['show'])
                 ->middlewareFor(['edit', 'update'], 'can:update,student')
                 ->middlewareFor('destroy', 'can:delete,student');
@@ -368,7 +370,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('kiosk/sales/{sale}', [\App\Http\Controllers\Admin\KioskController::class, 'showSale'])->name('kiosk.sales.show');
             
             // Customers
-            Route::resource('customers', CustomerController::class);
+            Route::resource('customers', CustomerController::class)->except(['show', 'destroy']);
 
             // Receipts (non-student)
             Route::resource('receipts', ReceiptController::class)
@@ -427,11 +429,11 @@ Route::middleware(['auth'])->group(function () {
                 Route::resource('roles', \App\Http\Controllers\Admin\SdaRoleController::class);
                 
                 // Meetings
-                Route::resource('meetings', \App\Http\Controllers\Sda\SdaMeetingController::class);
-                Route::post('meetings/{meeting}/start', [\App\Http\Controllers\Sda\SdaMeetingController::class, 'start'])->name('meetings.start');
-                Route::post('meetings/{meeting}/complete', [\App\Http\Controllers\Sda\SdaMeetingController::class, 'complete'])->name('meetings.complete');
-                Route::post('meetings/{meeting}/cancel', [\App\Http\Controllers\Sda\SdaMeetingController::class, 'cancel'])->name('meetings.cancel');
-                Route::post('meetings/{meeting}/attendance', [\App\Http\Controllers\Sda\SdaMeetingController::class, 'recordAttendance'])->name('meetings.attendance');
+                Route::resource('meetings', \App\Http\Controllers\Admin\SdaMeetingController::class);
+                Route::post('meetings/{meeting}/start', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'start'])->name('meetings.start');
+                Route::post('meetings/{meeting}/complete', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'complete'])->name('meetings.complete');
+                Route::post('meetings/{meeting}/cancel', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'cancel'])->name('meetings.cancel');
+                Route::post('meetings/{meeting}/attendance', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'recordAttendance'])->name('meetings.attendance');
                 
                 // Meeting Minutes
                 Route::get('meetings/{meeting}/minutes/create', [\App\Http\Controllers\Admin\SdaMinuteController::class, 'create'])->name('minutes.create');
@@ -473,8 +475,8 @@ Route::middleware(['auth'])->group(function () {
                 
                 // API Endpoints
                 Route::prefix('api')->name('api.')->group(function () {
-                    Route::get('search-users', [\App\Http\Controllers\Admin\SdaController::class, 'searchUsers'])->name('search-users');
-                    Route::get('committees/{committee}/members', [\App\Http\Controllers\Admin\SdaController::class, 'getCommitteeMembers'])->name('committees.members');
+                    Route::get('search-users', [\App\Http\Controllers\Admin\CommunicationController::class, 'searchUsers'])->name('search-users');
+                    Route::get('committees/{committee}/members', [\App\Http\Controllers\Admin\SdaController::class, 'committeeMembers'])->name('committees.members');
                 });
             });
             

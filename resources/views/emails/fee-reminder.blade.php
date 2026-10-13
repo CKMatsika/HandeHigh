@@ -18,7 +18,7 @@
         <table style="width: 100%; border-collapse: collapse;">
             <tr>
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>Invoice #:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">{{ $invoice->invoice_number }}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{{ $invoice->number }}</td>
             </tr>
             <tr>
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>Student:</strong></td>
@@ -26,12 +26,12 @@
             </tr>
             <tr>
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>Amount Due:</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">{{ number_format($invoice->balance, 2) }} {{ $invoice->currency }}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{{ number_format($invoice->balance, 2) }} {{ $invoice->school->currency ?? 'USD' }}</td>
             </tr>
             <tr>
                 <td style="padding: 10px; border: 1px solid #ddd;"><strong>Due Date:</strong></td>
                 <td style="padding: 10px; border: 1px solid #ddd;">
-                    {{ $invoice->due_date->format('F j, Y') }}
+                    {{ $invoice->due_date ? $invoice->due_date->format('F j, Y') : 'Immediate' }}
                     @if($daysOverdue > 0)
                         <span style="color: #e74c3c;">({{ $daysOverdue }} days overdue)</span>
                     @endif
@@ -40,9 +40,19 @@
         </table>
     </div>
 
-    @component('mail::button', ['url' => route('parent.invoices.show', $invoice->id)])
-        View Invoice & Make Payment
-    @endcomponent
+    @if(Route::has('parent.students.fees'))
+        @component('mail::button', ['url' => route('parent.students.fees', $student)])
+            View Statement & Fees
+        @endcomponent
+    @elseif(Route::has('student.fees'))
+        @component('mail::button', ['url' => route('student.fees')])
+            View Statement & Fees
+        @endcomponent
+    @else
+        @component('mail::button', ['url' => url('/login')])
+            View Statement & Fees
+        @endcomponent
+    @endif
 
     <p>If you have already made this payment, please ignore this reminder.</p>
 

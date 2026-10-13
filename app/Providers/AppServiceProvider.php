@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\BankReconciliation;
 use App\Models\Budget;
 use App\Models\CreditNote;
+use App\Models\Curriculum;
 use App\Models\Enrollment;
 use App\Models\FeeStructure;
 use App\Models\Invoice;
@@ -93,6 +94,7 @@ class AppServiceProvider extends ServiceProvider
             'absence' => \App\Models\TeacherAbsence::class,
             'substitution' => \App\Models\TimetableSubstitution::class,
             'change' => \App\Models\TimetableOperationalChange::class,
+            'curriculum' => Curriculum::class,
         ];
 
         foreach ($bindings as $parameter => $model) {

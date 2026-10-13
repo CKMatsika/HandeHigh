@@ -148,4 +148,68 @@ class DormitoryController extends Controller
 
         return redirect()->route('admin.dormitories.show', $dormitory)->with('success', 'Bed added successfully.');
     }
+
+    public function edit(Dormitory $dormitory)
+    {
+        $school = Auth::user()?->school;
+        if (! $school || $dormitory->school_id !== $school->id) {
+            abort(403);
+        }
+
+        $hostels = Hostel::where('school_id', $school->id)->active()->get();
+        $employees = Employee::where('school_id', $school->id)
+            ->active()
+            ->get()
+            ->filter(fn ($emp) => $emp->isNonTeaching());
+
+        return view('admin.dormitories.edit', compact('dormitory', 'hostels', 'employees'));
+    }
+
+    public function update(Request $request, Dormitory $dormitory)
+    {
+        $school = Auth::user()?->school;
+        if (! $school || $dormitory->school_id !== $school->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'hostel_id' => ['nullable', TenantExists::make('hostels')],
+            'name' => ['required', 'string', 'max:255'],
+            'gender' => ['required', 'in:male,female,mixed'],
+            'capacity' => ['required', 'integer', 'min:1'],
+            'supervisor_id' => ['nullable', TenantExists::make('employees')],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'is_active' => ['boolean'],
+        ]);
+
+        $dormitory->update([
+            'hostel_id' => $validated['hostel_id'] ?? null,
+            'name' => $validated['name'],
+            'gender' => $validated['gender'],
+            'capacity' => $validated['capacity'],
+            'description' => $validated['description'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        if (! empty($validated['supervisor_id'])) {
+            $employee = Employee::where('school_id', $school->id)->findOrFail($validated['supervisor_id']);
+            $this->boardingStaffService->assignDormitorySupervisor($dormitory, $employee);
+        } else {
+            $dormitory->update(['supervisor_id' => null]);
+        }
+
+        return redirect()->route('admin.dormitories.show', $dormitory)->with('success', 'Dormitory updated successfully.');
+    }
+
+    public function destroy(Dormitory $dormitory)
+    {
+        $school = Auth::user()?->school;
+        if (! $school || $dormitory->school_id !== $school->id) {
+            abort(403);
+        }
+
+        $dormitory->delete();
+
+        return redirect()->route('admin.dormitories.index')->with('success', 'Dormitory deleted successfully.');
+    }
 }

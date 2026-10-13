@@ -21,6 +21,8 @@ class TeacherController extends Controller
             abort(403);
         }
 
+        $managedClasses = collect();
+        $teachingClasses = collect();
         $teacherClasses = collect();
         $curricula = collect();
         $students = collect();
@@ -34,12 +36,45 @@ class TeacherController extends Controller
         $careerStudentTotal = 0;
         
         if ($user->hasRole('teacher')) {
-            $teacherClasses = $school->classes()->where('teacher_id', $user->id)->get();
-            $curricula = $school->curricula()->where('teacher_id', $user->id)->with(['class', 'subject'])->get();
+            // 1. Classes managed administratively (Class Teacher - attendance register, roll call)
+            $managedClasses = $school->classes()
+                ->where('teacher_id', $user->id)
+                ->withCount('enrollments')
+                ->get();
+            $teacherClasses = $managedClasses;
+
+            // 2. Curricula and subjects taught by this teacher
+            $curricula = $school->curricula()
+                ->where('teacher_id', $user->id)
+                ->with(['class.enrollments', 'subject'])
+                ->get();
             
-            // Get students from assigned classes
-            $classIds = $teacherClasses->pluck('id');
-            $students = $school->students()->whereIn('class_id', $classIds)->limit(10)->get();
+            // 3. Classes where this teacher teaches subjects
+            $teachingClassIds = $curricula->pluck('class_id')->unique()->filter()->values();
+            $teachingClasses = $school->classes()
+                ->whereIn('id', $teachingClassIds)
+                ->withCount('enrollments')
+                ->get();
+
+            // All associated class IDs & names for this teacher
+            $allClassIds = $managedClasses->pluck('id')->merge($teachingClassIds)->unique()->filter()->values();
+            $allClassNames = $managedClasses->pluck('name')->merge($teachingClasses->pluck('name'))->unique()->filter()->values()->all();
+            
+            // Get students across managed classes and teaching classes
+            $studentsQuery = $school->students();
+            if ($allClassIds->isNotEmpty() || !empty($allClassNames)) {
+                $studentsQuery->where(function ($query) use ($allClassIds, $allClassNames) {
+                    $query->whereHas('enrollments', function ($eq) use ($allClassIds) {
+                        $eq->whereIn('class_id', $allClassIds);
+                    });
+                    if (!empty($allClassNames)) {
+                        $query->orWhereIn('class_name', $allClassNames);
+                    }
+                });
+            } else {
+                $studentsQuery->whereRaw('1 = 0');
+            }
+            $students = (clone $studentsQuery)->limit(12)->get();
             
             // Get teacher record and schemes of work
             $teacher = Teacher::where('school_id', $school->id)->where('user_id', $user->id)->first();
@@ -91,9 +126,9 @@ class TeacherController extends Controller
             ]);
             
             // Career guidance stats for teacher's students
-            $allClassStudents = $school->students()->whereIn('class_id', $classIds)->pluck('id');
-            $careerStudentTotal = $allClassStudents->count();
-            $careerAssessmentsCount = CareerGuidanceAssessment::whereIn('student_id', $allClassStudents)
+            $allClassStudentIds = (clone $studentsQuery)->pluck('id');
+            $careerStudentTotal = $allClassStudentIds->count();
+            $careerAssessmentsCount = CareerGuidanceAssessment::whereIn('student_id', $allClassStudentIds)
                 ->where('status', 'published')->count();
             $careerAssessedStudents = $careerAssessmentsCount;
             
@@ -106,7 +141,9 @@ class TeacherController extends Controller
             ]);
         } else {
             // For super admin, show sample data
-            $teacherClasses = $school->classes()->limit(2)->get();
+            $managedClasses = $school->classes()->limit(1)->get();
+            $teachingClasses = $school->classes()->limit(3)->get();
+            $teacherClasses = $managedClasses;
             $curricula = $school->curricula()->with(['class', 'subject'])->limit(5)->get();
             $students = $school->students()->limit(5)->get();
             $teacherProjects = Project::where('school_id', $school->id)->limit(5)->get();
@@ -141,7 +178,9 @@ class TeacherController extends Controller
         return view('portal.teacher.dashboard', [
             'school' => $school,
             'user' => $user,
+            'managedClasses' => $managedClasses,
             'teacherClasses' => $teacherClasses,
+            'teachingClasses' => $teachingClasses,
             'curricula' => $curricula,
             'students' => $students,
             'assignments' => $assignments,

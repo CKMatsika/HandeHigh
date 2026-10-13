@@ -19,7 +19,10 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             SchoolSeeder::class,
             StaffPositionSeeder::class,
-            SuperAdminSeeder::class,
         ]);
+
+        if (app()->environment('local') && !app()->runningUnitTests()) {
+            $this->call(SuperAdminSeeder::class);
+        }
     }
 }

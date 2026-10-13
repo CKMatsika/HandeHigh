@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Dormitory extends Model
 {
@@ -50,7 +51,7 @@ class Dormitory extends Model
         return $this->hasMany(Bed::class);
     }
 
-    public function assignments(): HasMany
+    public function assignments(): HasManyThrough
     {
         return $this->hasManyThrough(BedAssignment::class, Bed::class);
     }

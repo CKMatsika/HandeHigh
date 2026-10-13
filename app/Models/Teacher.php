@@ -74,7 +74,12 @@ class Teacher extends Model
 
     public function subjectCurricula()
     {
-        return Curriculum::where('teacher_id', $this->user_id);
+        return $this->hasMany(Curriculum::class, 'teacher_id', 'user_id');
+    }
+
+    public function teachingClasses()
+    {
+        return SchoolClass::whereIn('id', $this->subjectCurricula()->pluck('class_id'));
     }
 
     public function schemesOfWork()

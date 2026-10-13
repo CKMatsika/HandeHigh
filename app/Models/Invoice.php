@@ -77,4 +77,28 @@ class Invoice extends Model
     {
         return $this->hasMany(PaymentAllocation::class);
     }
+
+    /**
+     * Generate the next sequential invoice number with pessimistic concurrency safety.
+     */
+    public static function generateNextNumber(int $schoolId, ?string $year = null): string
+    {
+        $yearStr = $year ? str_replace('-', '', $year) : date('Y');
+        $prefix = "INV-{$yearStr}-";
+
+        $latestNumber = static::where('school_id', $schoolId)
+            ->where('number', 'like', "{$prefix}%")
+            ->orderByRaw('LENGTH(number) DESC, number DESC')
+            ->lockForUpdate()
+            ->value('number');
+
+        $nextSeq = 1;
+        if ($latestNumber && preg_match('/-(\d+)$/', $latestNumber, $matches)) {
+            $nextSeq = (int) $matches[1] + 1;
+        } else {
+            $nextSeq = static::where('school_id', $schoolId)->count() + 1;
+        }
+
+        return $prefix . str_pad($nextSeq, 6, '0', STR_PAD_LEFT);
+    }
 }

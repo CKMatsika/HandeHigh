@@ -52,6 +52,14 @@ class TenantContext
 
     public function owns(Model $model): bool
     {
+        $user = request()->user()
+            ?? (Auth::guard('sanctum')->check() ? Auth::guard('sanctum')->user() : null)
+            ?? Auth::user();
+
+        if ($user && method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
+            return true;
+        }
+
         return $this->hasTenant()
             && (int) $model->getAttribute('school_id') === $this->id();
     }
@@ -64,6 +72,12 @@ class TenantContext
         $school = $this->school ?? $user?->school ?? ($user?->school_id ? School::find($user->school_id) : null);
 
         if (! $school) {
+            if ($user && method_exists($user, 'hasRole') && $user->hasRole('super-admin')) {
+                return $modelClass::query()
+                    ->where((new $modelClass)->getRouteKeyName(), $value)
+                    ->firstOrFail();
+            }
+
             abort(404);
         }
 

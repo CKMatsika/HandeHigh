@@ -67,20 +67,22 @@ return new class extends Migration
          * MySQL-safe budget workflow migration.
          * We alter the column directly to add the new enum values.
          */
-        DB::statement("
-            ALTER TABLE budgets 
-            MODIFY status ENUM(
-                'draft', 
-                'submitted', 
-                'bursar_review', 
-                'finance_committee', 
-                'committee_review', 
-                'approved', 
-                'active', 
-                'closed', 
-                'rejected'
-            ) NOT NULL DEFAULT 'draft'
-        ");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("
+                ALTER TABLE budgets 
+                MODIFY status ENUM(
+                    'draft', 
+                    'submitted', 
+                    'bursar_review', 
+                    'finance_committee', 
+                    'committee_review', 
+                    'approved', 
+                    'active', 
+                    'closed', 
+                    'rejected'
+                ) NOT NULL DEFAULT 'draft'
+            ");
+        }
     }
 
     /**
@@ -88,10 +90,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("
-            ALTER TABLE budgets 
-            MODIFY status ENUM('draft', 'approved', 'active', 'closed') NOT NULL DEFAULT 'draft'
-        ");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("
+                ALTER TABLE budgets 
+                MODIFY status ENUM('draft', 'approved', 'active', 'closed') NOT NULL DEFAULT 'draft'
+            ");
+        }
 
         Schema::table('budgets', function (Blueprint $table) {
             $table->dropForeign(['submitted_by']);

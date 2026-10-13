@@ -111,9 +111,9 @@ class InvoiceController extends Controller
             ->where('term', $validated['term'])
             ->first();
 
-        $invoiceNumber = 'INV-' . date('Y') . '-' . str_pad(Invoice::where('school_id', $school->id)->count() + 1, 6, '0', STR_PAD_LEFT);
+        DB::transaction(function () use ($validated, $student, $enrollment, $school) {
+            $invoiceNumber = Invoice::generateNextNumber($school->id);
 
-        DB::transaction(function () use ($validated, $student, $enrollment, $invoiceNumber, $school) {
             $invoice = Invoice::create([
                 'school_id' => $school->id,
                 'student_id' => $student->id,
@@ -350,7 +350,7 @@ class InvoiceController extends Controller
                         continue;
                     }
 
-                    $invoiceNumber = 'INV-' . date('Y') . '-' . str_pad(Invoice::where('school_id', $enrollment->school_id)->count() + 1, 6, '0', STR_PAD_LEFT);
+                    $invoiceNumber = Invoice::generateNextNumber($enrollment->school_id);
 
                     $invoice = Invoice::create([
                         'school_id' => $enrollment->school_id,
@@ -484,7 +484,7 @@ class InvoiceController extends Controller
                         continue;
                     }
 
-                    $invoiceNumber = 'INV-' . str_replace('-', '', $targetYear) . '-' . str_pad(Invoice::where('school_id', $enrollment->school_id)->count() + 1, 6, '0', STR_PAD_LEFT);
+                    $invoiceNumber = Invoice::generateNextNumber($enrollment->school_id, $targetYear);
 
                     $invoice = Invoice::create([
                         'school_id' => $enrollment->school_id,

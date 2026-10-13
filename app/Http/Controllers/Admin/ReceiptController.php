@@ -80,7 +80,7 @@ class ReceiptController extends Controller
         }
         $grand = $total + $tax;
 
-        $receiptNumber = 'RC-' . date('Ymd') . '-' . str_pad(Receipt::where('school_id', $school->id)->count() + 1, 5, '0', STR_PAD_LEFT);
+        $receiptNumber = Receipt::generateNextNumber($school->id);
 
         $receipt = Receipt::create([
             'school_id' => $school->id,

@@ -489,26 +489,20 @@ class AccountingService
 
         $newBalance = $lastBalance + $kioskSale->grand_total;
 
-        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
-
-        try {
-            \App\Models\Cashbook::create([
-                'school_id' => $school->id,
-                'account_id' => $cashAccount->id,
-                'transaction_type' => 'income',
-                'category' => 'kiosk_sales',
-                'description' => 'Kiosk Sale ' . $kioskSale->receipt_number,
-                'amount' => $kioskSale->grand_total,
-                'balance_after' => $newBalance,
-                'transaction_date' => $kioskSale->sale_date ?? now()->toDateString(),
-                'reference_number' => $kioskSale->receipt_number,
-                'payment_method' => $kioskSale->payment_method,
-                'created_by' => $kioskSale->cashier_id ?? auth()->id() ?? 1,
-                'notes' => 'Kiosk / Canteen retail sale',
-            ]);
-        } finally {
-            \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
-        }
+        \App\Models\Cashbook::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_type' => 'income',
+            'category' => 'kiosk_sales',
+            'description' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+            'amount' => $kioskSale->grand_total,
+            'balance_after' => $newBalance,
+            'transaction_date' => $kioskSale->sale_date ?? now()->toDateString(),
+            'reference_number' => $kioskSale->receipt_number,
+            'payment_method' => $kioskSale->payment_method,
+            'created_by' => $kioskSale->cashier_id ?? auth()->id(),
+            'notes' => 'Kiosk / Canteen retail sale',
+        ]);
     }
     
     /**
@@ -629,31 +623,23 @@ class AccountingService
         // Calculate new balance
         $newBalance = $lastBalance + $payment->amount;
         
-        // Disable foreign key checks temporarily to avoid constraint issues
-        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
-        
-        try {
-            // Create cashbook entry
-            \App\Models\Cashbook::create([
-                'school_id' => $school->id,
-                'account_id' => $cashAccount->id,
-                'transaction_type' => 'income',
-                'category' => 'fees',
-                'description' => 'Payment for invoice ' . $invoice->number,
-                'amount' => $payment->amount,
-                'balance_after' => $newBalance,
-                'transaction_date' => $payment->paid_at,
-                'reference_number' => $payment->reference ?? 'PAY-' . $payment->id,
-                'payment_method' => $payment->method,
-                'related_invoice_id' => $invoice->id,
-                'related_payment_id' => $payment->id,
-                'created_by' => auth()->id(),
-                'notes' => 'Student fee payment - ' . $invoice->student->first_name . ' ' . $invoice->student->last_name,
-            ]);
-        } finally {
-            // Re-enable foreign key checks
-            \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
-        }
+        // Create cashbook entry
+        \App\Models\Cashbook::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_type' => 'income',
+            'category' => 'fees',
+            'description' => 'Payment for invoice ' . $invoice->number,
+            'amount' => $payment->amount,
+            'balance_after' => $newBalance,
+            'transaction_date' => $payment->paid_at,
+            'reference_number' => $payment->reference ?? 'PAY-' . $payment->id,
+            'payment_method' => $payment->method,
+            'related_invoice_id' => $invoice->id,
+            'related_payment_id' => $payment->id,
+            'created_by' => auth()->id(),
+            'notes' => 'Student fee payment - ' . $invoice->student->first_name . ' ' . $invoice->student->last_name,
+        ]);
     }
 
     /**
@@ -729,29 +715,21 @@ class AccountingService
         // Calculate new balance
         $newBalance = $lastBalance + $receipt->grand_total;
         
-        // Disable foreign key checks temporarily to avoid constraint issues
-        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
-        
-        try {
-            // Create cashbook entry
-            \App\Models\Cashbook::create([
-                'school_id' => $school->id,
-                'account_id' => $cashAccount->id,
-                'transaction_type' => 'income',
-                'category' => 'other_revenue',
-                'description' => 'Receipt ' . $receipt->receipt_number,
-                'amount' => $receipt->grand_total,
-                'balance_after' => $newBalance,
-                'transaction_date' => $receipt->receipt_date,
-                'reference_number' => $receipt->receipt_number,
-                'payment_method' => $receipt->payment_method,
-                'created_by' => auth()->id(),
-                'notes' => $receipt->notes ?? 'General receipt',
-            ]);
-        } finally {
-            // Re-enable foreign key checks
-            \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
-        }
+        // Create cashbook entry
+        \App\Models\Cashbook::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_type' => 'income',
+            'category' => 'other_revenue',
+            'description' => 'Receipt ' . $receipt->receipt_number,
+            'amount' => $receipt->grand_total,
+            'balance_after' => $newBalance,
+            'transaction_date' => $receipt->receipt_date,
+            'reference_number' => $receipt->receipt_number,
+            'payment_method' => $receipt->payment_method,
+            'created_by' => auth()->id(),
+            'notes' => $receipt->notes ?? 'General receipt',
+        ]);
     }
 
     /**
@@ -810,58 +788,37 @@ class AccountingService
     {
         $school = auth()->user()->school;
         
-        // Disable foreign key checks temporarily
-        \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = OFF');
+        // Create cashbook entry for source account (money going out)
+        \App\Models\Cashbook::create([
+            'school_id' => $school->id,
+            'account_id' => $fromAccount->id,
+            'transaction_type' => 'expense',
+            'category' => 'transfer',
+            'description' => $description . ' - Transfer to ' . $toAccount->name,
+            'amount' => $amount,
+            'balance_after' => $fromBalance - $amount,
+            'transaction_date' => $transactionDate,
+            'reference_number' => 'TRANSFER-OUT-' . date('YmdHis'),
+            'payment_method' => 'transfer',
+            'created_by' => auth()->id(),
+            'notes' => 'Transfer out: ' . $description,
+        ]);
         
-        try {
-            // Get current balances
-            $fromBalance = \App\Models\Cashbook::where('school_id', $school->id)
-                ->where('account_id', $fromAccount->id)
-                ->orderBy('transaction_date', 'desc')
-                ->orderBy('created_at', 'desc')
-                ->value('balance_after') ?? 0;
-                
-            $toBalance = \App\Models\Cashbook::where('school_id', $school->id)
-                ->where('account_id', $toAccount->id)
-                ->orderBy('transaction_date', 'desc')
-                ->orderBy('created_at', 'desc')
-                ->value('balance_after') ?? 0;
-            
-            // Create cashbook entry for source account (money going out)
-            \App\Models\Cashbook::create([
-                'school_id' => $school->id,
-                'account_id' => $fromAccount->id,
-                'transaction_type' => 'expense',
-                'category' => 'transfer',
-                'description' => $description . ' - Transfer to ' . $toAccount->name,
-                'amount' => $amount,
-                'balance_after' => $fromBalance - $amount,
-                'transaction_date' => $transactionDate,
-                'reference_number' => 'TRANSFER-OUT-' . date('YmdHis'),
-                'payment_method' => 'transfer',
-                'created_by' => auth()->id(),
-                'notes' => 'Transfer out: ' . $description,
-            ]);
-            
-            // Create cashbook entry for destination account (money coming in)
-            \App\Models\Cashbook::create([
-                'school_id' => $school->id,
-                'account_id' => $toAccount->id,
-                'transaction_type' => 'income',
-                'category' => 'transfer',
-                'description' => $description . ' - Transfer from ' . $fromAccount->name,
-                'amount' => $amount,
-                'balance_after' => $toBalance + $amount,
-                'transaction_date' => $transactionDate,
-                'reference_number' => 'TRANSFER-IN-' . date('YmdHis'),
-                'payment_method' => 'transfer',
-                'created_by' => auth()->id(),
-                'notes' => 'Transfer in: ' . $description,
-            ]);
-        } finally {
-            // Re-enable foreign key checks
-            \Illuminate\Support\Facades\DB::statement('PRAGMA foreign_keys = ON');
-        }
+        // Create cashbook entry for destination account (money coming in)
+        \App\Models\Cashbook::create([
+            'school_id' => $school->id,
+            'account_id' => $toAccount->id,
+            'transaction_type' => 'income',
+            'category' => 'transfer',
+            'description' => $description . ' - Transfer from ' . $fromAccount->name,
+            'amount' => $amount,
+            'balance_after' => $toBalance + $amount,
+            'transaction_date' => $transactionDate,
+            'reference_number' => 'TRANSFER-IN-' . date('YmdHis'),
+            'payment_method' => 'transfer',
+            'created_by' => auth()->id(),
+            'notes' => 'Transfer in: ' . $description,
+        ]);
     }
 
     /**

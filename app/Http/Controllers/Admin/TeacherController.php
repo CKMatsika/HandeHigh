@@ -156,6 +156,8 @@ class TeacherController extends Controller
         $school = $request->user()?->school;
         if (!$school || $teacher->school_id !== $school->id) abort(403);
 
+        $this->ensureTeacherUserLinked($teacher, $school);
+
         $tab = $request->query('tab', 'overview');
 
         $teacher->load([
@@ -173,13 +175,13 @@ class TeacherController extends Controller
 
         $subjectCurricula = Curriculum::where('school_id', $school->id)
             ->where('teacher_id', $teacher->user_id)
-            ->with(['class', 'subject'])
+            ->with(['class.enrollments', 'subject'])
             ->get();
 
         $allSubjects = Subject::where('school_id', $school->id)->orderBy('name')->get();
         $availablePositions = StaffPosition::where('school_id', $school->id)
             ->where('is_active', true)->get();
-        $allClasses = SchoolClass::where('school_id', $school->id)->orderBy('name')->get();
+        $allClasses = SchoolClass::where('school_id', $school->id)->orderBy('grade')->orderBy('name')->get();
 
         return view('admin.teachers.show', compact(
             'school', 'teacher', 'tab', 'classes', 'subjectCurricula',
@@ -401,10 +403,13 @@ class TeacherController extends Controller
             'class_id' => ['required', TenantExists::make('classes')],
         ]);
 
+        $this->ensureTeacherUserLinked($teacher, $school);
+
         $class = SchoolClass::where('school_id', $school->id)->findOrFail($validated['class_id']);
         $class->update(['teacher_id' => $teacher->user_id]);
 
-        return back()->with('success', 'Teacher assigned as class teacher.');
+        return redirect()->route('admin.teachers.show', ['teacher' => $teacher, 'tab' => 'classes'])
+            ->with('success', "Teacher assigned as class teacher for {$class->name}.");
     }
 
     public function removeClassTeacher(Request $request, Teacher $teacher, SchoolClass $class)
@@ -413,7 +418,9 @@ class TeacherController extends Controller
         if (!$school || $teacher->school_id !== $school->id || $class->school_id !== $school->id) abort(403);
 
         $class->update(['teacher_id' => null]);
-        return back()->with('success', 'Class teacher assignment removed.');
+
+        return redirect()->route('admin.teachers.show', ['teacher' => $teacher, 'tab' => 'classes'])
+            ->with('success', 'Class teacher assignment removed.');
     }
 
     public function addTeachingAssignment(Request $request, Teacher $teacher)
@@ -422,45 +429,120 @@ class TeacherController extends Controller
         if (!$school || $teacher->school_id !== $school->id) abort(403);
 
         $validated = $request->validate([
-            'class_id' => ['required', TenantExists::make('classes')],
+            'class_id' => ['nullable', TenantExists::make('classes')],
+            'class_ids' => ['nullable', 'array'],
+            'class_ids.*' => [TenantExists::make('classes')],
             'subject_id' => ['required', TenantExists::make('subjects')],
             'weekly_periods' => 'nullable|integer|min:1|max:40',
             'term' => 'nullable|string|max:50',
             'academic_year' => 'nullable|string|max:20',
         ]);
 
-        $class = SchoolClass::where('school_id', $school->id)->findOrFail($validated['class_id']);
+        $selectedClassIds = [];
+        if (!empty($validated['class_ids'])) {
+            $selectedClassIds = array_merge($selectedClassIds, $validated['class_ids']);
+        }
+        if (!empty($validated['class_id'])) {
+            $selectedClassIds[] = $validated['class_id'];
+        }
+        $selectedClassIds = array_values(array_unique(array_filter($selectedClassIds)));
 
-        $exists = Curriculum::where('school_id', $school->id)
-            ->where('class_id', $class->id)
-            ->where('subject_id', $validated['subject_id'])
-            ->where('teacher_id', $teacher->user_id)
-            ->exists();
-
-        if ($exists) {
-            return back()->with('error', 'This teacher is already assigned to teach this subject in this class.');
+        if (empty($selectedClassIds)) {
+            return redirect()->route('admin.teachers.show', ['teacher' => $teacher, 'tab' => 'classes'])
+                ->with('error', 'Please select at least one class to assign.');
         }
 
-        Curriculum::create([
-            'school_id' => $school->id,
-            'class_id' => $class->id,
-            'subject_id' => $validated['subject_id'],
-            'teacher_id' => $teacher->user_id,
-            'weekly_periods' => $validated['weekly_periods'] ?? 4,
-            'term' => $validated['term'] ?? 'Term 1',
-            'academic_year' => $validated['academic_year'] ?? date('Y'),
-        ]);
+        $this->ensureTeacherUserLinked($teacher, $school);
 
-        return back()->with('success', 'Teaching assignment added.');
+        $subject = Subject::where('school_id', $school->id)->findOrFail($validated['subject_id']);
+        $weeklyPeriods = (int)($validated['weekly_periods'] ?? 4);
+        $term = $validated['term'] ?? 'Term 1';
+        $academicYear = $validated['academic_year'] ?? date('Y');
+
+        $assignedCount = 0;
+
+        foreach ($selectedClassIds as $classId) {
+            $class = SchoolClass::where('school_id', $school->id)->find($classId);
+            if (!$class) continue;
+
+            // Check if curriculum already exists for this class, subject & academic year
+            $curriculum = Curriculum::where('school_id', $school->id)
+                ->where('class_id', $class->id)
+                ->where('subject_id', $subject->id)
+                ->where('academic_year', $academicYear)
+                ->where(function ($q) use ($term) {
+                    if ($term) {
+                        $q->where('term', $term)->orWhereNull('term');
+                    }
+                })
+                ->first();
+
+            if ($curriculum) {
+                $curriculum->update([
+                    'teacher_id' => $teacher->user_id,
+                    'weekly_periods' => $weeklyPeriods,
+                    'term' => $term ?: $curriculum->term,
+                ]);
+            } else {
+                Curriculum::create([
+                    'school_id' => $school->id,
+                    'class_id' => $class->id,
+                    'subject_id' => $subject->id,
+                    'teacher_id' => $teacher->user_id,
+                    'weekly_periods' => $weeklyPeriods,
+                    'term' => $term ?: ($class->term ?? 'Term 1'),
+                    'academic_year' => $academicYear ?: ($class->academic_year ?? date('Y')),
+                ]);
+            }
+            $assignedCount++;
+        }
+
+        // Keep teacher's subjects in sync
+        if (!$teacher->subjects()->where('subject_id', $subject->id)->exists()) {
+            $teacher->subjects()->attach($subject->id);
+        }
+
+        return redirect()->route('admin.teachers.show', ['teacher' => $teacher, 'tab' => 'classes'])
+            ->with('success', "Assigned {$subject->name} to {$assignedCount} class(es) successfully.");
     }
 
     public function removeTeachingAssignment(Request $request, Teacher $teacher, Curriculum $curriculum)
     {
         $school = $request->user()?->school;
         if (!$school || $teacher->school_id !== $school->id) abort(403);
-        if ($curriculum->teacher_id !== $teacher->user_id) abort(403);
+        if ($curriculum->school_id !== $school->id) abort(403);
 
-        $curriculum->delete();
-        return back()->with('success', 'Teaching assignment removed.');
+        // Disassociate teacher without deleting the school's curriculum definition
+        $curriculum->update(['teacher_id' => null]);
+
+        return redirect()->route('admin.teachers.show', ['teacher' => $teacher, 'tab' => 'classes'])
+            ->with('success', 'Teaching assignment removed.');
+    }
+
+    private function ensureTeacherUserLinked(Teacher $teacher, $school): User
+    {
+        if ($teacher->user_id && $teacher->user) {
+            return $teacher->user;
+        }
+
+        $user = User::where('email', $teacher->email)->first();
+        if (!$user) {
+            $user = User::create([
+                'name' => $teacher->full_name,
+                'email' => $teacher->email,
+                'phone' => $teacher->phone,
+                'address' => $teacher->address,
+                'school_id' => $school->id,
+                'password' => Hash::make('password123'),
+                'is_active' => true,
+                'email_verified_at' => now(),
+            ]);
+            $user->assignRole('teacher');
+        }
+
+        $teacher->update(['user_id' => $user->id]);
+        $teacher->refresh();
+
+        return $user;
     }
 }

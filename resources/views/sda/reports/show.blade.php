@@ -90,7 +90,7 @@
                                     <div class="text-xs text-slate-400">{{ number_format($attachment['size'] / 1024, 2) }} KB</div>
                                 </div>
                             </div>
-                            <a href="{{ route('sda.reports.download-attachment', $report, $attachment['id']) }}" 
+                            <a href="{{ route('sda.reports.download', $report) }}" 
                                class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">
                                 Download
                             </a>

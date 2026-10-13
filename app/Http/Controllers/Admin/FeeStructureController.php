@@ -17,7 +17,7 @@ class FeeStructureController extends Controller
         $school = $user?->school;
 
         if (! $school) {
-            abort(400, 'No school context available for this user.');
+            abort(403, 'No school context available for this user.');
         }
 
         $academicYear = $request->input('academic_year', now()->format('Y'));
@@ -77,7 +77,7 @@ class FeeStructureController extends Controller
         $school = $user?->school;
 
         if (! $school) {
-            abort(400, 'No school context available for this user.');
+            abort(403, 'No school context available for this user.');
         }
 
         $academicYear = $request->input('academic_year', now()->format('Y'));
@@ -110,7 +110,7 @@ class FeeStructureController extends Controller
         $school = $user?->school;
 
         if (! $school) {
-            abort(400, 'No school context available for this user.');
+            abort(403, 'No school context available for this user.');
         }
 
         $validated = $request->validate([
@@ -168,7 +168,7 @@ class FeeStructureController extends Controller
         $school = $user?->school;
 
         if (! $school) {
-            abort(400, 'No school context available for this user.');
+            abort(403, 'No school context available for this user.');
         }
 
         if ($fee->school_id !== $school->id) {
@@ -229,7 +229,7 @@ class FeeStructureController extends Controller
         $school = $user?->school;
 
         if (! $school) {
-            abort(400, 'No school context available for this user.');
+            abort(403, 'No school context available for this user.');
         }
 
         if ($fee->school_id !== $school->id) {

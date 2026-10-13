@@ -15,11 +15,14 @@
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400">Assigned Classes</p>
-                    <p class="text-lg font-semibold text-slate-50">{{ $teacherClasses->count() }}</p>
+                    <p class="text-xs text-slate-400">Class Managed (Admin)</p>
+                    <p class="text-base font-semibold text-slate-50 mt-0.5">
+                        {{ $managedClasses->isNotEmpty() ? $managedClasses->pluck('name')->join(', ') : 'None Assigned' }}
+                    </p>
+                    <p class="text-[10px] text-slate-500 mt-0.5">Daily attendance & register</p>
                 </div>
-                <span class="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center">
-                    <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                <span class="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                 </span>
             </div>
         </div>
@@ -27,11 +30,12 @@
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400">Subjects Teaching</p>
-                    <p class="text-lg font-semibold text-slate-50">{{ $curricula->count() }}</p>
+                    <p class="text-xs text-slate-400">Classes Taught</p>
+                    <p class="text-lg font-semibold text-slate-50 mt-0.5">{{ $teachingClasses->count() }}</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5">{{ $curricula->count() }} subject allocation(s)</p>
                 </div>
-                <span class="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                <span class="h-8 w-8 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
+                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
                 </span>
             </div>
         </div>
@@ -205,52 +209,111 @@
         </div>
     </div>
 
-    <!-- Assigned Classes & Students -->
+    <!-- Classes Managed & Classes Taught -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <!-- Assigned Classes -->
+        <!-- 1. Administrative Class (Class Teacher) -->
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
             <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                <h2 class="text-sm font-medium text-slate-50">Assigned Classes</h2>
-                <a href="#" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Manage Classes</a>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <h2 class="text-sm font-semibold text-slate-50">Class Managed (Administrative)</h2>
+                </div>
+                <span class="text-[10px] text-emerald-400 font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">Class Teacher</span>
             </div>
-            <div class="p-4 space-y-2">
-                @forelse($teacherClasses as $class)
-                    <div class="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+            <div class="p-4 space-y-3">
+                @forelse($managedClasses as $class)
+                    <div class="flex items-center justify-between p-3 rounded-xl border border-slate-700/60 bg-slate-800/60">
                         <div>
-                            <p class="text-xs font-medium text-slate-50">{{ $class->name }}</p>
-                            <p class="text-[10px] text-slate-400">{{ $class->grade }} • {{ $class->academic_year }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-semibold text-slate-100">{{ $class->name }}</p>
+                                <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Grade {{ $class->grade }}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-1">
+                                {{ $class->enrollments_count ?? $class->enrollments->count() }} Enrolled Students · Year {{ $class->academic_year }}
+                            </p>
                         </div>
                         <div class="text-right">
-                            <p class="text-xs font-medium text-slate-50">{{ $class->students_count ?? 0 }}</p>
-                            <p class="text-[10px] text-slate-400">students</p>
+                            <span class="inline-flex items-center px-2 py-1 rounded text-[10px] bg-slate-700 text-slate-300">
+                                Attendance Register
+                            </span>
                         </div>
                     </div>
                 @empty
-                    <p class="text-xs text-slate-500 text-center py-4">No classes assigned</p>
+                    <div class="p-4 rounded-xl border border-dashed border-slate-800 text-center">
+                        <p class="text-xs text-slate-400">No administrative class assigned.</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5">You do not currently have class teacher register duties.</p>
+                    </div>
                 @endforelse
             </div>
         </div>
 
-        <!-- Recent Students -->
+        <!-- 2. Classes & Subjects Taught (Subject Specialisations) -->
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
             <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                <h2 class="text-sm font-medium text-slate-50">Recent Students</h2>
-                <a href="#" class="text-xs text-indigo-400 hover:text-indigo-300 transition">View All Students</a>
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                    <h2 class="text-sm font-semibold text-slate-50">Classes & Subjects Taught</h2>
+                </div>
+                <span class="text-[10px] text-cyan-300 font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                    {{ $teachingClasses->count() }} Class(es) · {{ $curricula->count() }} Allocation(s)
+                </span>
             </div>
-            <div class="p-4 space-y-2">
-                @forelse($students as $student)
-                    <div class="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+            <div class="p-4 space-y-2.5 max-h-80 overflow-y-auto">
+                @forelse($curricula as $curr)
+                    <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-800/40 hover:bg-slate-800/70 transition">
                         <div>
-                            <p class="text-xs font-medium text-slate-50">{{ $student->first_name }} {{ $student->last_name }}</p>
-                            <p class="text-[10px] text-slate-400">{{ $student->grade }} • {{ $student->class_name ?? 'No Class' }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-semibold text-slate-100">{{ $curr->class->name ?? 'Class #' . $curr->class_id }}</p>
+                                <span class="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-medium">
+                                    {{ $curr->subject->name ?? 'Subject' }}
+                                </span>
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-0.5">
+                                {{ $curr->weekly_periods }} periods/wk · {{ $curr->class->enrollments->count() ?? 0 }} students · {{ $curr->term ?? 'All Terms' }} ({{ $curr->academic_year }})
+                            </p>
                         </div>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
-                            {{ ucfirst($student->status) }}
-                        </span>
+                        <div>
+                            <a href="{{ route('admin.exams.performance-reports.my-subjects') }}" class="text-[11px] text-cyan-400 hover:text-cyan-300 transition">
+                                Enter Marks &rarr;
+                            </a>
+                        </div>
                     </div>
                 @empty
-                    <p class="text-xs text-slate-500 text-center py-4">No students found</p>
+                    <div class="p-4 rounded-xl border border-dashed border-slate-800 text-center">
+                        <p class="text-xs text-slate-400">No subject teaching classes allocated yet.</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5">Your subject allocations will appear here once assigned by the administrator.</p>
+                    </div>
                 @endforelse
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Students Across My Classes -->
+    <div class="mt-6">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                    <h2 class="text-sm font-semibold text-slate-50">Students in My Classes</h2>
+                </div>
+                <span class="text-[10px] text-slate-400">{{ $careerStudentTotal }} total students</span>
+            </div>
+            <div class="p-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    @forelse($students as $student)
+                        <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-800/40 flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-medium text-slate-100">{{ $student->first_name }} {{ $student->last_name }}</p>
+                                <p class="text-[10px] text-slate-400">{{ $student->grade ?? '' }} • {{ $student->class_name ?? 'Enrolled' }}</p>
+                            </div>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 capitalize">
+                                {{ $student->status }}
+                            </span>
+                        </div>
+                    @empty
+                        <p class="text-xs text-slate-500 text-center py-4 col-span-full">No students found in your assigned classes.</p>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>
