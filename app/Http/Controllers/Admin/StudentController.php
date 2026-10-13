@@ -291,6 +291,35 @@ class StudentController extends Controller
         DB::transaction(function () use ($student, $validated, $guardianIds) {
             $student->update($validated);
             $student->guardians()->sync($guardianIds);
+
+            // Sync with active or latest enrollment
+            $activeEnrollment = $student->currentEnrollment ?? $student->latestEnrollment;
+            if ($activeEnrollment) {
+                $targetClass = null;
+                if (! empty($validated['class_name'])) {
+                    $targetClass = SchoolClass::where('school_id', $student->school_id)
+                        ->where('name', $validated['class_name'])
+                        ->where(function ($q) use ($validated) {
+                            if (! empty($validated['grade'])) {
+                                $q->where('grade', $validated['grade'])
+                                  ->orWhere('grade', 'like', "%{$validated['grade']}%");
+                            }
+                        })
+                        ->first()
+                        ?? SchoolClass::where('school_id', $student->school_id)
+                        ->where('name', $validated['class_name'])
+                        ->first();
+                }
+
+                $activeEnrollment->update(array_filter([
+                    'grade' => $validated['grade'] ?? $activeEnrollment->grade,
+                    'class_name' => $validated['class_name'] ?? $activeEnrollment->class_name,
+                    'class_id' => $targetClass?->id ?? $activeEnrollment->class_id,
+                    'is_boarding' => $validated['is_boarding'],
+                    'has_transport' => $validated['has_transport'],
+                    'status' => $validated['status'] ?? $activeEnrollment->status,
+                ], fn($val) => !is_null($val)));
+            }
         });
 
         return redirect()->route('admin.students.show', $student)
@@ -369,10 +398,44 @@ class StudentController extends Controller
         $oldGrade = $student->grade;
         $oldClass = $student->class_name;
 
+        $targetClass = SchoolClass::where('school_id', $school->id)
+            ->where('name', $validated['class_name'])
+            ->where(function ($q) use ($validated) {
+                $q->where('grade', $validated['grade'])
+                  ->orWhere('grade', 'like', "%{$validated['grade']}%");
+            })
+            ->first()
+            ?? SchoolClass::where('school_id', $school->id)
+            ->where('name', $validated['class_name'])
+            ->first();
+
         $student->update([
             'grade' => $validated['grade'],
             'class_name' => $validated['class_name'],
         ]);
+
+        $activeEnrollment = $student->currentEnrollment ?? $student->latestEnrollment;
+        if ($activeEnrollment) {
+            $activeEnrollment->update([
+                'grade' => $validated['grade'],
+                'class_name' => $validated['class_name'],
+                'class_id' => $targetClass?->id ?? $activeEnrollment->class_id,
+            ]);
+        } else {
+            Enrollment::create([
+                'school_id' => $school->id,
+                'student_id' => $student->id,
+                'class_id' => $targetClass?->id,
+                'academic_year' => date('Y'),
+                'term' => 'Term 1',
+                'grade' => $validated['grade'],
+                'class_name' => $validated['class_name'],
+                'is_boarding' => (bool)$student->is_boarding,
+                'has_transport' => (bool)$student->has_transport,
+                'enrollment_date' => now(),
+                'status' => 'active',
+            ]);
+        }
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', "Student moved from {$oldGrade} {$oldClass} to {$validated['grade']} {$validated['class_name']}.");
@@ -396,6 +459,10 @@ class StudentController extends Controller
         if ($currentIndex !== false && $currentIndex < count($grades) - 1) {
             $newGrade = $grades[$currentIndex + 1];
             $student->update(['grade' => $newGrade]);
+
+            $activeEnrollment = $student->currentEnrollment ?? $student->latestEnrollment;
+            $activeEnrollment?->update(['grade' => $newGrade]);
+
             return redirect()->route('admin.students.show', $student)
                 ->with('success', "Student promoted to {$newGrade}.");
         }
@@ -422,6 +489,10 @@ class StudentController extends Controller
         if ($currentIndex !== false && $currentIndex > 0) {
             $newGrade = $grades[$currentIndex - 1];
             $student->update(['grade' => $newGrade]);
+
+            $activeEnrollment = $student->currentEnrollment ?? $student->latestEnrollment;
+            $activeEnrollment?->update(['grade' => $newGrade]);
+
             return redirect()->route('admin.students.show', $student)
                 ->with('success', "Student demoted to {$newGrade}.");
         }

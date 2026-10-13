@@ -8,6 +8,7 @@ use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Models\Enrollment;
 use App\Models\Teacher;
 use App\Models\Timetable;
 use App\Models\TimetableSlot;
@@ -358,5 +359,80 @@ class TeacherDashboardTest extends TestCase
         $response->assertSee('Teacher Dashboard');
         $response->assertSee('Mathematics');
         $response->assertSee('Form 2A');
+    }
+
+    public function test_teacher_dashboard_does_not_mix_streams_from_other_grades(): void
+    {
+        // Class 1: Form 1 North (managed or taught by another teacher)
+        $form1North = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'North',
+            'grade' => 'Form 1',
+            'academic_year' => '2026',
+        ]);
+
+        // Class 2: Form 2 North (assigned to this teacher)
+        $form2North = SchoolClass::create([
+            'school_id' => $this->school->id,
+            'name' => 'North',
+            'grade' => 'Form 2',
+            'academic_year' => '2026',
+            'teacher_id' => $this->teacherUser->id,
+        ]);
+
+        // Student A: Form 1 North
+        $studentForm1 = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'FormOne',
+            'last_name' => 'StudentNorth',
+            'grade' => 'Form 1',
+            'class_name' => 'North',
+            'status' => 'active',
+        ]);
+        Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $studentForm1->id,
+            'class_id' => $form1North->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'North',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // Student B: Form 2 North
+        $studentForm2 = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'FormTwo',
+            'last_name' => 'StudentNorth',
+            'grade' => 'Form 2',
+            'class_name' => 'North',
+            'status' => 'active',
+        ]);
+        Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $studentForm2->id,
+            'class_id' => $form2North->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'class_name' => 'North',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // Teacher dashboard should only show FormTwo StudentNorth and NOT FormOne StudentNorth!
+        $response = $this->actingAs($this->teacherUser)->get('/teacher/dashboard');
+
+        $response->assertStatus(200);
+        $response->assertSee('FormTwo StudentNorth');
+        $response->assertDontSee('FormOne StudentNorth');
+
+        // Dedicated class roster for Form 2 North
+        $rosterResponse = $this->actingAs($this->teacherUser)->get('/teacher/classes/' . $form2North->id);
+        $rosterResponse->assertStatus(200);
+        $rosterResponse->assertSee('FormTwo StudentNorth');
+        $rosterResponse->assertDontSee('FormOne StudentNorth');
     }
 }

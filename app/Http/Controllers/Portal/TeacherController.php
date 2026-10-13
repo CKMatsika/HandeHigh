@@ -128,16 +128,7 @@ class TeacherController extends Controller
 
             // Calculate real student counts for each class
             foreach ($allClasses as $c) {
-                $variants = $this->getClassNameVariations($c->name);
-                $cCount = Student::where('school_id', $school->id)
-                    ->where(function ($q) use ($c, $variants) {
-                        $q->whereIn('class_name', $variants)
-                          ->orWhereHas('enrollments', function ($eq) use ($c, $variants) {
-                              $eq->where('class_id', $c->id)
-                                 ->orWhereIn('class_name', $variants);
-                          });
-                    })
-                    ->count();
+                $cCount = $this->buildClassStudentQuery(Student::where('school_id', $school->id), $c)->count();
                 $c->real_student_count = $cCount;
                 $c->enrollments_count = $cCount;
             }
@@ -166,31 +157,18 @@ class TeacherController extends Controller
                 $selectedClass = $allClasses->firstWhere('id', $selectedClassId);
             }
 
-            // Build students query
+            // Build students query with grade + stream awareness
             if ($selectedClass) {
-                $selVariants = $this->getClassNameVariations($selectedClass->name);
+                $studentsQuery = $this->buildClassStudentQuery(Student::where('school_id', $school->id), $selectedClass);
+            } elseif ($allClasses->isNotEmpty()) {
                 $studentsQuery = $school->students()
-                    ->where(function ($q) use ($selectedClass, $selVariants) {
-                        $q->whereIn('class_name', $selVariants)
-                          ->orWhereHas('enrollments', function ($eq) use ($selectedClass, $selVariants) {
-                              $eq->where('class_id', $selectedClass->id)
-                                 ->orWhereIn('class_name', $selVariants);
-                          });
-                    });
-            } elseif ($allClassIds->isNotEmpty() || !empty($allClassNames)) {
-                $allVariants = [];
-                foreach ($allClassNames as $cName) {
-                    $allVariants = array_merge($allVariants, $this->getClassNameVariations($cName));
-                }
-                $allVariants = array_values(array_unique($allVariants));
-
-                $studentsQuery = $school->students()
-                    ->where(function ($q) use ($allClassIds, $allVariants) {
-                        $q->whereIn('class_name', $allVariants)
-                          ->orWhereHas('enrollments', function ($eq) use ($allClassIds, $allVariants) {
-                              $eq->whereIn('class_id', $allClassIds)
-                                 ->orWhereIn('class_name', $allVariants);
-                          });
+                    ->where(function ($q) use ($allClasses) {
+                        foreach ($allClasses as $idx => $class) {
+                            $method = $idx === 0 ? 'where' : 'orWhere';
+                            $q->$method(function ($cq) use ($class) {
+                                $this->buildClassStudentQuery($cq, $class);
+                            });
+                        }
                     });
             } else {
                 $studentsQuery = $school->students()->whereRaw('1 = 0');
@@ -436,16 +414,7 @@ class TeacherController extends Controller
             abort(403, 'You are not assigned to this class.');
         }
 
-        $classVariants = $this->getClassNameVariations($class->name);
-
-        $studentsQuery = Student::where('school_id', $school->id)
-            ->where(function ($q) use ($class, $classVariants) {
-                $q->whereIn('class_name', $classVariants)
-                  ->orWhereHas('enrollments', function ($eq) use ($class, $classVariants) {
-                      $eq->where('class_id', $class->id)
-                         ->orWhereIn('class_name', $classVariants);
-                  });
-            });
+        $studentsQuery = $this->buildClassStudentQuery(Student::where('school_id', $school->id), $class);
 
         if ($request->filled('search')) {
             $search = trim($request->get('search'));
@@ -589,6 +558,79 @@ class TeacherController extends Controller
         }
 
         return array_values(array_unique(array_filter(array_map('trim', $variations))));
+    }
+
+    protected function getGradeVariations(?string $grade): array
+    {
+        if (empty($grade)) {
+            return [];
+        }
+
+        $trimmed = trim($grade);
+        $variations = [$trimmed];
+
+        if (preg_match('/^(?:Form|Grade)\s*(\d+)/i', $trimmed, $matches)) {
+            $num = $matches[1];
+            $variations[] = (string)$num;
+            $variations[] = "Form {$num}";
+            $variations[] = "Form{$num}";
+            $variations[] = "Grade {$num}";
+            $variations[] = "Grade{$num}";
+        } elseif (is_numeric($trimmed)) {
+            $num = $trimmed;
+            $variations[] = (string)$num;
+            $variations[] = "Form {$num}";
+            $variations[] = "Form{$num}";
+            $variations[] = "Grade {$num}";
+            $variations[] = "Grade{$num}";
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $variations))));
+    }
+
+    protected function buildClassStudentQuery($query, SchoolClass $class)
+    {
+        $classVariants = $this->getClassNameVariations($class->name);
+        $gradeVariants = $this->getGradeVariations($class->grade);
+
+        if (! empty($class->grade) && ! empty($class->name)) {
+            $combinedVariants = $this->getClassNameVariations("{$class->grade} {$class->name}");
+            $classVariants = array_values(array_unique(array_merge($classVariants, $combinedVariants)));
+        }
+
+        return $query->where(function ($q) use ($class, $classVariants, $gradeVariants) {
+            // 1. Direct class_id link on active/any enrollment
+            $q->whereHas('enrollments', function ($eq) use ($class) {
+                $eq->where('class_id', $class->id);
+            });
+
+            // 2. Matching enrollment by grade AND stream/class_name
+            if (! empty($gradeVariants)) {
+                $q->orWhereHas('enrollments', function ($eq) use ($classVariants, $gradeVariants) {
+                    $eq->whereIn('grade', $gradeVariants)
+                       ->whereIn('class_name', $classVariants);
+                });
+            }
+
+            // 3. Matching student record by grade AND stream/class_name
+            if (! empty($gradeVariants)) {
+                $q->orWhere(function ($sq) use ($classVariants, $gradeVariants) {
+                    $sq->whereIn('grade', $gradeVariants)
+                       ->whereIn('class_name', $classVariants);
+                });
+            }
+
+            // 4. Strict explicit full name matches (e.g. "Form 2 North") where grade is embedded in the class name
+            $fullVariants = array_filter($classVariants, function ($v) {
+                return preg_match('/(?:Form|Grade|\d+)/i', $v);
+            });
+            if (! empty($fullVariants)) {
+                $q->orWhereIn('class_name', $fullVariants)
+                  ->orWhereHas('enrollments', function ($eq) use ($fullVariants) {
+                      $eq->whereIn('class_name', $fullVariants);
+                  });
+            }
+        });
     }
 }
 

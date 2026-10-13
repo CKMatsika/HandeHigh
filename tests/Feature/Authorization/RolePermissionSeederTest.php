@@ -24,7 +24,8 @@ class RolePermissionSeederTest extends TestCase
         $expected = RoleSeeder::roles();
         sort($expected);
         $this->assertSame($expected, Role::query()->orderBy('name')->pluck('name')->all());
-        $this->assertSame(12, Role::count());
+        $expectedRoleCount = count(RoleSeeder::roles());
+        $this->assertSame($expectedRoleCount, Role::count());
         $this->assertSame(['web'], Role::query()->distinct()->pluck('guard_name')->all());
     }
 
@@ -69,9 +70,10 @@ class RolePermissionSeederTest extends TestCase
         $roleSeeder->run();
         $permissionSeeder->run();
 
-        $this->assertSame(12, Role::count());
+        $expectedRoleCount = count(RoleSeeder::roles());
+        $this->assertSame($expectedRoleCount, Role::count());
         $this->assertSame(103, Permission::count());
-        $this->assertSame(12, Role::query()->select(['name', 'guard_name'])->distinct()->count());
+        $this->assertSame($expectedRoleCount, Role::query()->select(['name', 'guard_name'])->distinct()->count());
         $this->assertSame(103, Permission::query()->select(['name', 'guard_name'])->distinct()->count());
     }
 
@@ -80,7 +82,8 @@ class RolePermissionSeederTest extends TestCase
         (new DatabaseSeeder)->run();
         (new DatabaseSeeder)->run();
 
-        $this->assertSame(12, Role::count());
+        $expectedRoleCount = count(RoleSeeder::roles());
+        $this->assertSame($expectedRoleCount, Role::count());
         $this->assertSame(103, Permission::count());
         $this->assertDatabaseCount('users', 0);
     }

@@ -24,8 +24,8 @@
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
         <h3 class="text-sm font-semibold text-slate-300 mb-4">Academic Details</h3>
         <div class="space-y-3">
-            <div class="flex justify-between"><span class="text-slate-400 text-sm">Grade</span><span class="text-slate-100 text-sm">{{ $student->grade ?? '—' }}</span></div>
-            <div class="flex justify-between"><span class="text-slate-400 text-sm">Class</span><span class="text-slate-100 text-sm">{{ $student->class_name ?? '—' }}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400 text-sm">Grade</span><span class="text-slate-100 text-sm">{{ $student->grade ?? $student->latestEnrollment?->grade ?? '—' }}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400 text-sm">Class</span><span class="text-slate-100 text-sm">{{ $student->class_name ?? $student->latestEnrollment?->class_name ?? '—' }}</span></div>
             <div class="flex justify-between"><span class="text-slate-400 text-sm">House</span>
                 @if($student->house)
                     <span class="text-sm" style="color: {{ $student->house->color }}">{{ $student->house->emoji }} {{ $student->house->name }}</span>

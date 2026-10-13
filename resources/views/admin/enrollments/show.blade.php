@@ -23,10 +23,10 @@
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">
             <h2 class="text-sm font-semibold text-slate-100 mb-3">Student</h2>
             <div class="text-xs text-slate-200 space-y-1">
-                <div><span class="text-slate-400">Name:</span> {{ $student?->first_name }} {{ $student?->last_name }}</div>
-                <div><span class="text-slate-400">Grade/Class:</span> {{ $student?->grade }} {{ $student?->class_name }}</div>
-                <div><span class="text-slate-400">Boarding:</span> {{ $student?->is_boarding ? 'Yes' : 'No' }}</div>
-                <div><span class="text-slate-400">Transport:</span> {{ $student?->has_transport ? 'Yes' : 'No' }}</div>
+                <div><span class="text-slate-400">Name:</span> <a href="{{ $student ? route('admin.students.show', $student) : '#' }}" class="text-indigo-400 hover:underline font-medium">{{ $student?->first_name }} {{ $student?->last_name }}</a></div>
+                <div><span class="text-slate-400">Grade/Class:</span> {{ $student?->grade ?? $enrollment->grade }} {{ $student?->class_name ?? $enrollment->class_name }}</div>
+                <div><span class="text-slate-400">Boarding:</span> {{ ($student?->is_boarding ?? $enrollment->is_boarding) ? 'Yes' : 'No' }}</div>
+                <div><span class="text-slate-400">Transport:</span> {{ ($student?->has_transport ?? $enrollment->has_transport) ? 'Yes' : 'No' }}</div>
             </div>
         </div>
 

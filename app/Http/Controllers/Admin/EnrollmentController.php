@@ -9,6 +9,7 @@ use App\Models\Guardian;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\LedgerEntry;
+use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Imports\EnrollmentsImport;
 use Illuminate\Http\Request;
@@ -93,7 +94,22 @@ class EnrollmentController extends Controller
             'status' => ['required', 'string', 'max:20'],
         ]);
 
+        $resolvedClass = null;
+        if (! empty($validated['class_name'])) {
+            $resolvedClass = SchoolClass::where('school_id', $school->id)
+                ->where('name', $validated['class_name'])
+                ->where(function ($q) use ($validated) {
+                    $q->where('grade', $validated['grade'])
+                      ->orWhere('grade', 'like', "%{$validated['grade']}%");
+                })
+                ->first()
+                ?? SchoolClass::where('school_id', $school->id)
+                ->where('name', $validated['class_name'])
+                ->first();
+        }
+
         $enrollment->update([
+            'class_id' => $resolvedClass?->id ?? $enrollment->class_id,
             'academic_year' => $validated['academic_year'],
             'term' => $validated['term'],
             'grade' => $validated['grade'],
@@ -241,9 +257,24 @@ class EnrollmentController extends Controller
                 ],
             ]);
 
+            $resolvedClass = null;
+            if (! empty($validated['class_name'])) {
+                $resolvedClass = SchoolClass::where('school_id', $school->id)
+                    ->where('name', $validated['class_name'])
+                    ->where(function ($q) use ($validated) {
+                        $q->where('grade', $validated['grade'])
+                          ->orWhere('grade', 'like', "%{$validated['grade']}%");
+                    })
+                    ->first()
+                    ?? SchoolClass::where('school_id', $school->id)
+                    ->where('name', $validated['class_name'])
+                    ->first();
+            }
+
             $enrollment = Enrollment::create([
                 'school_id' => $school->id,
                 'student_id' => $student->id,
+                'class_id' => $resolvedClass?->id,
                 'academic_year' => $validated['academic_year'],
                 'term' => $validated['term'],
                 'grade' => $validated['grade'],

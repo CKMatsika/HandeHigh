@@ -26,6 +26,45 @@ class EnrollmentsImport implements ToModel, WithHeadingRow, WithValidation
         $firstName = $name[0];
         $lastName = $name[1] ?? $name[0];
 
+        $rawClassName = trim($row['class_name'] ?? '');
+        $rawGrade = trim($row['grade'] ?? '');
+
+        // Resolve class with grade awareness
+        $class = null;
+        if ($rawGrade !== '') {
+            $class = SchoolClass::where('school_id', $this->schoolId)
+                ->where('name', $rawClassName)
+                ->where(function ($q) use ($rawGrade) {
+                    $q->where('grade', $rawGrade)
+                      ->orWhere('grade', 'like', "%{$rawGrade}%");
+                })
+                ->first();
+        }
+
+        if (! $class) {
+            $class = SchoolClass::where('school_id', $this->schoolId)
+                ->where('name', $rawClassName)
+                ->first();
+        }
+
+        if (! $class && $rawGrade !== '') {
+            $combinedNames = [
+                "Form {$rawGrade} {$rawClassName}",
+                "Form{$rawGrade} {$rawClassName}",
+                "{$rawGrade} {$rawClassName}",
+                "Form {$rawGrade}{$rawClassName}",
+            ];
+            $class = SchoolClass::where('school_id', $this->schoolId)
+                ->whereIn('name', $combinedNames)
+                ->first();
+        }
+
+        $effectiveGrade = ! empty($rawGrade) ? $rawGrade : ($class?->grade ?? 'Form 1');
+        $effectiveClassName = ! empty($rawClassName) ? $rawClassName : ($class?->name ?? 'General');
+        $isBoarding = strtolower($row['is_boarding'] ?? 'no') === 'yes';
+        $hasTransport = strtolower($row['has_transport'] ?? 'no') === 'yes';
+        $status = $row['status'] ?? 'active';
+
         // Match students by email within the authenticated school's tenant.
         $student = Student::firstOrCreate(
             [
@@ -40,29 +79,38 @@ class EnrollmentsImport implements ToModel, WithHeadingRow, WithValidation
                 'address' => $row['address'] ?? null,
                 'date_of_birth' => isset($row['date_of_birth']) ? Carbon::parse($row['date_of_birth']) : null,
                 'gender' => $row['gender'] ?? 'other',
+                'grade' => $effectiveGrade,
+                'class_name' => $effectiveClassName,
+                'is_boarding' => $isBoarding,
+                'has_transport' => $hasTransport,
+                'status' => $status,
                 'school_id' => $this->schoolId,
             ]
         );
 
-        // Find class
-        $class = SchoolClass::where('name', $row['class_name'])
-            ->where('school_id', $this->schoolId)
-            ->firstOrFail();
+        // Always update student academic details so they are synced even if student existed
+        $student->update([
+            'grade' => $effectiveGrade,
+            'class_name' => $effectiveClassName,
+            'is_boarding' => $isBoarding,
+            'has_transport' => $hasTransport,
+            'status' => $status,
+        ]);
 
         return new Enrollment([
             'school_id' => $this->schoolId,
             'student_id' => $student->id,
-            'class_id' => $class->id,
+            'class_id' => $class?->id,
             'academic_year' => $row['academic_year'],
             'term' => $row['term'],
-            'grade' => $row['grade'] ?? $row['class_name'],
-            'class_name' => $row['class_name'],
-            'is_boarding' => strtolower($row['is_boarding'] ?? 'no') === 'yes',
-            'has_transport' => strtolower($row['has_transport'] ?? 'no') === 'yes',
+            'grade' => $effectiveGrade,
+            'class_name' => $effectiveClassName,
+            'is_boarding' => $isBoarding,
+            'has_transport' => $hasTransport,
             'enrollment_date' => isset($row['enrollment_date']) 
                 ? Carbon::parse($row['enrollment_date']) 
                 : now(),
-            'status' => $row['status'] ?? 'active',
+            'status' => $status,
         ]);
     }
 
@@ -71,15 +119,10 @@ class EnrollmentsImport implements ToModel, WithHeadingRow, WithValidation
         return [
             'student_name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
-            'class_name' => [
-                'required',
-                'string',
-                Rule::exists('classes', 'name')->where(function ($query) {
-                    $query->where('school_id', $this->schoolId);
-                })
-            ],
+            'class_name' => ['required', 'string'],
+            'grade' => ['nullable', 'string'],
             'academic_year' => 'required|string',
-            'term' => 'required|string|in:First Term,Second Term,Third Term',
+            'term' => 'required|string|in:First Term,Second Term,Third Term,Term 1,Term 2,Term 3',
             'enrollment_date' => 'nullable|date',
             'status' => 'nullable|in:active,inactive,graduated,transferred',
             'is_boarding' => 'nullable|in:yes,no',

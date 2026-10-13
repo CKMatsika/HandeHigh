@@ -60,6 +60,33 @@ class Student extends Model
         return $this->hasMany(Enrollment::class);
     }
 
+
+    public function currentEnrollment()
+    {
+        return $this->hasOne(Enrollment::class)
+            ->where('status', 'active')
+            ->latestOfMany('id');
+    }
+
+    public function getGradeAttribute($value)
+    {
+        if (! empty($value)) {
+            return $value;
+        }
+
+        return $this->currentEnrollment?->grade ?? $this->latestEnrollment?->grade;
+    }
+
+    public function getClassNameAttribute($value)
+    {
+        if (! empty($value)) {
+            return $value;
+        }
+
+        $enrollment = $this->currentEnrollment ?? $this->latestEnrollment;
+        return $enrollment?->class?->name ?? $enrollment?->class_name;
+    }
+
     public function attendances()
     {
         return $this->morphMany(Attendance::class, 'attendable');
