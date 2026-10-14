@@ -109,32 +109,96 @@
                 </div>
             </div>
 
-            <!-- Invoice Items Section -->
+            <!-- Saved Fee Structures Picker (Manual Selection by Ticking) -->
             <div class="pt-4 border-t border-slate-800">
+                <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 mb-5 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-800/80">
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 font-semibold text-xs">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                </svg>
+                            </span>
+                            <div>
+                                <h3 class="text-xs font-semibold text-slate-100">Select Fee Structures to Invoice (Tick to Include)</h3>
+                                <p class="text-[11px] text-slate-400">Tick individual fee structures to include on this invoice. Items and totals update automatically.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="selectRecommendedFees()" class="px-2.5 py-1 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 text-[11px] font-medium rounded-lg transition">
+                                Select Recommended
+                            </button>
+                            <button type="button" onclick="clearAllFeeSelections()" class="px-2.5 py-1 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 text-[11px] font-medium rounded-lg transition">
+                                Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    @if($feeStructures->isNotEmpty())
+                        <div id="single-fee-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            @foreach($feeStructures as $fee)
+                                @php
+                                    $isBoarding = str_contains(strtolower($fee->category ?? ''), 'boarding') || $fee->service_type === 'boarding' || str_contains(strtolower($fee->label ?? ''), 'boarding');
+                                    $isTransport = str_contains(strtolower($fee->category ?? ''), 'transport') || $fee->service_type === 'transport';
+                                @endphp
+                                <label class="single-fee-card flex items-start gap-2.5 p-3 rounded-xl border border-slate-800 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-900/60 cursor-pointer transition select-none"
+                                       data-fee-id="{{ $fee->id }}"
+                                       data-label="{{ $fee->label }}"
+                                       data-category="{{ $fee->category ?? 'fees' }}"
+                                       data-amount="{{ (float) $fee->amount }}"
+                                       data-grade="{{ strtolower($fee->grade ?? '') }}"
+                                       data-is-boarding="{{ $isBoarding ? '1' : '0' }}"
+                                       data-is-transport="{{ $isTransport ? '1' : '0' }}">
+                                    <input type="checkbox"
+                                           class="single-fee-checkbox mt-0.5 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                                           value="{{ $fee->id }}"
+                                           onchange="onFeeCheckboxToggle(this)">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-1.5">
+                                            <span class="text-xs font-semibold text-slate-200 truncate">{{ $fee->label }}</span>
+                                            <span class="text-xs font-bold text-emerald-400 font-mono shrink-0">${{ number_format($fee->amount, 2) }}</span>
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                            @if($isBoarding)
+                                                <span class="rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-purple-300">Boarding</span>
+                                            @elseif($isTransport)
+                                                <span class="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">Transport</span>
+                                            @else
+                                                <span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">{{ ucfirst($fee->category ?? 'Fee') }}</span>
+                                            @endif
+
+                                            @if($fee->grade)
+                                                <span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">{{ $fee->grade }}</span>
+                                            @else
+                                                <span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">All Grades</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-xs text-slate-400 italic">No saved fee structures found for this school.</p>
+                    @endif
+                </div>
+
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-100">Invoice Items & Fee Types</h3>
-                        <p class="text-xs text-slate-400">Select pre-configured fee types or enter custom fees with saved values.</p>
+                        <h3 class="text-sm font-semibold text-slate-100">Invoice Items</h3>
+                        <p class="text-xs text-slate-400">Ticked fee items appear below. You can also adjust quantities or add custom items.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" onclick="autoFillApplicableFees()" id="btnAutoFill"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-xs font-medium rounded-lg transition shadow-sm">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            Auto-fill Student Fees
-                        </button>
                         <button type="button" onclick="addInvoiceItem()" 
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                             </svg>
-                            Add Item
+                            Add Custom Item
                         </button>
                     </div>
                 </div>
 
-                <!-- Notification status for auto-fill -->
+                <!-- Notification status -->
                 <div id="feeNotification" class="hidden mb-3 p-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 rounded-lg text-xs flex items-center justify-between">
                     <span id="feeNotificationText"></span>
                     <button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-blue-400 hover:text-white">&times;</button>
@@ -224,6 +288,9 @@ function addInvoiceItem(preset = null) {
     const row = document.createElement('div');
     row.className = 'invoice-item bg-slate-800/60 hover:bg-slate-800/90 rounded-xl p-3.5 border border-slate-700/60 transition space-y-3';
     row.id = `item-row-${index}`;
+    if (feeId) {
+        row.setAttribute('data-linked-fee-id', feeId);
+    }
     
     row.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
@@ -285,11 +352,37 @@ function addInvoiceItem(preset = null) {
     const priceInput = row.querySelector('.item-unit-amount');
 
     feeSelect.addEventListener('change', function() {
+        const prevFeeId = row.getAttribute('data-linked-fee-id');
+        if (prevFeeId) {
+            const prevCb = document.querySelector(`.single-fee-checkbox[value="${prevFeeId}"]`);
+            if (prevCb) {
+                prevCb.checked = false;
+                const prevCard = prevCb.closest('.single-fee-card');
+                if (prevCard) {
+                    prevCard.classList.remove('border-indigo-500/60', 'bg-indigo-500/10');
+                    prevCard.classList.add('border-slate-800', 'bg-slate-950/50');
+                }
+            }
+        }
+
         const selectedOpt = this.options[this.selectedIndex];
         if (this.value && selectedOpt) {
             descInput.value = selectedOpt.dataset.label || '';
             catInput.value = selectedOpt.dataset.category || 'fees';
             priceInput.value = selectedOpt.dataset.amount || '0.00';
+            row.setAttribute('data-linked-fee-id', this.value);
+
+            const newCb = document.querySelector(`.single-fee-checkbox[value="${this.value}"]`);
+            if (newCb) {
+                newCb.checked = true;
+                const newCard = newCb.closest('.single-fee-card');
+                if (newCard) {
+                    newCard.classList.add('border-indigo-500/60', 'bg-indigo-500/10');
+                    newCard.classList.remove('border-slate-800', 'bg-slate-950/50');
+                }
+            }
+        } else {
+            row.removeAttribute('data-linked-fee-id');
         }
         calculateTotal();
     });
@@ -303,9 +396,126 @@ function addInvoiceItem(preset = null) {
 function removeInvoiceItem(index) {
     const row = document.getElementById(`item-row-${index}`);
     if (row) {
+        const linkedFeeId = row.getAttribute('data-linked-fee-id');
+        if (linkedFeeId) {
+            const cb = document.querySelector(`.single-fee-checkbox[value="${linkedFeeId}"]`);
+            if (cb) {
+                cb.checked = false;
+                const card = cb.closest('.single-fee-card');
+                if (card) {
+                    card.classList.remove('border-indigo-500/60', 'bg-indigo-500/10');
+                    card.classList.add('border-slate-800', 'bg-slate-950/50');
+                }
+            }
+        }
         row.remove();
         calculateTotal();
     }
+}
+
+function onFeeCheckboxToggle(checkbox) {
+    const feeId = checkbox.value;
+    const card = checkbox.closest('.single-fee-card');
+
+    if (checkbox.checked) {
+        if (card) {
+            card.classList.add('border-indigo-500/60', 'bg-indigo-500/10');
+            card.classList.remove('border-slate-800', 'bg-slate-950/50');
+        }
+
+        // Add item row if not already in list
+        const existingRow = document.querySelector(`.invoice-item[data-linked-fee-id="${feeId}"]`);
+        if (!existingRow) {
+            addInvoiceItem({
+                fee_structure_id: feeId,
+                label: card.dataset.label,
+                category: card.dataset.category,
+                amount: card.dataset.amount,
+                quantity: 1,
+            });
+        }
+    } else {
+        if (card) {
+            card.classList.remove('border-indigo-500/60', 'bg-indigo-500/10');
+            card.classList.add('border-slate-800', 'bg-slate-950/50');
+        }
+
+        // Remove row linked to this fee
+        const linkedRow = document.querySelector(`.invoice-item[data-linked-fee-id="${feeId}"]`);
+        if (linkedRow) {
+            linkedRow.remove();
+            calculateTotal();
+        }
+    }
+}
+
+function selectRecommendedFees() {
+    const studentSelect = document.getElementById('studentSelect');
+    const opt = studentSelect ? studentSelect.options[studentSelect.selectedIndex] : null;
+
+    if (!studentSelect?.value || !opt) {
+        showNotification('Please select a student first.', 'warning');
+        return;
+    }
+
+    const studentGrade = (opt.dataset.grade || '').trim().toLowerCase();
+    const isBoarding = opt.dataset.boarding === '1';
+    const hasTransport = opt.dataset.transport === '1';
+
+    let count = 0;
+    document.querySelectorAll('.single-fee-checkbox').forEach(cb => {
+        const card = cb.closest('.single-fee-card');
+        const feeGrade = (card.dataset.grade || '').trim().toLowerCase();
+        const feeIsBoarding = card.dataset.isBoarding === '1';
+        const feeIsTransport = card.dataset.isTransport === '1';
+        const feeIsOptional = card.dataset.isOptional === '1';
+
+        // Check if grade matches
+        if (feeGrade && studentGrade && feeGrade !== studentGrade) {
+            if (cb.checked) {
+                cb.checked = false;
+                onFeeCheckboxToggle(cb);
+            }
+            return;
+        }
+
+        // Don't select boarding fee for day scholars
+        if (feeIsBoarding && !isBoarding) {
+            if (cb.checked) {
+                cb.checked = false;
+                onFeeCheckboxToggle(cb);
+            }
+            return;
+        }
+
+        // Don't select transport fee for students without transport
+        if (feeIsTransport && !hasTransport) {
+            if (cb.checked) {
+                cb.checked = false;
+                onFeeCheckboxToggle(cb);
+            }
+            return;
+        }
+
+        if (feeIsOptional) {
+            return; // skip optional
+        }
+
+        cb.checked = true;
+        onFeeCheckboxToggle(cb);
+        count++;
+    });
+
+    showNotification(`Selected ${count} recommended fee structure(s) for ${opt.dataset.grade || 'student'} (${isBoarding ? 'Boarder' : 'Day Scholar'}).`, 'success');
+}
+
+function clearAllFeeSelections() {
+    document.querySelectorAll('.single-fee-checkbox').forEach(cb => {
+        if (cb.checked) {
+            cb.checked = false;
+            onFeeCheckboxToggle(cb);
+        }
+    });
 }
 
 function calculateTotal() {
@@ -322,76 +532,6 @@ function calculateTotal() {
     document.getElementById('items-count').textContent = items.length;
 }
 
-function autoFillApplicableFees() {
-    const studentSelect = document.getElementById('studentSelect');
-    const selectedOpt = studentSelect.options[studentSelect.selectedIndex];
-    
-    if (!studentSelect.value || !selectedOpt) {
-        showNotification('Please select a student first.', 'warning');
-        return;
-    }
-
-    const studentGrade = (selectedOpt.dataset.grade || '').trim().toLowerCase();
-    const isBoarding = selectedOpt.dataset.boarding === '1';
-    const hasTransport = selectedOpt.dataset.transport === '1';
-
-    // Filter fees
-    const matchingFees = feeStructures.filter(fee => {
-        const feeGrade = (fee.grade || '').trim().toLowerCase();
-        const feeCat = (fee.category || '').trim().toLowerCase();
-        const feeService = (fee.service_type || '').trim().toLowerCase();
-
-        // 1. Grade check: matches student grade OR is global (no grade specified)
-        if (feeGrade && studentGrade && feeGrade !== studentGrade) {
-            return false;
-        }
-
-        // 2. Boarding check: If fee is boarding and student is not boarding, exclude
-        const isBoardingFee = feeCat.includes('boarding') || feeService === 'boarding';
-        if (isBoardingFee && !isBoarding) {
-            return false;
-        }
-
-        // 3. Transport check: If fee is transport and student has no transport, exclude
-        const isTransportFee = feeCat.includes('transport') || feeService === 'transport';
-        if (isTransportFee && !hasTransport) {
-            return false;
-        }
-
-        // 4. Optional check: Skip optional subject fees by default in auto-fill
-        if (fee.is_optional && (feeCat === 'subject' || fee.subject_name)) {
-            return false;
-        }
-
-        return true;
-    });
-
-    if (matchingFees.length === 0) {
-        showNotification(`No specific preset fees found for ${selectedOpt.dataset.grade || 'this grade'}. You can choose preset fee types or add items manually.`, 'warning');
-        if (document.querySelectorAll('.invoice-item').length === 0) {
-            addInvoiceItem();
-        }
-        return;
-    }
-
-    // Clear existing items and populate matching fees
-    const container = document.getElementById('invoice-items');
-    container.innerHTML = '';
-    itemCount = 0;
-
-    matchingFees.forEach(fee => {
-        addInvoiceItem({
-            fee_structure_id: fee.id,
-            label: fee.label,
-            category: fee.category,
-            amount: fee.amount,
-            quantity: 1,
-        });
-    });
-
-    showNotification(`Successfully loaded ${matchingFees.length} applicable fee item(s) for ${selectedOpt.dataset.grade || 'Student'} (${isBoarding ? 'Boarder' : 'Day Scholar'}).`, 'success');
-}
-
 function showNotification(text, type = 'info') {
     const box = document.getElementById('feeNotification');
     const span = document.getElementById('feeNotificationText');
@@ -406,7 +546,7 @@ function showNotification(text, type = 'info') {
     box.classList.remove('hidden');
 }
 
-// When student changes, update badge and auto-fill fees
+// When student changes, update badge (without auto-forcing fee items)
 document.getElementById('studentSelect')?.addEventListener('change', function() {
     const opt = this.options[this.selectedIndex];
     const badgeContainer = document.getElementById('studentInfoBadge');
@@ -425,20 +565,27 @@ document.getElementById('studentSelect')?.addEventListener('change', function() 
             transportBadge.classList.add('hidden');
         }
 
-        // Auto-fill fees automatically for ease of use
-        autoFillApplicableFees();
+        // Highlight matching fees for user's convenience
+        const studentGrade = (opt.dataset.grade || '').trim().toLowerCase();
+        document.querySelectorAll('.single-fee-card').forEach(card => {
+            const feeGrade = (card.dataset.grade || '').trim().toLowerCase();
+            if (!feeGrade || !studentGrade || feeGrade === studentGrade) {
+                card.style.opacity = '1';
+            } else {
+                card.style.opacity = '0.55';
+            }
+        });
     } else {
         badgeContainer.classList.add('hidden');
+        document.querySelectorAll('.single-fee-card').forEach(card => { card.style.opacity = '1'; });
     }
 });
 
-// Initialize with 1 empty item if none present
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     const studentSelect = document.getElementById('studentSelect');
     if (studentSelect && studentSelect.value) {
         studentSelect.dispatchEvent(new Event('change'));
-    } else if (document.querySelectorAll('.invoice-item').length === 0) {
-        addInvoiceItem();
     }
 });
 </script>

@@ -390,6 +390,14 @@ class InvoiceController extends Controller
 
         $feeStructures = $feeStructureQuery->orderBy('category')->orderBy('code')->get();
 
+        // Selected fee structures (manual selection by ticking)
+        if ($request->has('fee_structure_ids')) {
+            $selectedFeeStructureIds = array_map('intval', (array) $request->input('fee_structure_ids', []));
+        } else {
+            // Default to all matching fees on first visit/filter
+            $selectedFeeStructureIds = $feeStructures->pluck('id')->toArray();
+        }
+
         // 3. Query matching active enrollments & students
         $enrollmentQuery = Enrollment::with([
             'student.guardians',
@@ -583,6 +591,11 @@ class InvoiceController extends Controller
             $studentTotal = 0.0;
 
             foreach ($feeStructures as $fee) {
+                // Only apply fee structures that are selected/ticked
+                if (! in_array($fee->id, $selectedFeeStructureIds)) {
+                    continue;
+                }
+
                 $isBoardingFee = str_contains(strtolower($fee->category ?? ''), 'boarding') 
                     || $fee->service_type === 'boarding' 
                     || str_contains(strtolower($fee->label ?? ''), 'boarding');
@@ -640,6 +653,7 @@ class InvoiceController extends Controller
             'grades' => $grades,
             'classes' => $classes,
             'feeStructures' => $feeStructures,
+            'selectedFeeStructureIds' => $selectedFeeStructureIds,
             'selectedYear' => $academicYear,
             'selectedTerm' => $term,
             'selectedGrade' => $grade,
@@ -674,6 +688,8 @@ class InvoiceController extends Controller
             'term' => ['required', 'string'],
             'enrollment_ids' => ['required', 'array', 'min:1'],
             'enrollment_ids.*' => ['integer', TenantExists::make('enrollments')],
+            'fee_structure_ids' => ['nullable', 'array'],
+            'fee_structure_ids.*' => ['integer', TenantExists::make('fee_structures')],
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
             'grade' => ['nullable', 'string'],
@@ -717,7 +733,26 @@ class InvoiceController extends Controller
         }
         $feeStructures = $feeStructureQuery->get();
 
+        // If specific fee structures were chosen manually via checkboxes, filter strictly to them
+        if ($request->has('fee_structure_ids')) {
+            $selectedFeeIds = array_map('intval', (array) $request->input('fee_structure_ids', []));
+            if (!empty($selectedFeeIds)) {
+                $directFees = FeeStructure::where('school_id', $school->id)
+                    ->whereIn('id', $selectedFeeIds)
+                    ->get();
+                $feeStructures = $feeStructures->whereIn('id', $selectedFeeIds)->merge($directFees)->unique('id');
+            } else {
+                $feeStructures = collect();
+            }
+        }
+
         $customItems = $validated['custom_fee_items'] ?? $validated['fee_items'] ?? [];
+
+        if ($feeStructures->isEmpty() && empty($customItems)) {
+            return back()
+                ->withErrors(['fee_structure_ids' => 'Please select at least one fee structure or enter custom fee items to generate invoices.'])
+                ->withInput();
+        }
 
         $createdInvoices = [];
         $skippedCount = 0;

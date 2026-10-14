@@ -623,4 +623,168 @@ class BulkInvoicingPreviewTest extends TestCase
         $this->assertEquals(2, $response->viewData('cohortBoarderCount'));
         $this->assertEquals(3, $response->viewData('cohortDayCount'));
     }
+
+    public function test_bulk_invoicing_preview_with_manual_fee_selection_only_applies_ticked_fees(): void
+    {
+        $tuition = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'category' => 'tuition',
+            'code' => 'F1-TUI',
+            'label' => 'Tuition - Day',
+            'amount' => 155.00,
+            'revenue_account_id' => $this->tuitionRevenueAccount->id,
+        ]);
+
+        $boarding = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'category' => 'boarding',
+            'code' => 'F1-BRD',
+            'label' => 'Boarding Fee',
+            'amount' => 490.00,
+            'revenue_account_id' => $this->boardingRevenueAccount->id,
+        ]);
+
+        $student = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Wendy',
+            'last_name' => 'Zekiya',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'status' => 'active',
+        ]);
+
+        Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'student_type' => 'boarding',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // When ONLY Boarding Fee is selected (ticked):
+        $response = $this->actingAs($this->adminUser)->get(route('admin.invoices.bulk.create', [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'residency' => 'boarding',
+            'fee_structure_ids' => [$boarding->id],
+        ]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Wendy Zekiya');
+        $response->assertSee('Boarding Fee');
+        // Total preview for student must be $490.00, NOT $645.00 ($490 + $155)
+        $response->assertSee('490.00');
+        $previews = $response->viewData('studentPreviews');
+        $this->assertCount(1, $previews);
+        $this->assertEquals(490.00, $previews[0]['total_amount']);
+        $this->assertCount(1, $previews[0]['applied_items']);
+        $this->assertEquals('Boarding Fee', $previews[0]['applied_items'][0]['label']);
+    }
+
+    public function test_bulk_invoicing_store_with_manual_fee_selection_creates_invoices_with_only_selected_fees(): void
+    {
+        $tuition = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'category' => 'tuition',
+            'code' => 'F1-TUI',
+            'label' => 'Tuition - Day',
+            'amount' => 155.00,
+            'revenue_account_id' => $this->tuitionRevenueAccount->id,
+        ]);
+
+        $boarding = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'category' => 'boarding',
+            'code' => 'F1-BRD',
+            'label' => 'Boarding Fee',
+            'amount' => 490.00,
+            'revenue_account_id' => $this->boardingRevenueAccount->id,
+        ]);
+
+        $student = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Wendy',
+            'last_name' => 'Zekiya',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'status' => 'active',
+        ]);
+
+        $enr = Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'class_name' => 'South',
+            'is_boarding' => true,
+            'student_type' => 'boarding',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        // Post with ONLY boarding fee selected:
+        $response = $this->actingAs($this->adminUser)->post(route('admin.invoices.bulk.store'), [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'enrollment_ids' => [$enr->id],
+            'fee_structure_ids' => [$boarding->id],
+            'issued_at' => now()->toDateString(),
+            'due_date' => now()->addDays(30)->toDateString(),
+        ]);
+
+        $response->assertRedirect(route('admin.invoices.index'));
+
+        $invoice = Invoice::where('student_id', $student->id)->first();
+        $this->assertNotNull($invoice);
+        // Only Boarding Fee ($490.00), Tuition ($155.00) must NOT be included!
+        $this->assertEquals(490.00, (float) $invoice->total_amount);
+        $this->assertEquals(490.00, (float) $invoice->balance);
+        $this->assertCount(1, $invoice->items);
+        $this->assertEquals('Boarding Fee', $invoice->items->first()->description);
+    }
+
+    public function test_single_invoicing_create_view_renders_manual_fee_checkboxes(): void
+    {
+        FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 1',
+            'category' => 'boarding',
+            'code' => 'F1-BRD',
+            'label' => 'Boarding Fee',
+            'amount' => 490.00,
+            'revenue_account_id' => $this->boardingRevenueAccount->id,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)->get(route('admin.invoices.create'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Select Fee Structures to Invoice (Tick to Include)');
+        $response->assertSee('Boarding Fee');
+        $response->assertSee('single-fee-checkbox');
+    }
 }

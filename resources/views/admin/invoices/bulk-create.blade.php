@@ -123,79 +123,117 @@
         </div>
     </form>
 
-    {{-- 2. Fee Structure Synchronization Details Card --}}
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 mb-6 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800/80">
-            <div class="flex items-center gap-2">
-                <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 font-semibold text-xs">2</span>
-                <h2 class="text-sm font-semibold text-slate-100">Fee Structure Synchronization</h2>
-            </div>
-            <div class="text-[11px] text-slate-400">
-                Active for: <strong class="text-slate-200">{{ $selectedYear }} {{ $selectedTerm }}</strong>
-                @if($selectedGrade)
-                    • Grade: <strong class="text-slate-200">{{ $selectedGrade }}</strong>
-                @endif
-            </div>
-        </div>
-
-        @if($feeStructures->isNotEmpty())
-            <div class="space-y-3">
-                <p class="text-xs text-slate-300">
-                    The following fee items were detected in your configured Fee Structure and will be automatically applied to the selected students:
-                </p>
-                <div class="flex flex-wrap gap-2.5">
-                    @foreach($feeStructures as $fee)
-                        @php
-                            $isBoarding = str_contains(strtolower($fee->category ?? ''), 'boarding') || $fee->service_type === 'boarding' || str_contains(strtolower($fee->label ?? ''), 'boarding');
-                            $isTransport = str_contains(strtolower($fee->category ?? ''), 'transport') || $fee->service_type === 'transport';
-                        @endphp
-                        <div class="rounded-xl border border-slate-700/80 bg-slate-950/60 px-3.5 py-2 text-xs flex items-center gap-2">
-                            <span class="font-medium text-slate-200">{{ $fee->label }}</span>
-                            <span class="text-emerald-400 font-semibold">${{ number_format($fee->amount, 2) }}</span>
-                            @if($isBoarding)
-                                <span class="rounded-md bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-purple-300">Boarders Only</span>
-                            @elseif($isTransport)
-                                <span class="rounded-md bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">Transport Only</span>
-                            @else
-                                <span class="rounded-md bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">All Students</span>
-                            @endif
-                            @if($fee->is_optional)
-                                <span class="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">Optional</span>
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
-                <div class="rounded-xl bg-slate-950/40 border border-slate-800/60 p-3 text-[11px] text-slate-400 flex items-start gap-2">
-                    <svg class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span>
-                        <strong>Intelligent Fee Rule:</strong> Boarding fees are strictly bound to students marked as boarders. If you choose <em>"Boarders Only"</em>, every selected student will receive the complete boarding fee package. If you choose <em>"Day Scholars Only"</em>, boarding fees are automatically omitted.
-                    </span>
-                </div>
-            </div>
-        @else
-            <div class="rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-xs text-amber-300 space-y-2">
-                <div class="font-semibold flex items-center gap-2">
-                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    No Fee Structure Configured for {{ $selectedYear }} {{ $selectedTerm }} {{ $selectedGrade ? "({$selectedGrade})" : "" }}
-                </div>
-                <p>
-                    We could not find active fee structure entries for this selection. You can either <a href="{{ route('admin.fees.index') }}" class="underline font-semibold text-amber-200 hover:text-white">configure fee structures under Finance &gt; Fees</a>, or manually define custom fee items below for this batch.
-                </p>
-            </div>
-        @endif
-    </div>
-
-    {{-- 3. Batch Invoicing POST Form with Live Student Preview Table --}}
+    {{-- 2. Batch Invoicing POST Form --}}
     <form id="bulk-invoice-form" method="POST" action="{{ route('admin.invoices.bulk.store') }}" class="space-y-6">
         @csrf
         <input type="hidden" name="academic_year" value="{{ $selectedYear }}">
         <input type="hidden" name="term" value="{{ $selectedTerm }}">
         <input type="hidden" name="grade" value="{{ $selectedGrade }}">
         <input type="hidden" name="include_optional" value="{{ $includeOptional ? '1' : '0' }}">
+
+        {{-- 2. Fee Structure Selection (Manual Ticking) Card --}}
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
+                <div class="flex items-center gap-2">
+                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 font-semibold text-xs">2</span>
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-100">Select Fee Structures to Invoice (Tick to Include)</h2>
+                        <p class="text-[11px] text-slate-400">Manually select which saved fee structures to bill. The student preview below recalculates immediately.</p>
+                    </div>
+                </div>
+                
+                @if($feeStructures->isNotEmpty())
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="btn-fee-select-all" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[11px] font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition">
+                            Select All
+                        </button>
+                        <button type="button" id="btn-fee-clear-all" class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[11px] font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition">
+                            Clear All
+                        </button>
+                        <button type="button" id="btn-fee-boarding-only" class="px-2.5 py-1 rounded-lg border border-purple-800/80 bg-purple-950/40 text-[11px] font-medium text-purple-300 hover:bg-purple-900/60 transition">
+                            Boarding Only
+                        </button>
+                        <button type="button" id="btn-fee-tuition-only" class="px-2.5 py-1 rounded-lg border border-indigo-800/80 bg-indigo-950/40 text-[11px] font-medium text-indigo-300 hover:bg-indigo-900/60 transition">
+                            Tuition Only
+                        </button>
+                    </div>
+                @endif
+            </div>
+
+            @if($feeStructures->isNotEmpty())
+                <div class="space-y-3">
+                    <p class="text-xs text-slate-300">
+                        Tick the fee structures you want to include on this invoice run. Unchecked items will be completely omitted:
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach($feeStructures as $fee)
+                            @php
+                                $isBoarding = str_contains(strtolower($fee->category ?? ''), 'boarding') || $fee->service_type === 'boarding' || str_contains(strtolower($fee->label ?? ''), 'boarding');
+                                $isTransport = str_contains(strtolower($fee->category ?? ''), 'transport') || $fee->service_type === 'transport';
+                                $isChecked = in_array($fee->id, $selectedFeeStructureIds);
+                            @endphp
+                            <label class="fee-card flex items-start gap-3 p-3.5 rounded-xl border {{ $isChecked ? 'border-indigo-500/60 bg-indigo-500/10' : 'border-slate-800 bg-slate-950/50' }} hover:border-slate-700 hover:bg-slate-900/60 transition cursor-pointer select-none">
+                                <input type="checkbox" name="fee_structure_ids[]" value="{{ $fee->id }}"
+                                       class="fee-structure-checkbox mt-0.5 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                                       data-id="{{ $fee->id }}"
+                                       data-amount="{{ (float) $fee->amount }}"
+                                       data-label="{{ $fee->label }}"
+                                       data-category="{{ strtolower($fee->category ?? 'fees') }}"
+                                       data-service="{{ strtolower($fee->service_type ?? '') }}"
+                                       data-grade="{{ strtolower($fee->grade ?? '') }}"
+                                       data-is-boarding="{{ $isBoarding ? '1' : '0' }}"
+                                       data-is-transport="{{ $isTransport ? '1' : '0' }}"
+                                       data-is-optional="{{ $fee->is_optional ? '1' : '0' }}"
+                                       {{ $isChecked ? 'checked' : '' }}>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-semibold text-slate-100 text-xs truncate">{{ $fee->label }}</span>
+                                        <span class="text-emerald-400 font-bold font-mono text-xs shrink-0">${{ number_format($fee->amount, 2) }}</span>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                        @if($isBoarding)
+                                            <span class="rounded bg-purple-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-purple-300">Boarders Only</span>
+                                        @elseif($isTransport)
+                                            <span class="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">Transport Only</span>
+                                        @else
+                                            <span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">All Students</span>
+                                        @endif
+
+                                        @if($fee->grade)
+                                            <span class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">{{ $fee->grade }}</span>
+                                        @endif
+
+                                        @if($fee->is_optional)
+                                            <span class="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">Optional</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="rounded-xl bg-slate-950/40 border border-slate-800/60 p-3 text-[11px] text-slate-400 flex items-start gap-2">
+                        <svg class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>
+                            <strong>Manual Selection Active:</strong> Only fee structures ticked above will be billed. Boarding fees still strictly apply only to boarders. Ticking/unticking recalculates student totals in the preview table below in real time.
+                        </span>
+                    </div>
+                </div>
+            @else
+                <div class="rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-xs text-amber-300 space-y-2">
+                    <div class="font-semibold flex items-center gap-2">
+                        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        No Fee Structure Configured for {{ $selectedYear }} {{ $selectedTerm }} {{ $selectedGrade ? "({$selectedGrade})" : "" }}
+                    </div>
+                    <p>
+                        We could not find active fee structure entries for this selection. You can either <a href="{{ route('admin.fees.index') }}" class="underline font-semibold text-amber-200 hover:text-white">configure fee structures under Finance &gt; Fees</a>, or manually define custom fee items below for this batch.
+                    </p>
+                </div>
+            @endif
+        </div>
 
         {{-- Invoice Dates Card --}}
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
@@ -314,7 +352,11 @@
                                     $enr = $preview['enrollment'];
                                     $isAlreadyInvoiced = (bool) $preview['existing_invoice'];
                                 @endphp
-                                <tr class="hover:bg-slate-800/30 transition {{ $isAlreadyInvoiced ? 'opacity-60 bg-slate-950/20' : '' }}">
+                                <tr class="hover:bg-slate-800/30 transition {{ $isAlreadyInvoiced ? 'opacity-60 bg-slate-950/20' : '' }}"
+                                    data-student-row
+                                    data-is-boarder="{{ $preview['is_boarder'] ? '1' : '0' }}"
+                                    data-has-transport="{{ $preview['has_transport'] ? '1' : '0' }}"
+                                    data-already="{{ $isAlreadyInvoiced ? '1' : '0' }}">
                                     <td class="py-3 px-4">
                                         <input type="checkbox" name="enrollment_ids[]" value="{{ $enr->id }}"
                                                data-amount="{{ $preview['total_amount'] }}"
@@ -355,7 +397,7 @@
                                         @endif
                                     </td>
                                     <td class="py-3 px-4">
-                                        <div class="flex flex-wrap gap-1 max-w-md">
+                                        <div class="student-applied-items flex flex-wrap gap-1 max-w-md">
                                             @forelse($preview['applied_items'] as $item)
                                                 @php
                                                     $isBoardingLine = str_contains(strtolower($item['category'] ?? ''), 'boarding') || str_contains(strtolower($item['label'] ?? ''), 'boarding');
@@ -370,10 +412,10 @@
                                         </div>
                                     </td>
                                     <td class="py-3 px-4 text-right whitespace-nowrap">
-                                        <div class="text-sm font-bold font-mono text-emerald-400">
+                                        <div class="student-total-amount text-sm font-bold font-mono text-emerald-400">
                                             ${{ number_format($preview['total_amount'], 2) }}
                                         </div>
-                                        <div class="text-[10px] text-slate-400">
+                                        <div class="student-items-count text-[10px] text-slate-400">
                                             {{ count($preview['applied_items']) }} item(s)
                                         </div>
                                     </td>
@@ -469,7 +511,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const masterCheckbox = document.getElementById('master-select-checkbox');
-            const checkboxes = document.querySelectorAll('.student-checkbox');
+            const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+            const feeCheckboxes = document.querySelectorAll('.fee-structure-checkbox');
             const countLabel = document.getElementById('selected-students-count');
             const footerCount = document.getElementById('footer-count');
             const footerTotal = document.getElementById('footer-total');
@@ -477,11 +520,17 @@
             const kpiReady = document.getElementById('kpi-ready-count');
             const submitBtn = document.getElementById('submit-btn');
 
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
             function updateMetrics() {
                 let selectedCount = 0;
                 let selectedTotal = 0.0;
+                const anyFeeChecked = document.querySelectorAll('.fee-structure-checkbox:checked').length > 0;
 
-                checkboxes.forEach(cb => {
+                studentCheckboxes.forEach(cb => {
                     if (cb.checked) {
                         selectedCount++;
                         selectedTotal += parseFloat(cb.getAttribute('data-amount') || 0);
@@ -497,14 +546,122 @@
                 if (kpiReady) kpiReady.textContent = selectedCount;
 
                 if (submitBtn) {
-                    submitBtn.disabled = selectedCount === 0;
+                    submitBtn.disabled = selectedCount === 0 || !anyFeeChecked;
                 }
             }
 
+            function recalculateFeePreviews() {
+                const checkedFees = [];
+
+                feeCheckboxes.forEach(cb => {
+                    const card = cb.closest('.fee-card');
+                    if (cb.checked) {
+                        checkedFees.push({
+                            id: cb.dataset.id,
+                            label: cb.dataset.label,
+                            amount: parseFloat(cb.dataset.amount) || 0,
+                            category: cb.dataset.category || 'fees',
+                            isBoarding: cb.dataset.isBoarding === '1',
+                            isTransport: cb.dataset.isTransport === '1',
+                            isOptional: cb.dataset.isOptional === '1',
+                        });
+                        if (card) {
+                            card.classList.add('border-indigo-500/60', 'bg-indigo-500/10');
+                            card.classList.remove('border-slate-800', 'bg-slate-950/50');
+                        }
+                    } else {
+                        if (card) {
+                            card.classList.remove('border-indigo-500/60', 'bg-indigo-500/10');
+                            card.classList.add('border-slate-800', 'bg-slate-950/50');
+                        }
+                    }
+                });
+
+                const studentRows = document.querySelectorAll('tr[data-student-row]');
+                studentRows.forEach(row => {
+                    const isBoarder = row.dataset.isBoarder === '1';
+                    const hasTransport = row.dataset.hasTransport === '1';
+                    const studentCheckbox = row.querySelector('.student-checkbox');
+                    const appliedItemsDiv = row.querySelector('.student-applied-items');
+                    const totalAmountDiv = row.querySelector('.student-total-amount');
+                    const itemsCountDiv = row.querySelector('.student-items-count');
+
+                    let studentTotal = 0;
+                    let appliedItemsHtml = '';
+                    let appliedCount = 0;
+
+                    checkedFees.forEach(fee => {
+                        // Boarding fee applies only to boarders
+                        if (fee.isBoarding && !isBoarder) {
+                            return;
+                        }
+                        // Transport fee applies only to students with transport
+                        if (fee.isTransport && !hasTransport) {
+                            return;
+                        }
+
+                        studentTotal += fee.amount;
+                        appliedCount++;
+
+                        const badgeClass = fee.isBoarding
+                            ? 'bg-purple-950/70 border border-purple-800/80 text-purple-200 font-medium'
+                            : 'bg-slate-800 text-slate-300';
+
+                        appliedItemsHtml += `<span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] ${badgeClass}">
+                            <span>${escapeHtml(fee.label)}</span>
+                            <span class="text-slate-400 font-mono">$${fee.amount.toFixed(2)}</span>
+                        </span> `;
+                    });
+
+                    if (appliedCount === 0) {
+                        appliedItemsHtml = '<span class="text-xs text-amber-400 italic">No fee structure items</span>';
+                    }
+
+                    if (appliedItemsDiv) appliedItemsDiv.innerHTML = appliedItemsHtml;
+                    if (totalAmountDiv) totalAmountDiv.textContent = '$' + studentTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    if (itemsCountDiv) itemsCountDiv.textContent = `${appliedCount} item(s)`;
+                    if (studentCheckbox) {
+                        studentCheckbox.setAttribute('data-amount', studentTotal);
+                    }
+                });
+
+                updateMetrics();
+            }
+
+            // Quick button listeners
+            document.getElementById('btn-fee-select-all')?.addEventListener('click', function() {
+                feeCheckboxes.forEach(cb => { cb.checked = true; });
+                recalculateFeePreviews();
+            });
+
+            document.getElementById('btn-fee-clear-all')?.addEventListener('click', function() {
+                feeCheckboxes.forEach(cb => { cb.checked = false; });
+                recalculateFeePreviews();
+            });
+
+            document.getElementById('btn-fee-boarding-only')?.addEventListener('click', function() {
+                feeCheckboxes.forEach(cb => {
+                    cb.checked = (cb.dataset.isBoarding === '1');
+                });
+                recalculateFeePreviews();
+            });
+
+            document.getElementById('btn-fee-tuition-only')?.addEventListener('click', function() {
+                feeCheckboxes.forEach(cb => {
+                    cb.checked = (cb.dataset.isBoarding !== '1');
+                });
+                recalculateFeePreviews();
+            });
+
+            // Fee structure checkboxes change
+            feeCheckboxes.forEach(cb => {
+                cb.addEventListener('change', recalculateFeePreviews);
+            });
+
+            // Master select checkbox
             if (masterCheckbox) {
                 masterCheckbox.addEventListener('change', function () {
-                    checkboxes.forEach(cb => {
-                        // Do not select already invoiced rows unless user explicitly ticks them
+                    studentCheckboxes.forEach(cb => {
                         if (cb.getAttribute('data-already') === '1' && masterCheckbox.checked) {
                             cb.checked = false;
                         } else {
@@ -515,12 +672,13 @@
                 });
             }
 
-            checkboxes.forEach(cb => {
+            // Student checkboxes change
+            studentCheckboxes.forEach(cb => {
                 cb.addEventListener('change', updateMetrics);
             });
 
             // Initial calculation
-            updateMetrics();
+            recalculateFeePreviews();
         });
     </script>
 @endsection
