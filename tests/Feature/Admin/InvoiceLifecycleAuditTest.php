@@ -279,4 +279,54 @@ class InvoiceLifecycleAuditTest extends TestCase
         $response->assertSee('Wrong fee structures applied in bulk.');
         $response->assertSee('View deleted snapshot');
     }
+
+    public function test_invoice_print_view_renders_clean_portrait_layout_matching_specification(): void
+    {
+        $invoice = Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'enrollment_id' => $this->enrollment->id,
+            'number' => 'INV-2026-000027',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'total_amount' => 490.00,
+            'balance' => 490.00,
+            'status' => 'unpaid',
+            'issued_at' => '2026-01-01',
+            'due_date' => '2026-01-31',
+        ]);
+
+        $invoice->items()->create([
+            'description' => 'Boarding Fee',
+            'quantity' => 1,
+            'unit_amount' => 490.00,
+            'line_total' => 490.00,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.print', $invoice));
+
+        $response->assertOk();
+        $response->assertSee('STUDENT INVOICE', false);
+        $response->assertSee('INV-2026-000027');
+        $response->assertSee('2026 &nbsp;/&nbsp; TERM 1', false);
+        $response->assertSee('ISSUED ON');
+        $response->assertSee('DUE DATE');
+        $response->assertSee('UNPAID');
+        $response->assertSee('BILL TO / STUDENT');
+        $response->assertSee('Wendy Zekiya');
+        $response->assertSee('INVOICE TOTAL');
+        $response->assertSee('AMOUNT PAID');
+        $response->assertSee('BALANCE DUE');
+        $response->assertSee('ITEMISED FEE CHARGES');
+        $response->assertSee('Boarding Fee');
+        $response->assertSee('TOTAL INVOICE');
+        $response->assertSee('LESS PAYMENTS');
+        $response->assertSee('BANKING & PAYMENT DETAILS', false);
+        $response->assertSee('Please use the invoice reference when making payment.');
+        $response->assertSee('PAYMENT NOTE');
+        $response->assertSee('Page 1 of 1');
+        // Ensure layouts.app sidebar and global app footer are NOT present
+        $response->assertDontSee('Betterlink Systems');
+    }
 }
