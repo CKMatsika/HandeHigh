@@ -23,6 +23,7 @@ use App\Models\Guardian;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\CreditNote;
+use App\Models\Receipt;
 use App\Models\LedgerEntry;
 use App\Models\JournalEntry;
 use App\Services\Finance\FinanceReportingService;
@@ -142,32 +143,160 @@ class StudentController extends Controller
         }
 
         // Student General Ledger Entries
-        $invoiceNumbers = $invoices->pluck('number')->toArray();
-        $paymentRefs = $payments->pluck('reference')->filter()->toArray();
+        $invoiceIds = $invoices->pluck('id')->filter()->toArray();
+        $invoiceNumbers = $invoices->pluck('number')->filter()->unique()->toArray();
+
+        $directPaymentIds = $payments->pluck('id')->filter()->toArray();
+        $allocatedPaymentIds = !empty($invoiceIds)
+            ? DB::table('payment_allocations')->whereIn('invoice_id', $invoiceIds)->pluck('payment_id')->toArray()
+            : [];
+        $paymentIds = array_values(array_unique(array_merge($directPaymentIds, $allocatedPaymentIds)));
+
+        $paymentRefs = $payments->pluck('reference')->filter()->unique()->toArray();
+        foreach ($paymentIds as $pId) {
+            $paymentRefs[] = 'PAY-' . $pId;
+            $paymentRefs[] = 'REC-' . str_pad((string) $pId, 6, '0', STR_PAD_LEFT);
+        }
+        $paymentRefs = array_values(array_unique($paymentRefs));
+
+        $creditNoteIds = $creditNotes->pluck('id')->filter()->toArray();
+        $creditNoteNumbers = $creditNotes->pluck('credit_note_number')->filter()->unique()->toArray();
+
+        // Direct receipts linked to student or student's invoices
+        $receipts = Receipt::where('school_id', $school->id)
+            ->where(function ($rq) use ($student, $invoiceNumbers) {
+                $rq->where('customer_id', $student->id);
+                if (!empty($invoiceNumbers)) {
+                    $rq->orWhereIn('reference', $invoiceNumbers);
+                }
+            })
+            ->get();
+        $receiptIds = $receipts->pluck('id')->filter()->toArray();
+        $receiptNumbers = $receipts->pluck('receipt_number')->filter()->unique()->toArray();
 
         $glEntries = JournalEntry::with(['account', 'batch'])
-            ->whereHas('batch', function ($q) use ($school, $invoiceNumbers, $paymentRefs, $student) {
+            ->whereHas('batch', function ($q) use (
+                $school,
+                $invoiceIds,
+                $invoiceNumbers,
+                $paymentIds,
+                $paymentRefs,
+                $creditNoteIds,
+                $creditNoteNumbers,
+                $receiptIds,
+                $receiptNumbers,
+                $student
+            ) {
                 $q->where('school_id', $school->id)
-                  ->where(function ($bq) use ($invoiceNumbers, $paymentRefs, $student) {
+                  ->where(function ($bq) use (
+                      $invoiceIds,
+                      $invoiceNumbers,
+                      $paymentIds,
+                      $paymentRefs,
+                      $creditNoteIds,
+                      $creditNoteNumbers,
+                      $receiptIds,
+                      $receiptNumbers,
+                      $student
+                  ) {
                       $hasCondition = false;
-                      if (!empty($invoiceNumbers)) {
-                          $bq->whereIn('reference_number', $invoiceNumbers);
+
+                      // 1. Direct source relationships
+                      if (!empty($invoiceIds)) {
+                          $bq->where(function ($sq) use ($invoiceIds) {
+                              $sq->where('source_type', 'invoice')->whereIn('source_id', $invoiceIds);
+                          });
                           $hasCondition = true;
                       }
+
+                      if (!empty($paymentIds)) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(function ($sq) use ($paymentIds) {
+                              $sq->where('source_type', 'payment')->whereIn('source_id', $paymentIds);
+                          });
+                          $hasCondition = true;
+                      }
+
+                      if (!empty($creditNoteIds)) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(function ($sq) use ($creditNoteIds) {
+                              $sq->where('source_type', 'credit_note')->whereIn('source_id', $creditNoteIds);
+                          });
+                          $hasCondition = true;
+                      }
+
+                      if (!empty($receiptIds)) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(function ($sq) use ($receiptIds) {
+                              $sq->where('source_type', 'receipt')->whereIn('source_id', $receiptIds);
+                          });
+                          $hasCondition = true;
+                      }
+
+                      // 2. Reference numbers (invoice numbers, payment receipt numbers, credit note numbers)
+                      if (!empty($invoiceNumbers)) {
+                          $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                          $bq->$method('reference_number', $invoiceNumbers);
+                          $hasCondition = true;
+                      }
+
                       if (!empty($paymentRefs)) {
-                          if ($hasCondition) {
-                              $bq->orWhereIn('reference_number', $paymentRefs);
-                          } else {
-                              $bq->whereIn('reference_number', $paymentRefs);
+                          $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                          $bq->$method('reference_number', $paymentRefs);
+                          $hasCondition = true;
+                      }
+
+                      if (!empty($creditNoteNumbers)) {
+                          $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                          $bq->$method('reference_number', $creditNoteNumbers);
+                          $hasCondition = true;
+                      }
+
+                      if (!empty($receiptNumbers)) {
+                          $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                          $bq->$method('reference_number', $receiptNumbers);
+                          $hasCondition = true;
+                      }
+
+                      // 3. Batches whose description contains the student's unique invoice numbers
+                      if (!empty($invoiceNumbers)) {
+                          foreach ($invoiceNumbers as $invNum) {
+                              $method = $hasCondition ? 'orWhere' : 'where';
+                              $bq->$method('description', 'like', "%{$invNum}%");
                               $hasCondition = true;
                           }
                       }
-                      if ($hasCondition) {
-                          $bq->orWhere('description', 'like', "%{$student->first_name}%{$student->last_name}%")
-                             ->orWhere('description', 'like', "%{$student->admission_number}%");
-                      } else {
-                          $bq->where('description', 'like', "%{$student->first_name}%{$student->last_name}%")
-                             ->orWhere('description', 'like', "%{$student->admission_number}%");
+
+                      // 4. Fallback to manual batches explicitly mentioning the student
+                      $adm = trim((string) $student->admission_number);
+                      if (!empty($adm) && strlen($adm) >= 3) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(function ($mq) use ($adm) {
+                              $mq->where(function ($st) {
+                                  $st->whereIn('source_type', ['manual', 'adjustment'])
+                                     ->orWhereNull('source_type');
+                              })->where('description', 'like', "%{$adm}%");
+                          });
+                          $hasCondition = true;
+                      }
+
+                      $firstName = trim((string) $student->first_name);
+                      $lastName = trim((string) $student->last_name);
+                      if (!empty($firstName) && !empty($lastName) && strlen($firstName) >= 2 && strlen($lastName) >= 2) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(function ($mq) use ($firstName, $lastName) {
+                              $mq->where(function ($st) {
+                                  $st->whereIn('source_type', ['manual', 'adjustment'])
+                                     ->orWhereNull('source_type');
+                              })->where('description', 'like', "%{$firstName}%")
+                                ->where('description', 'like', "%{$lastName}%");
+                          });
+                          $hasCondition = true;
+                      }
+
+                      // If no conditions exist for this student, isolate strictly to 0 results
+                      if (!$hasCondition) {
+                          $bq->whereRaw('1 = 0');
                       }
                   });
             })

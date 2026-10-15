@@ -497,12 +497,15 @@
                 </h3>
                 <p class="text-xs text-slate-400 mt-0.5">Double-entry accounting journal postings for this student</p>
             </div>
-            <a href="{{ route('admin.reports.general-ledger', ['search' => $student->admission_number ?? ($student->first_name . ' ' . $student->last_name)]) }}" 
-               target="_blank"
-               class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition">
-                <span>Open in GL Explorer</span>
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-            </a>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-slate-400 font-mono">{{ $glEntries->count() }} posting(s)</span>
+                <a href="{{ route('admin.reports.general-ledger', ['search' => !empty($student->admission_number) ? $student->admission_number : trim($student->first_name . ' ' . $student->last_name)]) }}" 
+                   target="_blank"
+                   class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium transition">
+                    <span>Open in GL Explorer</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </a>
+            </div>
         </div>
 
         <div class="overflow-x-auto">
