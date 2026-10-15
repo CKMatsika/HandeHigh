@@ -79,11 +79,7 @@ class SchoolSetupController extends Controller
 
         // Handle logo upload
         if ($request->hasFile('logo')) {
-            if ($school->logo) {
-                Storage::disk('public')->delete($school->logo);
-            }
-            $logoPath = $request->file('logo')->store('school-logos', 'public');
-            $school->update(['logo' => $logoPath]);
+            app(\App\Services\Branding\SchoolDocumentBrandingService::class)->storeLogo($school, $request->file('logo'));
         }
 
         // Update school settings

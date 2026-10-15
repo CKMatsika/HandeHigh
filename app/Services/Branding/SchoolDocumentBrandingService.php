@@ -15,8 +15,13 @@ class SchoolDocumentBrandingService
     public function getBrandingPayload(School $school, ?array $snapshot = null): array
     {
         if (!empty($snapshot)) {
-            $logoUrl = !empty($snapshot['logo_url']) ? $snapshot['logo_url'] : $this->getLogoUrl($school);
             $logoBase64 = !empty($snapshot['logo_base64']) ? $snapshot['logo_base64'] : $this->getLogoBase64($school);
+            $rawLogoUrl = $snapshot['logo_url'] ?? null;
+            if ($rawLogoUrl && !str_contains($rawLogoUrl, 'localhost') && !str_contains($rawLogoUrl, '127.0.0.1')) {
+                $logoUrl = $rawLogoUrl;
+            } else {
+                $logoUrl = $this->getLogoUrl($school);
+            }
 
             return [
                 'name' => $snapshot['name'] ?? $school->name,
@@ -24,7 +29,7 @@ class SchoolDocumentBrandingService
                 'motto' => $snapshot['motto'] ?? $school->motto,
                 'logo_url' => $logoUrl,
                 'logo_base64' => $logoBase64,
-                'has_logo' => !empty($logoUrl) || !empty($logoBase64) || !empty($school->logo),
+                'has_logo' => !empty($logoBase64) || !empty($school->logo) || !empty($school->logo_base64),
                 'address' => $snapshot['address'] ?? $school->address,
                 'postal_address' => $snapshot['postal_address'] ?? $school->postal_address,
                 'city' => $snapshot['city'] ?? $school->city,
@@ -57,13 +62,16 @@ class SchoolDocumentBrandingService
             ];
         }
 
+        $logoBase64 = $this->getLogoBase64($school);
+        $logoUrl = $this->getLogoUrl($school);
+
         return [
             'name' => $school->name,
             'display_name' => $school->display_name ?: $school->name,
             'motto' => $school->motto,
-            'logo_url' => $this->getLogoUrl($school),
-            'logo_base64' => $this->getLogoBase64($school),
-            'has_logo' => !empty($school->logo),
+            'logo_url' => $logoUrl,
+            'logo_base64' => $logoBase64,
+            'has_logo' => !empty($logoBase64) || !empty($school->logo) || !empty($school->logo_base64),
             'address' => $school->address,
             'postal_address' => $school->postal_address,
             'city' => $school->city,
@@ -137,7 +145,7 @@ class SchoolDocumentBrandingService
     }
 
     /**
-     * Store an uploaded logo safely into the tenant-specific directory.
+     * Store an uploaded logo safely into the tenant-specific directory and database base64.
      */
     public function storeLogo(School $school, UploadedFile $file): string
     {
@@ -146,7 +154,14 @@ class SchoolDocumentBrandingService
         $filename = 'logo_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $file->getClientOriginalExtension();
         $path = $file->storeAs("schools/{$school->id}/branding", $filename, 'public');
 
-        $school->update(['logo' => $path]);
+        $mime = $file->getMimeType() ?: 'image/png';
+        $content = file_get_contents($file->getRealPath());
+        $base64 = 'data:' . $mime . ';base64,' . base64_encode($content);
+
+        $school->update([
+            'logo' => $path,
+            'logo_base64' => $base64,
+        ]);
 
         return $path;
     }
@@ -160,38 +175,24 @@ class SchoolDocumentBrandingService
             Storage::disk('public')->delete($school->logo);
         }
 
-        $school->update(['logo' => null]);
+        $school->update([
+            'logo' => null,
+            'logo_base64' => null,
+        ]);
     }
 
     /**
-     * Get the public URL for the school logo.
+     * Get the public URL for the school logo using dedicated streaming route.
      */
     public function getLogoUrl(School $school): ?string
     {
-        if (!$school->logo) {
+        if (!$school->id) {
             return null;
         }
 
-        // 1. If it's already an absolute URL
-        if (str_starts_with($school->logo, 'http://') || str_starts_with($school->logo, 'https://')) {
-            return $school->logo;
-        }
-
-        // 2. Check public disk
-        try {
-            if (Storage::disk('public')->exists($school->logo)) {
-                return Storage::disk('public')->url($school->logo);
-            }
-        } catch (\Throwable $e) {
-            // Ignore filesystem driver error
-        }
-
-        // 3. Fallback to standard Storage::url or asset
-        try {
-            return Storage::disk('public')->url($school->logo);
-        } catch (\Throwable $e) {
-            return asset('storage/' . ltrim($school->logo, '/'));
-        }
+        // Return the dedicated streaming endpoint for this school
+        // This ensures proper caching, automatic SVG crest fallback if missing, and immunity to APP_URL misconfigurations.
+        return url("/schools/{$school->id}/logo");
     }
 
     /**
@@ -199,21 +200,36 @@ class SchoolDocumentBrandingService
      */
     public function getLogoBase64(School $school): ?string
     {
+        // 1. Direct from database (fastest, persists across cloud container redeployments)
+        if (!empty($school->logo_base64)) {
+            return $school->logo_base64;
+        }
+
         if (!$school->logo) {
             return null;
         }
 
+        // 2. Check public storage disk
         try {
             if (Storage::disk('public')->exists($school->logo)) {
                 $mime = Storage::disk('public')->mimeType($school->logo) ?: 'image/png';
                 $content = Storage::disk('public')->get($school->logo);
-                return 'data:' . $mime . ';base64,' . base64_encode($content);
+                $base64 = 'data:' . $mime . ';base64,' . base64_encode($content);
+
+                // Backfill into database
+                if ($school->id) {
+                    try {
+                        $school->updateQuietly(['logo_base64' => $base64]);
+                    } catch (\Throwable $e) {}
+                }
+
+                return $base64;
             }
         } catch (\Throwable $e) {
             // Fallback to direct path checks below
         }
 
-        // Fallback: check standard storage paths
+        // 3. Fallback: check standard storage paths on local filesystem
         $candidatePaths = [
             storage_path('app/public/' . ltrim($school->logo, '/')),
             public_path('storage/' . ltrim($school->logo, '/')),
@@ -225,7 +241,15 @@ class SchoolDocumentBrandingService
                 try {
                     $mime = mime_content_type($path) ?: 'image/png';
                     $content = file_get_contents($path);
-                    return 'data:' . $mime . ';base64,' . base64_encode($content);
+                    $base64 = 'data:' . $mime . ';base64,' . base64_encode($content);
+
+                    if ($school->id) {
+                        try {
+                            $school->updateQuietly(['logo_base64' => $base64]);
+                        } catch (\Throwable $e) {}
+                    }
+
+                    return $base64;
                 } catch (\Throwable $e) {
                     // Continue
                 }

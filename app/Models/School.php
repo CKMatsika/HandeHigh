@@ -29,6 +29,7 @@ class School extends Model
         'motto',
         'description',
         'logo',
+        'logo_base64',
         'established_year',
         'school_type',
         'registration_number',
