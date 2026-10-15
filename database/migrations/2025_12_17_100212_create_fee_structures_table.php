@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('fee_structures', function (Blueprint $table) {
+        if (! Schema::hasTable('fee_structures')) {
+            Schema::create('fee_structures', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
 
@@ -33,6 +34,7 @@ return new class extends Migration
 
             $table->unique(['school_id', 'academic_year', 'term', 'grade', 'code'], 'fee_structures_unique_per_grade');
         });
+        }
     }
 
     /**

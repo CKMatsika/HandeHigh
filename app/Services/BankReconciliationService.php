@@ -121,7 +121,8 @@ class BankReconciliationService
         $matches = [];
 
         foreach ($cashbookTransactions as $cashbookTx) {
-            $confidence = $this->calculateMatchConfidence($bankTransaction, $cashbookTx);
+            $matchResult = $this->calculateMatchConfidence($bankTransaction, $cashbookTx);
+            $confidence = is_array($matchResult) ? ($matchResult['score'] ?? 0) : (float) $matchResult;
             
             if ($confidence >= $minConfidence) {
                 $matches[] = [

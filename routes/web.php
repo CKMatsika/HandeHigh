@@ -146,6 +146,7 @@ Route::middleware(['auth'])->group(function () {
                 ->middlewareFor('destroy', 'can:delete,invoice');
             Route::get('invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('payments.create');
             Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+            Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
             Route::get('students/{student}/statement', [StatementController::class, 'create'])->name('students.statement.create')->middleware('can:view,student');
             Route::post('students/{student}/statement', [StatementController::class, 'show'])->name('students.statement.show')->middleware('can:view,student');
             Route::get('students/{student}/statement/print', [StatementController::class, 'print'])->name('students.statement.print')->middleware('can:view,student');

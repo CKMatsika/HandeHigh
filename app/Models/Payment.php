@@ -14,6 +14,7 @@ class Payment extends Model
         'student_id',
         'guardian_id',
         'method',
+        'account_id',
         'reference',
         'amount',
         'paid_at',
@@ -53,5 +54,21 @@ class Payment extends Model
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function account()
+    {
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    /**
+     * Resolve document branding payload for official receipt printing.
+     */
+    public function getSchoolBrandingAttribute(): array
+    {
+        $school = $this->school ?: (auth()->check() ? auth()->user()?->school : null) ?: School::find($this->school_id);
+
+        return app(\App\Services\Branding\SchoolDocumentBrandingService::class)
+            ->getBrandingPayload($school ?? new School());
     }
 }

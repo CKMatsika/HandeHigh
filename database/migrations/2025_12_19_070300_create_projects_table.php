@@ -11,22 +11,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('projects', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('school_id')->constrained()->onDelete('cascade');
-            $table->string('code', 50);
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->date('start_date')->nullable();
-            $table->date('end_date')->nullable();
-            $table->decimal('budget_amount', 15, 2)->default(0);
-            $table->enum('status', ['active', 'completed', 'cancelled'])->default('active');
-            $table->string('project_type')->nullable(); // grant, construction, event, etc.
-            $table->timestamps();
-            
-            $table->unique(['school_id', 'code']);
-            $table->index(['school_id', 'status']);
-        });
+        if (! Schema::hasTable('projects')) {
+            Schema::create('projects', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('school_id')->constrained()->onDelete('cascade');
+                $table->string('code', 50);
+                $table->string('name');
+                $table->text('description')->nullable();
+                $table->date('start_date')->nullable();
+                $table->date('end_date')->nullable();
+                $table->decimal('budget_amount', 15, 2)->default(0);
+                $table->enum('status', ['active', 'completed', 'cancelled'])->default('active');
+                $table->string('project_type')->nullable(); // grant, construction, event, etc.
+                $table->timestamps();
+                
+                $table->unique(['school_id', 'code']);
+                $table->index(['school_id', 'status']);
+            });
+        }
     }
 
     /**

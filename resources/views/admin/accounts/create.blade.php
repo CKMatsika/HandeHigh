@@ -46,7 +46,36 @@
                 </div>
                 <div>
                     <label class="block text-slate-400 font-medium mb-1">Category <span class="text-rose-400">*</span></label>
-                    <input name="category" value="{{ old('category', $selectedParent?->category ?? 'tuition_revenue') }}" placeholder="e.g. current_asset, tuition_revenue" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:ring-indigo-500" required />
+                    <select name="category" id="accountCategorySelect" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100 focus:border-indigo-500 focus:ring-indigo-500" required>
+                        <optgroup label="Assets (1000s)">
+                            <option value="bank" @selected(old('category', $selectedParent?->category) === 'bank')>Bank Account (bank)</option>
+                            <option value="cash" @selected(old('category', $selectedParent?->category) === 'cash')>Cash / Petty Cash (cash)</option>
+                            <option value="current_asset" @selected(old('category', $selectedParent?->category) === 'current_asset')>Current Asset (current_asset)</option>
+                            <option value="receivable" @selected(old('category', $selectedParent?->category) === 'receivable')>Accounts / Fees Receivable (receivable)</option>
+                            <option value="fixed_asset" @selected(old('category', $selectedParent?->category) === 'fixed_asset')>Fixed Asset (fixed_asset)</option>
+                        </optgroup>
+                        <optgroup label="Liabilities (2000-3000s)">
+                            <option value="current_liability" @selected(old('category', $selectedParent?->category) === 'current_liability')>Current Liability (current_liability)</option>
+                            <option value="payable" @selected(old('category', $selectedParent?->category) === 'payable')>Accounts Payable (payable)</option>
+                            <option value="long_term_liability" @selected(old('category', $selectedParent?->category) === 'long_term_liability')>Long-Term Liability (long_term_liability)</option>
+                        </optgroup>
+                        <optgroup label="Equity (4000s)">
+                            <option value="equity" @selected(old('category', $selectedParent?->category) === 'equity')>Equity / Capital (equity)</option>
+                            <option value="retained_earnings" @selected(old('category', $selectedParent?->category) === 'retained_earnings')>Retained Earnings (retained_earnings)</option>
+                        </optgroup>
+                        <optgroup label="Revenue (5000s)">
+                            <option value="tuition_revenue" @selected(old('category', $selectedParent?->category ?? 'tuition_revenue') === 'tuition_revenue')>Tuition & Fees Revenue (tuition_revenue)</option>
+                            <option value="other_revenue" @selected(old('category', $selectedParent?->category) === 'other_revenue')>Other Revenue (other_revenue)</option>
+                            <option value="grants" @selected(old('category', $selectedParent?->category) === 'grants')>Grants & Donations (grants)</option>
+                        </optgroup>
+                        <optgroup label="Expenses (6000-7000s)">
+                            <option value="salary_expense" @selected(old('category', $selectedParent?->category) === 'salary_expense')>Salaries & Staff Expenses (salary_expense)</option>
+                            <option value="utility_expense" @selected(old('category', $selectedParent?->category) === 'utility_expense')>Utilities (utility_expense)</option>
+                            <option value="maintenance_expense" @selected(old('category', $selectedParent?->category) === 'maintenance_expense')>Repairs & Maintenance (maintenance_expense)</option>
+                            <option value="supply_expense" @selected(old('category', $selectedParent?->category) === 'supply_expense')>Supplies & Materials (supply_expense)</option>
+                            <option value="other_expense" @selected(old('category', $selectedParent?->category) === 'other_expense')>Other Operating Expenses (other_expense)</option>
+                        </optgroup>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-slate-400 font-medium mb-1">Parent / Header Account</label>

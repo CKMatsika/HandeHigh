@@ -11,17 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('conversations', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('school_id')->constrained()->onDelete('cascade');
-            $table->string('name')->nullable();
-            $table->enum('type', ['direct', 'group'])->default('direct');
-            $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-            
-            $table->index(['school_id', 'type']);
-        });
+        if (! Schema::hasTable('conversations')) {
+            Schema::create('conversations', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('school_id')->constrained()->onDelete('cascade');
+                $table->string('name')->nullable();
+                $table->enum('type', ['direct', 'group'])->default('direct');
+                $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+                
+                $table->index(['school_id', 'type']);
+            });
+        }
     }
 
     /**

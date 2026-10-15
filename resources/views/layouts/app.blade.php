@@ -278,6 +278,14 @@
                                     <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
                                     <span>Journal Entries</span>
                                 </a>
+                                <a href="{{ route('admin.bank-accounts.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.bank-accounts.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span>Bank Accounts</span>
+                                </a>
+                                <a href="{{ route('admin.cashbook.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.cashbook.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Cash Book</span>
+                                </a>
                                 <a href="{{ route('admin.bank-reconciliations.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.bank-reconciliations.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-orange-400"></span>
                                     <span>Bank Reconciliation</span>
@@ -815,6 +823,7 @@
                        currentRoute.includes('/vendors') || currentRoute.includes('/budgets') ||
                        currentRoute.includes('/accounts') || currentRoute.includes('/journals') || 
                        currentRoute.includes('/bank-reconciliations') || currentRoute.includes('/interbank-transfers') ||
+                       currentRoute.includes('/bank-accounts') || currentRoute.includes('/cashbook') ||
                        currentRoute.includes('/credit-notes') || currentRoute.includes('/ai-finance')) {
                     toggleMenu('finance');
                 } else if (currentRoute.includes('/communication')) {

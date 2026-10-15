@@ -469,7 +469,7 @@ class AccountingService
         ]);
 
         // Create cashbook entry
-        $this->createCashbookEntryForKiosk($kioskSale, $cashAccount);
+        $this->createCashbookEntryForKiosk($kioskSale, $cashAccount, $journalBatch);
 
         return $journalBatch;
     }
@@ -477,7 +477,7 @@ class AccountingService
     /**
      * Create cashbook entry for kiosk sale
      */
-    private function createCashbookEntryForKiosk($kioskSale, $cashAccount): void
+    private function createCashbookEntryForKiosk($kioskSale, $cashAccount, $journalBatch = null): void
     {
         $school = $kioskSale->school;
 
@@ -503,51 +503,82 @@ class AccountingService
             'created_by' => $kioskSale->cashier_id ?? auth()->id(),
             'notes' => 'Kiosk / Canteen retail sale',
         ]);
+
+        $debitEntryId = $journalBatch?->entries->firstWhere('account_id', $cashAccount->id)?->id;
+
+        \App\Models\CashbookTransaction::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_date' => $kioskSale->sale_date ?? now()->toDateString(),
+            'reference_number' => $kioskSale->receipt_number,
+            'description' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+            'amount' => $kioskSale->grand_total,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'journal_entry_id' => $debitEntryId,
+            'status' => 'unmatched',
+            'created_by' => $kioskSale->cashier_id ?? auth()->id(),
+            'notes' => 'Kiosk / Canteen retail sale',
+        ]);
     }
     
     /**
      * Post payment to accounting
      */
-    public function postPayment($payment, $invoice): JournalBatch
+    public function postPayment($payment, $invoice, $selectedAccountId = null): JournalBatch
     {
         $school = $payment->school;
         
-        // Determine cash account based on payment method
-        $cashAccountCode = match($payment->method) {
-            'cash' => '1102', // Petty Cash - where physical cash is stored
-            'bank' => '1301', // Main operating bank
-            'mobile_money' => '1303', // Mobile money account
-            default => '1102',
-        };
-        
-        $cashAccount = Account::where('school_id', $school->id)
-            ->where('code', $cashAccountCode)
-            ->first();
-        
-        if (!$cashAccount) {
+        $cashAccount = null;
+        $targetAccountId = $selectedAccountId ?? $payment->account_id;
+        if ($targetAccountId) {
             $cashAccount = Account::where('school_id', $school->id)
-                ->whereIn('code', ['1101', '1102', '1100', '1301', '1300'])
+                ->where('id', $targetAccountId)
                 ->first();
         }
 
         if (!$cashAccount) {
-            $cashAccount = Account::create([
-                'school_id' => $school->id,
-                'code' => $cashAccountCode,
-                'name' => match($payment->method) {
-                    'bank' => 'Main Operating Account',
-                    'mobile_money' => 'Mobile Money Account',
-                    default => 'Petty Cash',
-                },
-                'type' => 'asset',
-                'category' => match($payment->method) {
-                    'bank', 'mobile_money' => 'bank',
-                    default => 'cash',
-                },
-                'currency' => 'USD',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
+            // Determine cash account based on payment method
+            $cashAccountCode = match($payment->method) {
+                'cash' => '1102', // Petty Cash - where physical cash is stored
+                'bank' => '1301', // Main operating bank
+                'mobile_money' => '1303', // Mobile money account
+                default => '1102',
+            };
+            
+            $cashAccount = Account::where('school_id', $school->id)
+                ->where('code', $cashAccountCode)
+                ->first();
+            
+            if (!$cashAccount) {
+                $cashAccount = Account::where('school_id', $school->id)
+                    ->whereIn('code', ['1101', '1102', '1100', '1301', '1300'])
+                    ->first();
+            }
+
+            if (!$cashAccount) {
+                $cashAccount = Account::create([
+                    'school_id' => $school->id,
+                    'code' => $cashAccountCode,
+                    'name' => match($payment->method) {
+                        'bank' => 'Main Operating Account',
+                        'mobile_money' => 'Mobile Money Account',
+                        default => 'Petty Cash',
+                    },
+                    'type' => 'asset',
+                    'category' => match($payment->method) {
+                        'bank', 'mobile_money' => 'bank',
+                        default => 'cash',
+                    },
+                    'currency' => 'USD',
+                    'is_active' => true,
+                    'is_postable' => true,
+                ]);
+            }
+        }
+
+        if (empty($payment->account_id) && $cashAccount) {
+            $payment->updateQuietly(['account_id' => $cashAccount->id]);
         }
         
         $feesReceivableAccount = Account::where('school_id', $school->id)
@@ -583,7 +614,7 @@ class AccountingService
             'source_type' => 'payment',
             'source_id' => $payment->id,
             'status' => 'posted',
-            'created_by' => auth()->id(),
+            'created_by' => auth()->id() ?? $payment->created_by,
             'entries' => [
                 [
                     'account_id' => $cashAccount->id,
@@ -601,7 +632,7 @@ class AccountingService
         ]);
         
         // Create cashbook entry
-        $this->createCashbookEntry($payment, $invoice, $cashAccount);
+        $this->createCashbookEntry($payment, $invoice, $cashAccount, $journalBatch);
         
         return $journalBatch;
     }
@@ -609,7 +640,7 @@ class AccountingService
     /**
      * Create cashbook entry for payment
      */
-    private function createCashbookEntry($payment, $invoice, $cashAccount): void
+    private function createCashbookEntry($payment, $invoice, $cashAccount, $journalBatch = null): void
     {
         $school = $payment->school;
         
@@ -623,7 +654,7 @@ class AccountingService
         // Calculate new balance
         $newBalance = $lastBalance + $payment->amount;
         
-        // Create cashbook entry
+        // Create cashbook entry (legacy cashbook model)
         \App\Models\Cashbook::create([
             'school_id' => $school->id,
             'account_id' => $cashAccount->id,
@@ -637,8 +668,26 @@ class AccountingService
             'payment_method' => $payment->method,
             'related_invoice_id' => $invoice->id,
             'related_payment_id' => $payment->id,
-            'created_by' => auth()->id(),
-            'notes' => 'Student fee payment - ' . $invoice->student->first_name . ' ' . $invoice->student->last_name,
+            'created_by' => auth()->id() ?? $payment->created_by,
+            'notes' => 'Student fee payment - ' . ($invoice->student ? ($invoice->student->first_name . ' ' . $invoice->student->last_name) : 'Student'),
+        ]);
+
+        // Dual sync: Create CashbookTransaction entry for bank reconciliation
+        $debitEntryId = $journalBatch?->entries->firstWhere('account_id', $cashAccount->id)?->id;
+
+        \App\Models\CashbookTransaction::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_date' => $payment->paid_at,
+            'reference_number' => $payment->reference ?? 'PAY-' . $payment->id,
+            'description' => 'Fee Payment for invoice ' . $invoice->number . ($invoice->student ? ' - ' . $invoice->student->first_name . ' ' . $invoice->student->last_name : ''),
+            'amount' => $payment->amount,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'journal_entry_id' => $debitEntryId,
+            'status' => 'unmatched',
+            'created_by' => auth()->id() ?? $payment->created_by,
+            'notes' => 'Payment method: ' . $payment->method,
         ]);
     }
 
@@ -693,7 +742,7 @@ class AccountingService
         ]);
         
         // Create cashbook entry for receipt
-        $this->createCashbookEntryForReceipt($receipt, $cashAccount);
+        $this->createCashbookEntryForReceipt($receipt, $cashAccount, $journalBatch);
         
         return $journalBatch;
     }
@@ -701,7 +750,7 @@ class AccountingService
     /**
      * Create cashbook entry for receipt
      */
-    private function createCashbookEntryForReceipt($receipt, $cashAccount): void
+    private function createCashbookEntryForReceipt($receipt, $cashAccount, $journalBatch = null): void
     {
         $school = $receipt->school;
         
@@ -727,6 +776,23 @@ class AccountingService
             'transaction_date' => $receipt->receipt_date,
             'reference_number' => $receipt->receipt_number,
             'payment_method' => $receipt->payment_method,
+            'created_by' => auth()->id(),
+            'notes' => $receipt->notes ?? 'General receipt',
+        ]);
+
+        $debitEntryId = $journalBatch?->entries->firstWhere('account_id', $cashAccount->id)?->id;
+
+        \App\Models\CashbookTransaction::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_date' => $receipt->receipt_date,
+            'reference_number' => $receipt->receipt_number,
+            'description' => 'Receipt ' . $receipt->receipt_number . (!empty($receipt->customer_name) ? ' - ' . $receipt->customer_name : ''),
+            'amount' => $receipt->grand_total,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'journal_entry_id' => $debitEntryId,
+            'status' => 'unmatched',
             'created_by' => auth()->id(),
             'notes' => $receipt->notes ?? 'General receipt',
         ]);
@@ -776,7 +842,7 @@ class AccountingService
         ]);
         
         // Create cashbook entries for both accounts
-        $this->createTransferCashbookEntries($fromAccount, $toAccount, $amount, $description, $transactionDate);
+        $this->createTransferCashbookEntries($fromAccount, $toAccount, $amount, $description, $transactionDate, $journalBatch);
         
         return $journalBatch;
     }
@@ -784,9 +850,24 @@ class AccountingService
     /**
      * Create cashbook entries for inter-account transfers
      */
-    private function createTransferCashbookEntries($fromAccount, $toAccount, $amount, $description, $transactionDate): void
+    private function createTransferCashbookEntries($fromAccount, $toAccount, $amount, $description, $transactionDate, $journalBatch = null): void
     {
-        $school = auth()->user()->school;
+        $school = $fromAccount->school ?? auth()->user()?->school;
+
+        $fromBalance = \App\Models\Cashbook::where('school_id', $school->id)
+            ->where('account_id', $fromAccount->id)
+            ->orderBy('transaction_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->value('balance_after') ?? 0;
+
+        $toBalance = \App\Models\Cashbook::where('school_id', $school->id)
+            ->where('account_id', $toAccount->id)
+            ->orderBy('transaction_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->value('balance_after') ?? 0;
+
+        $refOut = 'TRANSFER-OUT-' . date('YmdHis');
+        $refIn = 'TRANSFER-IN-' . date('YmdHis');
         
         // Create cashbook entry for source account (money going out)
         \App\Models\Cashbook::create([
@@ -798,7 +879,7 @@ class AccountingService
             'amount' => $amount,
             'balance_after' => $fromBalance - $amount,
             'transaction_date' => $transactionDate,
-            'reference_number' => 'TRANSFER-OUT-' . date('YmdHis'),
+            'reference_number' => $refOut,
             'payment_method' => 'transfer',
             'created_by' => auth()->id(),
             'notes' => 'Transfer out: ' . $description,
@@ -814,10 +895,46 @@ class AccountingService
             'amount' => $amount,
             'balance_after' => $toBalance + $amount,
             'transaction_date' => $transactionDate,
-            'reference_number' => 'TRANSFER-IN-' . date('YmdHis'),
+            'reference_number' => $refIn,
             'payment_method' => 'transfer',
             'created_by' => auth()->id(),
             'notes' => 'Transfer in: ' . $description,
+        ]);
+
+        // Dual sync: Create CashbookTransaction entries for bank reconciliation
+        $creditEntryId = $journalBatch?->entries->firstWhere('account_id', $fromAccount->id)?->id;
+        $debitEntryId = $journalBatch?->entries->firstWhere('account_id', $toAccount->id)?->id;
+
+        // Source account: credit (money outgoing from source)
+        \App\Models\CashbookTransaction::create([
+            'school_id' => $school->id,
+            'account_id' => $fromAccount->id,
+            'transaction_date' => $transactionDate,
+            'reference_number' => $refOut,
+            'description' => $description . ' - Transfer to ' . $toAccount->name,
+            'amount' => $amount,
+            'transaction_type' => 'credit',
+            'category' => 'transfer',
+            'journal_entry_id' => $creditEntryId,
+            'status' => 'unmatched',
+            'created_by' => auth()->id(),
+            'notes' => 'Transfer out to ' . $toAccount->name,
+        ]);
+
+        // Destination account: debit (money incoming to destination)
+        \App\Models\CashbookTransaction::create([
+            'school_id' => $school->id,
+            'account_id' => $toAccount->id,
+            'transaction_date' => $transactionDate,
+            'reference_number' => $refIn,
+            'description' => $description . ' - Transfer from ' . $fromAccount->name,
+            'amount' => $amount,
+            'transaction_type' => 'debit',
+            'category' => 'transfer',
+            'journal_entry_id' => $debitEntryId,
+            'status' => 'unmatched',
+            'created_by' => auth()->id(),
+            'notes' => 'Transfer in from ' . $fromAccount->name,
         ]);
     }
 
@@ -836,7 +953,7 @@ class AccountingService
             ->where('id', $transfer->to_bank_account_id)
             ->first() ?? Account::where('school_id', $school->id)->where('code', '1301')->firstOrFail();
 
-        return $this->createJournalBatch([
+        $journalBatch = $this->createJournalBatch([
             'school_id' => $school->id,
             'transaction_date' => $transfer->transfer_date,
             'reference_number' => $transfer->transfer_number,
@@ -860,6 +977,17 @@ class AccountingService
                 ],
             ],
         ]);
+
+        $this->createTransferCashbookEntries(
+            $fromAccount,
+            $toAccount,
+            $transfer->amount,
+            'Interbank transfer ' . $transfer->transfer_number,
+            $transfer->transfer_date,
+            $journalBatch
+        );
+
+        return $journalBatch;
     }
 
     /**
@@ -887,7 +1015,7 @@ class AccountingService
         $debitAccountId = $isExpense ? $offsetAccount->id : $cashAccount->id;
         $creditAccountId = $isExpense ? $cashAccount->id : $offsetAccount->id;
         
-        return $this->createJournalBatch([
+        $batch = $this->createJournalBatch([
             'school_id' => $school->id,
             'transaction_date' => $cashbook->transaction_date,
             'reference_number' => $cashbook->reference_number ?? 'CSH-' . $cashbook->id,
@@ -911,6 +1039,26 @@ class AccountingService
                 ],
             ],
         ]);
+
+        // Dual sync: Ensure CashbookTransaction exists for bank reconciliation
+        $entry = $batch->entries->firstWhere('account_id', $cashAccount->id);
+        \App\Models\CashbookTransaction::firstOrCreate([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'reference_number' => $cashbook->reference_number ?? 'CSH-' . $cashbook->id,
+        ], [
+            'transaction_date' => $cashbook->transaction_date,
+            'description' => $cashbook->description,
+            'amount' => $cashbook->amount,
+            'transaction_type' => $isExpense ? 'credit' : 'debit',
+            'category' => $isExpense ? 'expense' : 'income',
+            'journal_entry_id' => $entry?->id,
+            'status' => 'unmatched',
+            'created_by' => $cashbook->created_by ?? auth()->id(),
+            'notes' => $cashbook->notes,
+        ]);
+
+        return $batch;
     }
     
     /**

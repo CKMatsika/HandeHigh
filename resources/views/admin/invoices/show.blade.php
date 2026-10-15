@@ -97,6 +97,24 @@
         @endif
     </div>
 
+    @if(session('receipt_url'))
+        <div class="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-center justify-between text-xs text-emerald-200">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-300 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <div>
+                    <p class="font-semibold text-emerald-100">{{ session('status', 'Payment recorded successfully!') }}</p>
+                    <p class="text-[11px] text-emerald-300/80">Official student fee receipt is ready for printing and records.</p>
+                </div>
+            </div>
+            <a href="{{ session('receipt_url') }}" target="_blank" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 transition gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Print Official Receipt
+            </a>
+        </div>
+    @endif
+
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4 mt-4">
         <h2 class="text-sm font-semibold text-slate-100 mb-3">Payments</h2>
         @if($invoice->allocations->count())
@@ -105,8 +123,10 @@
                     <tr class="border-b border-slate-800 text-slate-400">
                         <th class="text-left py-2 font-medium">Date</th>
                         <th class="text-left py-2 font-medium">Method</th>
+                        <th class="text-left py-2 font-medium">Account</th>
                         <th class="text-left py-2 font-medium">Reference</th>
                         <th class="text-right py-2 font-medium">Amount</th>
+                        <th class="text-right py-2 font-medium">Receipt</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -114,8 +134,16 @@
                         <tr class="border-b border-slate-800/70">
                             <td class="py-2 align-middle">{{ $allocation->payment?->paid_at?->format('Y-m-d') ?? '—' }}</td>
                             <td class="py-2 align-middle">{{ $allocation->payment?->method ? ucfirst(str_replace('_', ' ', $allocation->payment->method)) : '—' }}</td>
+                            <td class="py-2 align-middle text-slate-400">{{ $allocation->payment?->account ? ($allocation->payment->account->code . ' · ' . $allocation->payment->account->name) : 'Cash/Bank' }}</td>
                             <td class="py-2 align-middle">{{ $allocation->payment?->reference ?: '—' }}</td>
-                            <td class="py-2 align-middle text-right font-medium">{{ number_format($allocation->amount, 2) }}</td>
+                            <td class="py-2 align-middle text-right font-medium text-emerald-400">{{ number_format($allocation->amount, 2) }}</td>
+                            <td class="py-2 align-middle text-right">
+                                @if($allocation->payment)
+                                    <a href="{{ route('admin.payments.receipt', $allocation->payment) }}" target="_blank" class="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-600 hover:text-white transition">
+                                        Print Receipt
+                                    </a>
+                                @endif
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>

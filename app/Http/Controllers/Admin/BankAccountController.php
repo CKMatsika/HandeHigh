@@ -51,21 +51,62 @@ class BankAccountController extends Controller
         ]);
 
         $school = auth()->user()->school;
-        
+
+        // Find next available bank account code in 1300 series
+        $existingCodes = Account::where('school_id', $school->id)
+            ->where('code', 'like', '13%')
+            ->pluck('code')
+            ->toArray();
+
+        $nextNum = 1;
+        while (in_array(sprintf('13%02d', $nextNum), $existingCodes)) {
+            $nextNum++;
+        }
+        $accountCode = sprintf('13%02d', $nextNum);
+
+        $parentBank = Account::where('school_id', $school->id)
+            ->where('code', '1300')
+            ->first();
+
+        $desc = "Bank: {$request->bank_name} | Acc No: {$request->account_number}" 
+            . ($request->branch_name ? " | Branch: {$request->branch_name}" : '')
+            . ($request->notes ? " | {$request->notes}" : '');
+
         // Create bank account in chart of accounts
         $bankAccount = Account::create([
             'school_id' => $school->id,
-            'code' => '13' . str_pad(Account::where('school_id', $school->id)->max('id') + 1, 3, '0', STR_PAD_LEFT),
-            'name' => $request->account_name,
+            'code' => $accountCode,
+            'name' => $request->account_name . " ({$request->bank_name})",
             'type' => 'asset',
             'category' => 'bank',
+            'parent_id' => $parentBank?->id,
             'opening_balance' => $request->opening_balance,
             'currency' => $request->currency,
-            'description' => $request->notes,
+            'description' => $desc,
+            'is_postable' => true,
             'is_active' => true,
         ]);
 
-        // Create opening balance transaction in cashbook
+        // Keep legacy bank_accounts table synchronized if table exists
+        try {
+            \App\Models\BankAccount::create([
+                'school_id' => $school->id,
+                'account_name' => $request->account_name,
+                'account_number' => $request->account_number,
+                'bank_name' => $request->bank_name,
+                'branch_name' => $request->branch_name,
+                'account_type' => $request->account_type,
+                'opening_balance' => $request->opening_balance,
+                'current_balance' => $request->opening_balance,
+                'currency' => $request->currency,
+                'is_active' => true,
+                'notes' => $request->notes,
+            ]);
+        } catch (\Throwable $e) {
+            // Ignore legacy table errors
+        }
+
+        // Create opening balance transaction in cashbook & bank reconciliation
         if ($request->opening_balance > 0) {
             Cashbook::create([
                 'school_id' => $school->id,
@@ -79,10 +120,23 @@ class BankAccountController extends Controller
                 'payment_method' => 'bank_transfer',
                 'created_by' => auth()->id(),
             ]);
+
+            \App\Models\CashbookTransaction::create([
+                'school_id' => $school->id,
+                'account_id' => $bankAccount->id,
+                'transaction_date' => now()->toDateString(),
+                'reference_number' => 'OP-BAL-' . $bankAccount->id,
+                'description' => 'Opening balance for ' . $request->account_name,
+                'amount' => $request->opening_balance,
+                'transaction_type' => 'debit',
+                'category' => 'income',
+                'status' => 'unmatched',
+                'created_by' => auth()->id(),
+            ]);
         }
 
         return redirect()->route('admin.bank-accounts.index')
-            ->with('success', 'Bank account created successfully.');
+            ->with('success', "Bank account [{$bankAccount->code}] {$bankAccount->name} created successfully.");
     }
 
     public function show($id)
