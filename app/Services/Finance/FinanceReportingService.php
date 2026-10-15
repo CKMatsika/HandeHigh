@@ -843,6 +843,13 @@ class FinanceReportingService
                     'name' => $account->name,
                     'category' => $account->category ?? 'Operating Revenue',
                     'amount' => $netRevenue,
+                    'balance' => $netRevenue,
+                    'account' => (object) [
+                        'id' => $account->id,
+                        'code' => $account->code,
+                        'name' => $account->name,
+                        'category' => $account->category ?? 'Operating Revenue',
+                    ],
                 ];
             })->filter(function ($item) {
                 return abs($item['amount']) > 0.001;
@@ -869,6 +876,13 @@ class FinanceReportingService
                     'name' => $account->name,
                     'category' => $account->category ?? 'Operating Expense',
                     'amount' => $netExpense,
+                    'balance' => $netExpense,
+                    'account' => (object) [
+                        'id' => $account->id,
+                        'code' => $account->code,
+                        'name' => $account->name,
+                        'category' => $account->category ?? 'Operating Expense',
+                    ],
                 ];
             })->filter(function ($item) {
                 return abs($item['amount']) > 0.001;

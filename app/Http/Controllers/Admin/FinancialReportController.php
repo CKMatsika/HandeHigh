@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\DebtorsAgingExport;
 use App\Exports\FeeCollectionsExport;
+use App\Exports\IncomeExpenditureExport;
 use App\Exports\OutstandingFeesExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
@@ -277,9 +278,29 @@ class FinancialReportController extends Controller
             'netIncome' => $reportData['net_surplus_deficit'],
             'revenueAccounts' => $reportData['revenue_accounts'],
             'expenseAccounts' => $reportData['expense_accounts'],
+            'incomeByCategory' => $reportData['income_by_category'],
+            'expenditureByCategory' => $reportData['expenditure_by_category'],
             'start' => $reportData['start_date'],
             'end' => $reportData['end_date'],
+            'school' => $school,
         ]));
+    }
+
+    /**
+     * Export Income and Expenditure to Excel/CSV
+     */
+    public function exportIncomeExpenditure(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only(['start_date', 'end_date']);
+        $reportData = $this->reportingService->getIncomeExpenditure($school, $filters);
+        $filename = 'income-expenditure-' . ($reportData['start_date'] ?? now()->toDateString()) . '-to-' . ($reportData['end_date'] ?? now()->toDateString()) . '.xlsx';
+
+        return Excel::download(new IncomeExpenditureExport($reportData, $school), $filename);
     }
 
     /**

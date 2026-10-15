@@ -292,9 +292,11 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/outstanding-fees/export', [FinancialReportController::class, 'exportOutstandingFees'])->name('reports.outstanding-fees.export');
             Route::get('reports/collection-summary', [FinancialReportController::class, 'collectionSummary'])->name('reports.collection-summary');
             Route::get('reports/income-expenditure', [FinancialReportController::class, 'incomeExpenditure'])->name('reports.income-expenditure');
+            Route::get('reports/income-expenditure/export', [FinancialReportController::class, 'exportIncomeExpenditure'])->name('reports.income-expenditure.export');
             Route::get('reports/cashbook-summary', [FinancialReportController::class, 'cashbookSummary'])->name('reports.cashbook-summary');
             Route::get('reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->name('reports.trial-balance');
             Route::get('reports/income-statement', [FinancialReportController::class, 'incomeStatement'])->name('reports.income-statement');
+            Route::get('reports/income-statement/export', [FinancialReportController::class, 'exportIncomeExpenditure'])->name('reports.income-statement.export');
             Route::get('reports/balance-sheet', [FinancialReportController::class, 'balanceSheet'])->name('reports.balance-sheet');
             Route::get('reports/cash-flow', [FinancialReportController::class, 'cashFlowStatement'])->name('reports.cash-flow');
             Route::get('reports/general-ledger', [FinancialReportController::class, 'generalLedger'])->name('reports.general-ledger');

@@ -517,4 +517,57 @@ class FinanceReportingTest extends TestCase
         $response->assertOk();
         $response->assertHeader('content-disposition');
     }
+
+    public function test_income_and_expenditure_report_route_renders_successfully(): void
+    {
+        $revAccount = Account::create([
+            'school_id' => $this->schoolA->id,
+            'code' => '5101',
+            'name' => 'Tuition Revenue Test',
+            'type' => 'revenue',
+            'category' => 'tuition_revenue',
+            'is_active' => true,
+            'is_postable' => true,
+        ]);
+
+        $batch = JournalBatch::create([
+            'school_id' => $this->schoolA->id,
+            'batch_number' => 'JB-IE-TEST',
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Test Income Batch',
+            'status' => 'posted',
+            'created_by' => $this->bursarA->id,
+        ]);
+
+        JournalEntry::create([
+            'journal_batch_id' => $batch->id,
+            'account_id' => $revAccount->id,
+            'entry_type' => 'credit',
+            'amount' => 1500,
+        ]);
+
+        $response = $this->actingAs($this->bursarA)->get(route('admin.reports.income-expenditure'));
+        $response->assertOk();
+        $response->assertViewIs('admin.reports.income-statement');
+        $response->assertViewHas('totalRevenue');
+        $response->assertViewHas('totalExpenses');
+        $response->assertViewHas('netIncome');
+        $response->assertSee('Income &amp; Expenditure Statement', false);
+        $response->assertSee('Tuition Revenue Test');
+        $response->assertSee('1,500.00');
+    }
+
+    public function test_income_statement_route_renders_successfully(): void
+    {
+        $response = $this->actingAs($this->bursarA)->get(route('admin.reports.income-statement'));
+        $response->assertOk();
+        $response->assertViewIs('admin.reports.income-statement');
+    }
+
+    public function test_income_expenditure_excel_export_downloads_file(): void
+    {
+        $response = $this->actingAs($this->bursarA)->get(route('admin.reports.income-expenditure.export'));
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+    }
 }
