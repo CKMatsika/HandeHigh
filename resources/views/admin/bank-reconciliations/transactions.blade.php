@@ -104,12 +104,15 @@
                                     </span>
                                 </td>
                                 <td class="px-2 py-2 text-center">
-                                    @if($tx->status === 'unmatched')
-                                        <button onclick="showMatchModal({{ $tx->id }}, 'bank')" class="text-indigo-400 hover:text-indigo-300 text-xs">
+                                    @if($tx->status === 'unmatched' || $tx->status === 'partially_matched')
+                                        <button type="button" onclick="showMatchModal({{ $tx->id }}, 'bank', {{ (float) $tx->unmatched_amount }}, '{{ addslashes($tx->description) }}', '{{ $tx->transaction_date->format('M j, Y') }}')" class="text-indigo-400 hover:text-indigo-300 font-medium text-xs">
                                             Match
                                         </button>
                                     @else
-                                        <button onclick="showUnmatchModal({{ $tx->id }})" class="text-red-400 hover:text-red-300 text-xs">
+                                        @php
+                                            $matchedCashbook = $tx->cashbookMatches->first();
+                                        @endphp
+                                        <button type="button" onclick="showUnmatchModal({{ $tx->id }}, {{ $matchedCashbook ? $matchedCashbook->id : 'null' }})" class="text-red-400 hover:text-red-300 font-medium text-xs">
                                             Unmatch
                                         </button>
                                     @endif
@@ -158,12 +161,15 @@
                                     </span>
                                 </td>
                                 <td class="px-2 py-2 text-center">
-                                    @if($tx->status === 'unmatched')
-                                        <button onclick="showMatchModal({{ $tx->id }}, 'cashbook')" class="text-indigo-400 hover:text-indigo-300 text-xs">
+                                    @if($tx->status === 'unmatched' || $tx->status === 'partially_matched')
+                                        <button type="button" onclick="showMatchModal({{ $tx->id }}, 'cashbook', {{ (float) $tx->unmatched_amount }}, '{{ addslashes($tx->description) }}', '{{ $tx->transaction_date->format('M j, Y') }}')" class="text-indigo-400 hover:text-indigo-300 font-medium text-xs">
                                             Match
                                         </button>
                                     @else
-                                        <button onclick="showUnmatchModal({{ $tx->id }})" class="text-red-400 hover:text-red-300 text-xs">
+                                        @php
+                                            $matchedBank = $tx->bankMatches->first();
+                                        @endphp
+                                        <button type="button" onclick="showUnmatchModal({{ $matchedBank ? $matchedBank->id : 'null' }}, {{ $tx->id }})" class="text-red-400 hover:text-red-300 font-medium text-xs">
                                             Unmatch
                                         </button>
                                     @endif
@@ -268,24 +274,54 @@
     </div>
 
     <!-- Match Transactions Modal -->
-    <div id="matchModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-slate-800 rounded-xl p-6 w-full max-w-2xl">
-            <h3 class="text-lg font-semibold text-slate-100 mb-4">Match Transactions</h3>
-            <form id="matchForm" method="POST">
+    <div id="matchModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 w-full max-w-2xl transform transition-all">
+            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+                <div class="flex items-center space-x-2">
+                    <span class="p-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg text-sm">🔗</span>
+                    <h3 class="text-base font-semibold text-slate-100" id="matchModalTitle">Match Transactions</h3>
+                </div>
+                <button type="button" onclick="hideMatchModal()" class="text-slate-400 hover:text-slate-200 text-lg leading-none">&times;</button>
+            </div>
+
+            <!-- Source Transaction Summary -->
+            <div class="mb-4 p-3 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400" id="sourceTypeLabel">Selected Bank Transaction</span>
+                    <div class="text-sm font-semibold text-slate-100 mt-0.5" id="sourceDescLabel">-</div>
+                    <div class="text-xs text-slate-400" id="sourceDateLabel">-</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Unmatched Amount</div>
+                    <div class="text-lg font-mono font-bold text-indigo-400" id="sourceAmountLabel">$0.00</div>
+                </div>
+            </div>
+
+            <form id="matchForm" action="{{ route('admin.bank-reconciliations.manual-match') }}" method="POST">
                 @csrf
                 <input type="hidden" id="matchBankTxId" name="bank_transaction_id">
                 <input type="hidden" id="matchCashbookTxId" name="cashbook_transaction_id">
+                
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-2">Match Amount</label>
-                        <input type="number" id="matchAmount" name="match_amount" required step="0.01" min="0" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-slate-200">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-medium text-slate-300" id="availableMatchesHeading">Select Transaction to Match</label>
+                            <span class="text-[11px] text-slate-400" id="matchesCountLabel"></span>
+                        </div>
+                        <div id="availableMatches" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            <div class="p-4 text-center text-slate-400 text-xs">Loading available matches...</div>
+                        </div>
                     </div>
-                    <div id="availableMatches" class="space-y-2 max-h-60 overflow-y-auto">
-                        <!-- Available matches will be loaded here -->
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Match Amount ($)</label>
+                        <input type="number" id="matchAmount" name="match_amount" required step="0.01" min="0.01" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <p class="text-[11px] text-slate-400 mt-1">Amount to reconcile between the selected pair.</p>
                     </div>
-                    <div class="flex justify-end space-x-2">
-                        <button type="button" onclick="hideMatchModal()" class="px-4 py-2 bg-slate-600 text-white text-xs rounded hover:bg-slate-500">Cancel</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Match</button>
+
+                    <div class="flex justify-end space-x-3 pt-3 border-t border-slate-800">
+                        <button type="button" onclick="hideMatchModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-medium rounded-lg hover:bg-slate-700 border border-slate-700 transition">Cancel</button>
+                        <button type="submit" id="submitMatchBtn" class="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-500 transition shadow-lg shadow-indigo-600/30">Confirm Match</button>
                     </div>
                 </div>
             </form>
@@ -293,8 +329,46 @@
     </div>
 
     <script>
-        let currentMatchType = '';
-        let currentTransactionId = null;
+        const accountId = {{ $account->id }};
+        const availableMatchesUrl = "{{ route('admin.bank-reconciliations.available-matches') }}";
+
+        const localBankUnmatched = [
+            @foreach($bankTransactions as $tx)
+                @if($tx->status !== 'matched')
+                {
+                    id: {{ $tx->id }},
+                    date: '{{ $tx->transaction_date->format('M j, Y') }}',
+                    description: '{{ addslashes($tx->description) }}',
+                    reference_number: '{{ addslashes($tx->reference_number ?? '') }}',
+                    amount: {{ (float) $tx->amount }},
+                    unmatched_amount: {{ (float) $tx->unmatched_amount }},
+                    category: '{{ $tx->transaction_type }}',
+                    status: '{{ $tx->status }}'
+                },
+                @endif
+            @endforeach
+        ];
+
+        const localCashbookUnmatched = [
+            @foreach($cashbookTransactions as $tx)
+                @if($tx->status !== 'matched')
+                {
+                    id: {{ $tx->id }},
+                    date: '{{ $tx->transaction_date->format('M j, Y') }}',
+                    description: '{{ addslashes($tx->description) }}',
+                    reference_number: '{{ addslashes($tx->reference_number ?? '') }}',
+                    amount: {{ (float) $tx->amount }},
+                    unmatched_amount: {{ (float) $tx->unmatched_amount }},
+                    category: '{{ addslashes($tx->category_label ?? $tx->category) }}',
+                    status: '{{ $tx->status }}'
+                },
+                @endif
+            @endforeach
+        ];
+
+        let currentSourceType = '';
+        let currentSourceId = null;
+        let currentSourceUnmatchedAmount = 0;
 
         function showAddBankTxModal() {
             document.getElementById('addBankTxModal').classList.remove('hidden');
@@ -310,42 +384,143 @@
             document.getElementById('addCashbookTxModal').classList.add('hidden');
         }
 
-        function showMatchModal(transactionId, type) {
-            currentMatchType = type;
-            currentTransactionId = transactionId;
-            
-            if (type === 'bank') {
-                document.getElementById('matchBankTxId').value = transactionId;
-                loadCashbookMatches(transactionId);
-            } else {
-                document.getElementById('matchCashbookTxId').value = transactionId;
-                loadBankMatches(transactionId);
-            }
-            
+        function showMatchModal(transactionId, type, unmatchedAmount, description, date) {
+            currentSourceType = type;
+            currentSourceId = transactionId;
+            currentSourceUnmatchedAmount = parseFloat(unmatchedAmount) || 0;
+
+            // Reset inputs
+            document.getElementById('matchBankTxId').value = type === 'bank' ? transactionId : '';
+            document.getElementById('matchCashbookTxId').value = type === 'cashbook' ? transactionId : '';
+            document.getElementById('matchAmount').value = currentSourceUnmatchedAmount.toFixed(2);
+            document.getElementById('matchAmount').max = currentSourceUnmatchedAmount;
+
+            // Update UI headers & summaries
+            document.getElementById('sourceTypeLabel').textContent = type === 'bank' ? 'Selected Bank Transaction' : 'Selected Cashbook Transaction';
+            document.getElementById('sourceDescLabel').textContent = description || 'Transaction #' + transactionId;
+            document.getElementById('sourceDateLabel').textContent = date || '';
+            document.getElementById('sourceAmountLabel').textContent = '$' + currentSourceUnmatchedAmount.toFixed(2);
+            document.getElementById('availableMatchesHeading').textContent = type === 'bank' ? 'Select Matching Cashbook Transaction' : 'Select Matching Bank Transaction';
+
+            // First render local candidates immediately (0ms)
+            const localCandidates = type === 'bank' ? localCashbookUnmatched : localBankUnmatched;
+            renderCandidates(localCandidates, currentSourceUnmatchedAmount);
+
+            // Open modal
             document.getElementById('matchModal').classList.remove('hidden');
+
+            // Then fetch from server to get full list (including outside current date range)
+            fetch(`${availableMatchesUrl}?account_id=${accountId}&type=${type}&transaction_id=${transactionId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.success && Array.isArray(data.matches)) {
+                        renderCandidates(data.matches, currentSourceUnmatchedAmount);
+                    }
+                })
+                .catch(err => {
+                    console.warn('Could not fetch remote candidates, using local candidates', err);
+                });
+        }
+
+        function renderCandidates(candidates, targetAmount) {
+            const matchesDiv = document.getElementById('availableMatches');
+            const countLabel = document.getElementById('matchesCountLabel');
+
+            if (!candidates || candidates.length === 0) {
+                matchesDiv.innerHTML = `
+                    <div class="p-6 text-center border border-slate-800 rounded-xl bg-slate-950/40">
+                        <p class="text-sm text-slate-300 font-medium">No unmatched ${currentSourceType === 'bank' ? 'cashbook' : 'bank'} transactions found.</p>
+                        <p class="text-xs text-slate-500 mt-1">Ensure corresponding transactions are entered for this account.</p>
+                    </div>
+                `;
+                countLabel.textContent = '0 available';
+                return;
+            }
+
+            countLabel.textContent = `${candidates.length} available`;
+
+            // Sort so exact amount match is first
+            const sorted = [...candidates].sort((a, b) => {
+                const diffA = Math.abs(a.unmatched_amount - targetAmount);
+                const diffB = Math.abs(b.unmatched_amount - targetAmount);
+                return diffA - diffB;
+            });
+
+            let html = '';
+            sorted.forEach((item, index) => {
+                const isExact = Math.abs(item.unmatched_amount - targetAmount) < 0.005;
+                const isFirst = index === 0;
+
+                html += `
+                    <label class="candidate-option flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-950/50 hover:bg-slate-800/60 hover:border-slate-700 cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <input type="radio" name="candidate_tx_radio" value="${item.id}" data-unmatched="${item.unmatched_amount}" ${isFirst ? 'checked' : ''} onchange="onCandidateSelected(${item.id}, ${item.unmatched_amount})" class="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200">${escapeHtml(item.description)}</div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">
+                                    <span>${item.date}</span>
+                                    ${item.category ? `<span class="mx-1">•</span><span class="capitalize">${escapeHtml(item.category)}</span>` : ''}
+                                    ${item.reference_number ? `<span class="mx-1">•</span><span>Ref: ${escapeHtml(item.reference_number)}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-mono text-xs font-bold text-slate-100">$${parseFloat(item.unmatched_amount).toFixed(2)}</div>
+                            ${isExact ? `<span class="inline-block mt-0.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Exact Match</span>` : ''}
+                        </div>
+                    </label>
+                `;
+            });
+
+            matchesDiv.innerHTML = html;
+
+            // Select the first one by default
+            if (sorted.length > 0) {
+                onCandidateSelected(sorted[0].id, sorted[0].unmatched_amount);
+            }
+        }
+
+        function onCandidateSelected(candidateId, candidateUnmatched) {
+            if (currentSourceType === 'bank') {
+                document.getElementById('matchCashbookTxId').value = candidateId;
+            } else {
+                document.getElementById('matchBankTxId').value = candidateId;
+            }
+
+            const matchAmount = Math.min(currentSourceUnmatchedAmount, parseFloat(candidateUnmatched) || 0);
+            const amountInput = document.getElementById('matchAmount');
+            amountInput.value = matchAmount.toFixed(2);
+            amountInput.max = matchAmount.toFixed(2);
         }
 
         function hideMatchModal() {
             document.getElementById('matchModal').classList.add('hidden');
         }
 
-        function loadCashbookMatches(bankTxId) {
-            // This would be an AJAX call to load available cashbook transactions
-            // For now, we'll show a placeholder
-            const matchesDiv = document.getElementById('availableMatches');
-            matchesDiv.innerHTML = '<p class="text-slate-400 text-sm">Loading available matches...</p>';
-        }
+        document.getElementById('matchForm').addEventListener('submit', function(e) {
+            const bankId = document.getElementById('matchBankTxId').value;
+            const cashbookId = document.getElementById('matchCashbookTxId').value;
+            const amount = parseFloat(document.getElementById('matchAmount').value);
 
-        function loadBankMatches(cashbookTxId) {
-            // This would be an AJAX call to load available bank transactions
-            // For now, we'll show a placeholder
-            const matchesDiv = document.getElementById('availableMatches');
-            matchesDiv.innerHTML = '<p class="text-slate-400 text-sm">Loading available matches...</p>';
-        }
+            if (!bankId || !cashbookId) {
+                e.preventDefault();
+                alert('Please select a corresponding transaction to match.');
+                return false;
+            }
 
-        function showUnmatchModal(transactionId) {
+            if (!amount || amount <= 0) {
+                e.preventDefault();
+                alert('Please enter a valid match amount greater than 0.');
+                return false;
+            }
+
+            const btn = document.getElementById('submitMatchBtn');
+            btn.disabled = true;
+            btn.textContent = 'Matching...';
+        });
+
+        function showUnmatchModal(bankTxId, cashbookTxId) {
             if (confirm('Are you sure you want to unmatch this transaction?')) {
-                // Submit unmatch form
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '{{ route("admin.bank-reconciliations.unmatch") }}';
@@ -356,23 +531,49 @@
                 csrf.value = '{{ csrf_token() }}';
                 form.appendChild(csrf);
                 
-                const bankTxId = document.createElement('input');
-                bankTxId.type = 'hidden';
-                bankTxId.name = 'bank_transaction_id';
-                bankTxId.value = transactionId;
-                form.appendChild(bankTxId);
+                if (bankTxId) {
+                    const bInput = document.createElement('input');
+                    bInput.type = 'hidden';
+                    bInput.name = 'bank_transaction_id';
+                    bInput.value = bankTxId;
+                    form.appendChild(bInput);
+                }
                 
-                // You would need to also pass the cashbook transaction ID
-                // This is simplified for demonstration
+                if (cashbookTxId) {
+                    const cInput = document.createElement('input');
+                    cInput.type = 'hidden';
+                    cInput.name = 'cashbook_transaction_id';
+                    cInput.value = cashbookTxId;
+                    form.appendChild(cInput);
+                }
                 
                 document.body.appendChild(form);
                 form.submit();
             }
         }
 
-        // Auto-refresh every 30 seconds to show updated matching status
-        setTimeout(() => {
-            window.location.reload();
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.toString().replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Auto-refresh every 30 seconds only if no modal is open
+        setInterval(() => {
+            const modals = ['matchModal', 'addBankTxModal', 'addCashbookTxModal'];
+            const isAnyModalOpen = modals.some(id => {
+                const el = document.getElementById(id);
+                return el && !el.classList.contains('hidden');
+            });
+            if (!isAnyModalOpen) {
+                window.location.reload();
+            }
         }, 30000);
     </script>
 @endsection

@@ -316,4 +316,208 @@ class BankAccountsAndReconciliationIntegrationTest extends TestCase
         $this->assertEquals('matched', $cashbookTx->status);
         $this->assertEquals('matched', $bankTx->status);
     }
+
+    public function test_available_matches_endpoint_returns_candidates(): void
+    {
+        $bankAccount = Account::create([
+            'school_id' => $this->school->id,
+            'code' => '1308',
+            'name' => 'Stanbic Operations',
+            'type' => 'asset',
+            'category' => 'bank',
+            'currency' => 'USD',
+            'is_active' => true,
+            'is_postable' => true,
+        ]);
+
+        $cashbookTx = CashbookTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Tuition deposit Wendy Zekiya',
+            'amount' => 450.00,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'status' => 'unmatched',
+        ]);
+
+        $bankTx = BankTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Payment 450',
+            'amount' => 450.00,
+            'transaction_type' => 'credit',
+            'source' => 'manual',
+            'status' => 'unmatched',
+        ]);
+
+        $response = $this->actingAs($this->bursar)
+            ->getJson(route('admin.bank-reconciliations.available-matches', [
+                'account_id' => $bankAccount->id,
+                'type' => 'bank',
+                'transaction_id' => $bankTx->id,
+            ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('matches.0.id', $cashbookTx->id);
+        $response->assertJsonPath('matches.0.is_exact', true);
+        $response->assertJsonPath('matches.0.amount', 450);
+    }
+
+    public function test_manual_match_endpoint_matches_bank_and_cashbook_transactions(): void
+    {
+        $bankAccount = Account::create([
+            'school_id' => $this->school->id,
+            'code' => '1309',
+            'name' => 'ZB Bank Current',
+            'type' => 'asset',
+            'category' => 'bank',
+            'currency' => 'USD',
+            'is_active' => true,
+            'is_postable' => true,
+        ]);
+
+        $cashbookTx = CashbookTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Payment from student',
+            'amount' => 450.00,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'status' => 'unmatched',
+        ]);
+
+        $bankTx = BankTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Bank direct payment',
+            'amount' => 450.00,
+            'transaction_type' => 'credit',
+            'source' => 'manual',
+            'status' => 'unmatched',
+        ]);
+
+        $response = $this->actingAs($this->bursar)
+            ->post(route('admin.bank-reconciliations.manual-match'), [
+                'bank_transaction_id' => $bankTx->id,
+                'cashbook_transaction_id' => $cashbookTx->id,
+                'match_amount' => 450.00,
+            ]);
+
+        $response->assertSessionHas('success');
+        $this->assertEquals('matched', $bankTx->fresh()->status);
+        $this->assertEquals('matched', $cashbookTx->fresh()->status);
+        $this->assertDatabaseHas('transaction_matches', [
+            'bank_transaction_id' => $bankTx->id,
+            'cashbook_transaction_id' => $cashbookTx->id,
+            'match_amount' => 450.00,
+        ]);
+    }
+
+    public function test_posting_to_transactions_view_url_routes_to_manual_match_instead_of_405(): void
+    {
+        $bankAccount = Account::create([
+            'school_id' => $this->school->id,
+            'code' => '1310',
+            'name' => 'BancABC',
+            'type' => 'asset',
+            'category' => 'bank',
+            'currency' => 'USD',
+            'is_active' => true,
+            'is_postable' => true,
+        ]);
+
+        $cashbookTx = CashbookTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Cashbook payment',
+            'amount' => 200.00,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'status' => 'unmatched',
+        ]);
+
+        $bankTx = BankTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Bank payment',
+            'amount' => 200.00,
+            'transaction_type' => 'credit',
+            'source' => 'manual',
+            'status' => 'unmatched',
+        ]);
+
+        // Post to the GET transactions view URL directly - should NOT return 405 Method Not Allowed!
+        $response = $this->actingAs($this->bursar)
+            ->post(route('admin.bank-reconciliations.transactions', $bankAccount->id), [
+                'bank_transaction_id' => $bankTx->id,
+                'cashbook_transaction_id' => $cashbookTx->id,
+                'match_amount' => 200.00,
+            ]);
+
+        $response->assertSessionHas('success');
+        $this->assertNotEquals(405, $response->getStatusCode());
+        $this->assertEquals('matched', $bankTx->fresh()->status);
+        $this->assertEquals('matched', $cashbookTx->fresh()->status);
+    }
+
+    public function test_unmatch_removes_match_and_restores_unmatched_status(): void
+    {
+        $bankAccount = Account::create([
+            'school_id' => $this->school->id,
+            'code' => '1311',
+            'name' => 'FBC Bank',
+            'type' => 'asset',
+            'category' => 'bank',
+            'currency' => 'USD',
+            'is_active' => true,
+            'is_postable' => true,
+        ]);
+
+        $cashbookTx = CashbookTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Tx to unmatch',
+            'amount' => 150.00,
+            'transaction_type' => 'debit',
+            'category' => 'income',
+            'status' => 'unmatched',
+        ]);
+
+        $bankTx = BankTransaction::create([
+            'school_id' => $this->school->id,
+            'account_id' => $bankAccount->id,
+            'transaction_date' => now()->toDateString(),
+            'description' => 'Bank tx to unmatch',
+            'amount' => 150.00,
+            'transaction_type' => 'credit',
+            'source' => 'manual',
+            'status' => 'unmatched',
+        ]);
+
+        app(BankReconciliationService::class)->createMatch($bankTx, $cashbookTx, 150.00, 'manual');
+        $this->assertEquals('matched', $bankTx->fresh()->status);
+        $this->assertEquals('matched', $cashbookTx->fresh()->status);
+
+        // Unmatch by providing bank_transaction_id (even if cashbook_id is omitted or passed)
+        $response = $this->actingAs($this->bursar)
+            ->post(route('admin.bank-reconciliations.unmatch'), [
+                'bank_transaction_id' => $bankTx->id,
+            ]);
+
+        $response->assertSessionHas('success');
+        $this->assertEquals('unmatched', $bankTx->fresh()->status);
+        $this->assertEquals('unmatched', $cashbookTx->fresh()->status);
+        $this->assertDatabaseMissing('transaction_matches', [
+            'bank_transaction_id' => $bankTx->id,
+            'cashbook_transaction_id' => $cashbookTx->id,
+        ]);
+    }
 }

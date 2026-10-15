@@ -204,6 +204,120 @@ class BankReconciliationController extends Controller
         return back()->with('success', $result['message']);
     }
 
+    public function availableMatches(Request $request)
+    {
+        $school = Auth::user()?->school;
+        if (! $school) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'account_id' => ['required', TenantExists::make('accounts')],
+            'type' => ['required', 'in:bank,cashbook'],
+            'transaction_id' => ['required', 'integer'],
+        ]);
+
+        $accountId = $validated['account_id'];
+        $type = $validated['type'];
+        $txId = $validated['transaction_id'];
+
+        if ($type === 'bank') {
+            $sourceTx = BankTransaction::where('school_id', $school->id)
+                ->where('account_id', $accountId)
+                ->findOrFail($txId);
+
+            $targetAmount = (float) $sourceTx->unmatched_amount;
+
+            $candidates = CashbookTransaction::where('school_id', $school->id)
+                ->where('account_id', $accountId)
+                ->whereIn('status', ['unmatched', 'partially_matched'])
+                ->get()
+                ->map(function ($tx) use ($targetAmount) {
+                    $unmatched = (float) $tx->unmatched_amount;
+                    return [
+                        'id' => $tx->id,
+                        'date' => $tx->transaction_date->format('M j, Y'),
+                        'raw_date' => $tx->transaction_date->format('Y-m-d'),
+                        'description' => $tx->description,
+                        'reference_number' => $tx->reference_number,
+                        'amount' => (float) $tx->amount,
+                        'unmatched_amount' => $unmatched,
+                        'category' => $tx->category_label ?? $tx->category,
+                        'type' => $tx->transaction_type,
+                        'is_exact' => abs($unmatched - $targetAmount) < 0.001,
+                        'diff' => abs($unmatched - $targetAmount),
+                    ];
+                })
+                ->sortBy([
+                    ['is_exact', 'desc'],
+                    ['diff', 'asc'],
+                    ['raw_date', 'desc'],
+                ])
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'source' => [
+                    'id' => $sourceTx->id,
+                    'type' => 'bank',
+                    'description' => $sourceTx->description,
+                    'reference_number' => $sourceTx->reference_number,
+                    'amount' => (float) $sourceTx->amount,
+                    'unmatched_amount' => (float) $sourceTx->unmatched_amount,
+                    'date' => $sourceTx->transaction_date->format('M j, Y'),
+                ],
+                'matches' => $candidates,
+            ]);
+        } else {
+            $sourceTx = CashbookTransaction::where('school_id', $school->id)
+                ->where('account_id', $accountId)
+                ->findOrFail($txId);
+
+            $targetAmount = (float) $sourceTx->unmatched_amount;
+
+            $candidates = BankTransaction::where('school_id', $school->id)
+                ->where('account_id', $accountId)
+                ->whereIn('status', ['unmatched', 'partially_matched'])
+                ->get()
+                ->map(function ($tx) use ($targetAmount) {
+                    $unmatched = (float) $tx->unmatched_amount;
+                    return [
+                        'id' => $tx->id,
+                        'date' => $tx->transaction_date->format('M j, Y'),
+                        'raw_date' => $tx->transaction_date->format('Y-m-d'),
+                        'description' => $tx->description,
+                        'reference_number' => $tx->reference_number,
+                        'amount' => (float) $tx->amount,
+                        'unmatched_amount' => $unmatched,
+                        'category' => $tx->transaction_type,
+                        'type' => $tx->transaction_type,
+                        'is_exact' => abs($unmatched - $targetAmount) < 0.001,
+                        'diff' => abs($unmatched - $targetAmount),
+                    ];
+                })
+                ->sortBy([
+                    ['is_exact', 'desc'],
+                    ['diff', 'asc'],
+                    ['raw_date', 'desc'],
+                ])
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'source' => [
+                    'id' => $sourceTx->id,
+                    'type' => 'cashbook',
+                    'description' => $sourceTx->description,
+                    'reference_number' => $sourceTx->reference_number,
+                    'amount' => (float) $sourceTx->amount,
+                    'unmatched_amount' => (float) $sourceTx->unmatched_amount,
+                    'date' => $sourceTx->transaction_date->format('M j, Y'),
+                ],
+                'matches' => $candidates,
+            ]);
+        }
+    }
+
     public function manualMatch(Request $request)
     {
         $school = Auth::user()?->school;
@@ -214,14 +328,25 @@ class BankReconciliationController extends Controller
         $validated = $request->validate([
             'bank_transaction_id' => ['required', TenantExists::make('bank_transactions')],
             'cashbook_transaction_id' => ['required', TenantExists::make('cashbook_transactions')],
-            'match_amount' => ['required', 'numeric', 'min:0'],
+            'match_amount' => ['required', 'numeric', 'min:0.01'],
         ]);
 
         $bankTransaction = BankTransaction::where('school_id', $school->id)->findOrFail($validated['bank_transaction_id']);
         $cashbookTransaction = CashbookTransaction::where('school_id', $school->id)->findOrFail($validated['cashbook_transaction_id']);
 
         if ($bankTransaction->account_id !== $cashbookTransaction->account_id) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Transactions must belong to the same bank account.'], 422);
+            }
             return back()->with('error', 'Transactions must belong to the same bank account.');
+        }
+
+        if ($validated['match_amount'] > $bankTransaction->unmatched_amount || $validated['match_amount'] > $cashbookTransaction->unmatched_amount) {
+            $msg = 'Match amount cannot exceed the remaining unmatched amount on either transaction.';
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return back()->with('error', $msg);
         }
 
         try {
@@ -232,8 +357,14 @@ class BankReconciliationController extends Controller
                 'manual'
             );
 
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => 'Transactions matched successfully.']);
+            }
             return back()->with('success', 'Transactions matched successfully.');
         } catch (\Exception $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Failed to match transactions: ' . $e->getMessage()], 500);
+            }
             return back()->with('error', 'Failed to match transactions: ' . $e->getMessage());
         }
     }
@@ -244,6 +375,31 @@ class BankReconciliationController extends Controller
         if (! $school) {
             abort(403);
         }
+
+        $bankTxId = $request->input('bank_transaction_id');
+        $cashbookTxId = $request->input('cashbook_transaction_id');
+
+        // If only one was provided, resolve the partner from transaction_matches
+        if ($bankTxId && ! $cashbookTxId) {
+            $match = \DB::table('transaction_matches')
+                ->where('bank_transaction_id', $bankTxId)
+                ->first();
+            if ($match) {
+                $cashbookTxId = $match->cashbook_transaction_id;
+            }
+        } elseif ($cashbookTxId && ! $bankTxId) {
+            $match = \DB::table('transaction_matches')
+                ->where('cashbook_transaction_id', $cashbookTxId)
+                ->first();
+            if ($match) {
+                $bankTxId = $match->bank_transaction_id;
+            }
+        }
+
+        $request->merge([
+            'bank_transaction_id' => $bankTxId,
+            'cashbook_transaction_id' => $cashbookTxId,
+        ]);
 
         $validated = $request->validate([
             'bank_transaction_id' => ['required', TenantExists::make('bank_transactions')],
@@ -259,18 +415,46 @@ class BankReconciliationController extends Controller
             ->where('cashbook_transaction_id', $cashbookTransaction->id)
             ->delete();
 
-        // Recalculate matched amounts
+        // Recalculate matched amounts and status for both transactions
+        $remainingBankMatches = \DB::table('transaction_matches')
+            ->where('bank_transaction_id', $bankTransaction->id)
+            ->get();
+        $bankMatchedTotal = (float) $remainingBankMatches->sum('match_amount');
+        $bankMatchedWith = $remainingBankMatches->map(function ($m) {
+            return [
+                'cashbook_transaction_id' => $m->cashbook_transaction_id,
+                'amount' => (float) $m->match_amount,
+                'type' => $m->match_type,
+            ];
+        })->values()->all();
+
         $bankTransaction->update([
-            'matched_amount' => 0,
-            'status' => 'unmatched',
-            'matched_with' => null,
+            'matched_amount' => $bankMatchedTotal,
+            'status' => $bankMatchedTotal >= $bankTransaction->amount ? 'matched' : ($bankMatchedTotal > 0 ? 'partially_matched' : 'unmatched'),
+            'matched_with' => !empty($bankMatchedWith) ? $bankMatchedWith : null,
         ]);
 
+        $remainingCashbookMatches = \DB::table('transaction_matches')
+            ->where('cashbook_transaction_id', $cashbookTransaction->id)
+            ->get();
+        $cashbookMatchedTotal = (float) $remainingCashbookMatches->sum('match_amount');
+        $cashbookMatchedWith = $remainingCashbookMatches->map(function ($m) {
+            return [
+                'bank_transaction_id' => $m->bank_transaction_id,
+                'amount' => (float) $m->match_amount,
+                'type' => $m->match_type,
+            ];
+        })->values()->all();
+
         $cashbookTransaction->update([
-            'matched_amount' => 0,
-            'status' => 'unmatched',
-            'matched_with' => null,
+            'matched_amount' => $cashbookMatchedTotal,
+            'status' => $cashbookMatchedTotal >= $cashbookTransaction->amount ? 'matched' : ($cashbookMatchedTotal > 0 ? 'partially_matched' : 'unmatched'),
+            'matched_with' => !empty($cashbookMatchedWith) ? $cashbookMatchedWith : null,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'Match removed successfully.']);
+        }
 
         return back()->with('success', 'Match removed successfully.');
     }

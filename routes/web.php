@@ -324,9 +324,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/exam-results/export', [AcademicReportController::class, 'exportExamResultsRegister'])->name('reports.exam-results.export');
 
             // Bank Reconciliation & Transfers
-            Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index','create','store','show'])
-                ->middlewareFor('show', 'can:view,bankReconciliation');
+            Route::get('bank-reconciliations/available-matches', [BankReconciliationController::class, 'availableMatches'])->name('bank-reconciliations.available-matches');
             Route::get('bank-reconciliations/transactions/{account}', [BankReconciliationController::class, 'transactions'])->name('bank-reconciliations.transactions')->middleware('can:view,account');
+            Route::post('bank-reconciliations/transactions/{account}', [BankReconciliationController::class, 'manualMatch'])->middleware('can:view,account');
             Route::post('bank-reconciliations/import-statement', [BankReconciliationController::class, 'importStatement'])->name('bank-reconciliations.import-statement');
             Route::post('bank-reconciliations/auto-match', [BankReconciliationController::class, 'autoMatch'])->name('bank-reconciliations.auto-match');
             Route::post('bank-reconciliations/add-bank-charge', [BankReconciliationController::class, 'addBankCharge'])->name('bank-reconciliations.add-bank-charge');
@@ -334,6 +334,8 @@ Route::middleware(['auth'])->group(function () {
             Route::post('bank-reconciliations/unmatch', [BankReconciliationController::class, 'unmatchTransaction'])->name('bank-reconciliations.unmatch');
             Route::post('bank-reconciliations/add-cashbook-transaction', [BankReconciliationController::class, 'addCashbookTransaction'])->name('bank-reconciliations.add-cashbook-transaction');
             Route::post('bank-reconciliations/add-bank-transaction', [BankReconciliationController::class, 'addBankTransaction'])->name('bank-reconciliations.add-bank-transaction');
+            Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index','create','store','show'])
+                ->middlewareFor('show', 'can:view,bankReconciliation');
             Route::resource('interbank-transfers', InterbankTransferController::class)->only(['index','create','store']);
 
             // Budgets
