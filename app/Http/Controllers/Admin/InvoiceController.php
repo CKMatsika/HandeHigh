@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Invoice;
-use App\Models\InvoiceItem;
+use App\Models\AuditLog;
 use App\Models\Enrollment;
 use App\Models\FeeStructure;
-use App\Models\Student;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\JournalBatch;
 use App\Models\LedgerEntry;
 use App\Models\SchoolClass;
+use App\Models\Student;
 use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
@@ -92,11 +94,12 @@ class InvoiceController extends Controller
             ->where('id', $validated['student_id'])
             ->firstOrFail();
 
-        // Check if invoice already exists
+        // Check if active invoice already exists
         $existingInvoice = Invoice::where('school_id', $school->id)
             ->where('student_id', $validated['student_id'])
             ->where('academic_year', $validated['academic_year'])
             ->where('term', $validated['term'])
+            ->where('status', '!=', 'cancelled')
             ->first();
 
         if ($existingInvoice) {
@@ -112,7 +115,7 @@ class InvoiceController extends Controller
             ->where('term', $validated['term'])
             ->first();
 
-        DB::transaction(function () use ($validated, $student, $enrollment, $school) {
+        DB::transaction(function () use ($validated, $student, $enrollment, $school, $user) {
             $invoiceNumber = Invoice::generateNextNumber($school->id);
 
             $invoice = Invoice::create([
@@ -153,6 +156,27 @@ class InvoiceController extends Controller
             ]);
 
             $this->accountingService->postInvoice($invoice);
+
+            AuditLog::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'action' => 'create',
+                'module' => 'accounting',
+                'model_type' => Invoice::class,
+                'model_id' => $invoice->id,
+                'description' => "Created invoice {$invoice->number} for {$student->first_name} {$student->last_name} ({$validated['academic_year']} - {$validated['term']}) total: $" . number_format($totalAmount, 2),
+                'new_values' => [
+                    'invoice_number' => $invoice->number,
+                    'student_id' => $student->id,
+                    'student_name' => "{$student->first_name} {$student->last_name}",
+                    'academic_year' => $validated['academic_year'],
+                    'term' => $validated['term'],
+                    'total_amount' => $totalAmount,
+                    'items_count' => count($validated['items']),
+                ],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return redirect()
@@ -160,44 +184,99 @@ class InvoiceController extends Controller
             ->with('status', 'Invoice created successfully.');
     }
 
-    public function destroy(Invoice $invoice)
+    public function destroy(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
         $school = $user?->school;
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
-        }
-
-        if ($invoice->status === 'cancelled') {
-            return back()
-                ->with('status', 'Invoice is already cancelled.');
         }
 
         $totalPaid = (float) $invoice->allocations->sum('amount');
 
         if ($totalPaid > 0) {
             return back()
-                ->withErrors(['general' => 'Cannot delete invoice with payments. Cancel the invoice instead.']);
+                ->withErrors(['general' => 'Cannot delete an invoice with recorded payments. Please void or reverse payment allocations before deleting.']);
         }
 
-        DB::transaction(function () use ($invoice) {
-            // Delete invoice items
+        $reason = trim((string) ($request->input('deletion_reason') ?: $request->input('reason') ?: ''));
+        if (empty($reason)) {
+            $reason = 'No specific reason provided';
+        }
+
+        $invoice->loadMissing(['student', 'items']);
+        $student = $invoice->student;
+        $studentName = $student ? "{$student->first_name} {$student->last_name}" : 'Student #' . $invoice->student_id;
+        $invoiceNumber = $invoice->number;
+        $totalAmount = (float) $invoice->total_amount;
+
+        DB::transaction(function () use ($invoice, $school, $user, $student, $studentName, $reason, $totalAmount) {
+            // 1. Record comprehensive Audit Log before deletion
+            AuditLog::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'action' => 'delete',
+                'module' => 'accounting',
+                'model_type' => Invoice::class,
+                'model_id' => $invoice->id,
+                'description' => "Deleted invoice {$invoice->number} for {$studentName} ({$invoice->academic_year} - {$invoice->term}) total: $" . number_format($totalAmount, 2) . ". Reason: {$reason}",
+                'old_values' => [
+                    'invoice_number' => $invoice->number,
+                    'student_id' => $invoice->student_id,
+                    'student_name' => $studentName,
+                    'student_admission_number' => $student?->admission_number,
+                    'grade' => $student?->grade,
+                    'class_name' => $student?->class_name,
+                    'academic_year' => $invoice->academic_year,
+                    'term' => $invoice->term,
+                    'total_amount' => $totalAmount,
+                    'balance' => (float) $invoice->balance,
+                    'issued_at' => $invoice->issued_at?->format('Y-m-d'),
+                    'due_date' => $invoice->due_date?->format('Y-m-d'),
+                    'previous_status' => $invoice->status,
+                    'deletion_reason' => $reason,
+                    'deleted_by_user_id' => $user->id,
+                    'deleted_by_name' => $user->name,
+                    'deleted_by_email' => $user->email,
+                    'deleted_at' => now()->toDateTimeString(),
+                    'items' => $invoice->items->map(fn($item) => [
+                        'description' => $item->description,
+                        'category' => $item->category,
+                        'quantity' => (int) $item->quantity,
+                        'unit_amount' => (float) $item->unit_amount,
+                        'line_total' => (float) $item->line_total,
+                    ])->values()->toArray(),
+                ],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+
+            // 2. Delete invoice items
             $invoice->items()->delete();
 
-            // Delete ledger entries
+            // 3. Delete ledger entries
             $invoice->ledgerEntries()->delete();
 
-            // Delete the invoice
+            // 4. Delete journal batches and their entries
+            JournalBatch::where('school_id', $school->id)
+                ->where('source_type', 'invoice')
+                ->where('source_id', $invoice->id)
+                ->each(function ($batch) {
+                    $batch->entries()->delete();
+                    $batch->delete();
+                });
+
+            // 5. Delete the invoice
             $invoice->delete();
         });
 
         return redirect()
             ->route('admin.invoices.index')
-            ->with('status', 'Invoice deleted successfully.');
+            ->with('status', "Invoice {$invoiceNumber} was permanently removed from active listings, and the audit log trail has been recorded.");
     }
 
-    public function cancel(Invoice $invoice)
+    public function cancel(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
         $school = $user?->school;
@@ -211,7 +290,10 @@ class InvoiceController extends Controller
                 ->with('status', 'Invoice is already cancelled.');
         }
 
-        DB::transaction(function () use ($invoice) {
+        $student = $invoice->student;
+        $studentName = $student ? "{$student->first_name} {$student->last_name}" : 'Student #' . $invoice->student_id;
+
+        DB::transaction(function () use ($invoice, $school, $user, $studentName) {
             $invoice->update(['status' => 'cancelled']);
 
             // Create cancellation ledger entries
@@ -238,6 +320,20 @@ class InvoiceController extends Controller
                     'description' => 'Invoice cancellation for ' . $invoice->number,
                 ]);
             }
+
+            AuditLog::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'action' => 'update',
+                'module' => 'accounting',
+                'model_type' => Invoice::class,
+                'model_id' => $invoice->id,
+                'description' => "Cancelled invoice {$invoice->number} for {$studentName} ({$invoice->academic_year} - {$invoice->term}) balance: $" . number_format($invoice->balance, 2),
+                'new_values' => ['status' => 'cancelled'],
+                'old_values' => ['status' => 'unpaid'],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return redirect()
@@ -981,6 +1077,7 @@ class InvoiceController extends Controller
                         ->where('student_id', $enrollment->student_id)
                         ->where('academic_year', $targetYear)
                         ->where('term', $targetTerm)
+                        ->where('status', '!=', 'cancelled')
                         ->first();
 
                     if ($existingInvoice) {

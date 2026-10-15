@@ -65,7 +65,8 @@ class StatementController extends Controller
         $invoicesQuery = Invoice::with(['items', 'allocations.payment'])
             ->where('school_id', $school->id)
             ->where('student_id', $student->id)
-            ->where('academic_year', $academicYear);
+            ->where('academic_year', $academicYear)
+            ->where('status', '!=', 'cancelled');
 
         if ($term) {
             $invoicesQuery->where('term', $term);
@@ -125,6 +126,7 @@ class StatementController extends Controller
                 ->where('student_id', $student->id)
                 ->where('academic_year', $academicYear)
                 ->where('term', '<', $term)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -145,6 +147,7 @@ class StatementController extends Controller
             $previousInvoices = Invoice::where('school_id', $school->id)
                 ->where('student_id', $student->id)
                 ->where('academic_year', '<', $academicYear)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -213,7 +216,8 @@ class StatementController extends Controller
         $invoicesQuery = Invoice::with(['items', 'allocations.payment'])
             ->where('school_id', $school->id)
             ->where('student_id', $student->id)
-            ->where('academic_year', $academicYear);
+            ->where('academic_year', $academicYear)
+            ->where('status', '!=', 'cancelled');
 
         if ($term) {
             $invoicesQuery->where('term', $term);
@@ -273,6 +277,7 @@ class StatementController extends Controller
                 ->where('student_id', $student->id)
                 ->where('academic_year', $academicYear)
                 ->where('term', '<', $term)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -293,6 +298,7 @@ class StatementController extends Controller
             $previousInvoices = Invoice::where('school_id', $school->id)
                 ->where('student_id', $student->id)
                 ->where('academic_year', '<', $academicYear)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -351,7 +357,8 @@ class StatementController extends Controller
         $invoicesQuery = Invoice::with(['items', 'allocations.payment'])
             ->where('school_id', $school->id)
             ->where('student_id', $student->id)
-            ->where('academic_year', $academicYear);
+            ->where('academic_year', $academicYear)
+            ->where('status', '!=', 'cancelled');
 
         if ($term) {
             $invoicesQuery->where('term', $term);
@@ -410,6 +417,7 @@ class StatementController extends Controller
                 ->where('student_id', $student->id)
                 ->where('academic_year', $academicYear)
                 ->where('term', '<', $term)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -429,6 +437,7 @@ class StatementController extends Controller
             $previousInvoices = Invoice::where('school_id', $school->id)
                 ->where('student_id', $student->id)
                 ->where('academic_year', '<', $academicYear)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -494,7 +503,8 @@ class StatementController extends Controller
         $invoicesQuery = Invoice::with(['items', 'allocations.payment'])
             ->where('school_id', $school->id)
             ->where('student_id', $student->id)
-            ->where('academic_year', $academicYear);
+            ->where('academic_year', $academicYear)
+            ->where('status', '!=', 'cancelled');
 
         if ($term) {
             $invoicesQuery->where('term', $term);
@@ -553,6 +563,7 @@ class StatementController extends Controller
                 ->where('student_id', $student->id)
                 ->where('academic_year', $academicYear)
                 ->where('term', '<', $term)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)
@@ -572,6 +583,7 @@ class StatementController extends Controller
             $previousInvoices = Invoice::where('school_id', $school->id)
                 ->where('student_id', $student->id)
                 ->where('academic_year', '<', $academicYear)
+                ->where('status', '!=', 'cancelled')
                 ->sum('total_amount');
 
             $previousPayments = Payment::where('school_id', $school->id)

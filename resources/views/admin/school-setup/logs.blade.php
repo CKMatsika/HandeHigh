@@ -122,10 +122,37 @@
                             </td>
                             <td class="px-4 py-3 text-xs text-slate-300">
                                 @if($log->description)
-                                    <div>{{ $log->description }}</div>
+                                    <div class="font-medium text-slate-200">{{ $log->description }}</div>
+                                @endif
+                                @if(!empty($log->old_values['deletion_reason']))
+                                    <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-rose-950/60 border border-rose-800/60 px-2.5 py-1 text-[11px] text-rose-200">
+                                        <span class="font-semibold text-rose-300">Deletion Reason:</span>
+                                        <span>{{ $log->old_values['deletion_reason'] }}</span>
+                                    </div>
+                                @endif
+                                @if(!empty($log->old_values['items']) && is_array($log->old_values['items']))
+                                    <details class="mt-1.5 text-[11px]">
+                                        <summary class="cursor-pointer font-medium text-indigo-400 hover:text-indigo-300 select-none">
+                                            View deleted snapshot ({{ count($log->old_values['items']) }} fee items - ${{ number_format($log->old_values['total_amount'] ?? 0, 2) }})
+                                        </summary>
+                                        <div class="mt-1.5 p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1 text-slate-300">
+                                            @foreach($log->old_values['items'] as $item)
+                                                <div class="flex justify-between items-center text-[10.5px]">
+                                                    <span>{{ $item['description'] ?? 'Item' }} (Qty: {{ $item['quantity'] ?? 1 }})</span>
+                                                    <span class="font-mono font-medium text-slate-200">${{ number_format($item['line_total'] ?? 0, 2) }}</span>
+                                                </div>
+                                            @endforeach
+                                            @if(!empty($log->old_values['deleted_by']))
+                                                <div class="pt-1 border-t border-slate-800 text-[10px] text-slate-400 flex justify-between">
+                                                    <span>Deleted by: {{ $log->old_values['deleted_by'] }}</span>
+                                                    <span>{{ $log->old_values['deleted_at'] ?? '' }}</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </details>
                                 @endif
                                 @if($log->subject_id)
-                                    <div class="text-slate-400">ID: {{ $log->subject_id }}</div>
+                                    <div class="text-slate-400 text-[11px] mt-0.5">ID: {{ $log->subject_id }}</div>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-xs text-slate-300">

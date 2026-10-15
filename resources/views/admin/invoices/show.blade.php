@@ -26,12 +26,12 @@
             @if($invoice->balance > 0 && $invoice->status !== 'cancelled')
                 <a href="{{ route('admin.payments.create', $invoice) }}" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 transition">Record payment</a>
             @endif
-            @if($invoice->status === 'cancelled' && $invoice->balance === $invoice->total_amount)
-                <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to permanently delete this invoice?')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="inline-flex items-center rounded-full bg-red-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-600 transition">Delete</button>
-                </form>
+            @if($totalPaid == 0)
+                <button type="button" 
+                        onclick="openDeleteInvoiceModal('{{ route('admin.invoices.destroy', $invoice) }}', '{{ $invoice->number }}', '{{ addslashes(($invoice->student?->first_name ?? '') . ' ' . ($invoice->student?->last_name ?? '')) }}', '{{ number_format($invoice->total_amount, 2) }}', '{{ $invoice->academic_year }} - {{ $invoice->term }}')"
+                        class="inline-flex items-center rounded-full bg-rose-500/20 border border-rose-500/40 px-4 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-600 hover:text-white transition">
+                    Delete
+                </button>
             @endif
             <a href="{{ route('admin.invoices.index') }}" class="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition">Back</a>
         </div>
@@ -124,4 +124,104 @@
             <p class="text-xs text-slate-400">No payments recorded yet.</p>
         @endif
     </div>
+
+    <!-- Delete Invoice Modal with Audit Reason -->
+    <div id="deleteInvoiceModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Backdrop -->
+            <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" onclick="closeDeleteInvoiceModal()"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <!-- Modal Content -->
+            <div class="relative inline-block align-bottom bg-slate-900 border border-slate-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <form id="deleteInvoiceForm" method="POST" action="">
+                    @csrf
+                    @method('DELETE')
+                    <div class="p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-100" id="modal-title">Delete Invoice Permanently</h3>
+                                <p class="text-xs text-slate-400">Remove from active listings with recorded audit tracking</p>
+                            </div>
+                        </div>
+
+                        <!-- Invoice info pill box -->
+                        <div class="rounded-xl bg-slate-950/60 border border-slate-800 p-3 mb-4 text-xs space-y-1.5">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Invoice:</span>
+                                <span id="modalInvoiceNumber" class="font-mono font-medium text-slate-200">INV-XXXX</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Student:</span>
+                                <span id="modalStudentName" class="font-medium text-slate-200">—</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Period:</span>
+                                <span id="modalPeriod" class="text-slate-300">—</span>
+                            </div>
+                            <div class="flex justify-between border-t border-slate-800 pt-1.5">
+                                <span class="text-slate-400">Total Billed:</span>
+                                <span id="modalAmount" class="font-semibold text-emerald-400">$0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="deletion_reason" class="block text-xs font-medium text-slate-300 mb-1.5">
+                                Reason for Deletion <span class="text-rose-400">*</span>
+                            </label>
+                            <textarea id="deletion_reason" 
+                                      name="deletion_reason" 
+                                      rows="3" 
+                                      required
+                                      placeholder="e.g., Mistakes on dates and fee structure lines during bulk generation, re-invoicing correctly..." 
+                                      class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"></textarea>
+                            <p class="text-[11px] text-slate-400 mt-1.5">
+                                🔒 This deletion and your reason will be permanently recorded in the audit trail for administrative review and compliance.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950/50 px-6 py-3 border-t border-slate-800 flex justify-end gap-2">
+                        <button type="button" 
+                                onclick="closeDeleteInvoiceModal()" 
+                                class="rounded-full border border-slate-700 bg-slate-800 px-4 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="rounded-full bg-rose-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-rose-700 transition">
+                            Confirm & Delete Invoice
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openDeleteInvoiceModal(actionUrl, invoiceNumber, studentName, amount, period) {
+            const form = document.getElementById('deleteInvoiceForm');
+            form.action = actionUrl;
+            document.getElementById('modalInvoiceNumber').innerText = invoiceNumber;
+            document.getElementById('modalStudentName').innerText = studentName;
+            document.getElementById('modalAmount').innerText = '$' + amount;
+            document.getElementById('modalPeriod').innerText = period;
+            document.getElementById('deletion_reason').value = '';
+            document.getElementById('deleteInvoiceModal').classList.remove('hidden');
+        }
+
+        function closeDeleteInvoiceModal() {
+            document.getElementById('deleteInvoiceModal').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDeleteInvoiceModal();
+            }
+        });
+    </script>
 @endsection

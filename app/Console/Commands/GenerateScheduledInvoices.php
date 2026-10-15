@@ -138,6 +138,7 @@ class GenerateScheduledInvoices extends Command
                         ->where('student_id', $enrollment->student_id)
                         ->where('academic_year', $academicYear)
                         ->where('term', $term)
+                        ->where('status', '!=', 'cancelled')
                         ->first();
 
                     if ($existingInvoice) {
