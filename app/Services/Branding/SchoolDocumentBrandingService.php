@@ -15,13 +15,16 @@ class SchoolDocumentBrandingService
     public function getBrandingPayload(School $school, ?array $snapshot = null): array
     {
         if (!empty($snapshot)) {
+            $logoUrl = !empty($snapshot['logo_url']) ? $snapshot['logo_url'] : $this->getLogoUrl($school);
+            $logoBase64 = !empty($snapshot['logo_base64']) ? $snapshot['logo_base64'] : $this->getLogoBase64($school);
+
             return [
                 'name' => $snapshot['name'] ?? $school->name,
                 'display_name' => $snapshot['display_name'] ?? $snapshot['name'] ?? $school->display_name ?? $school->name,
                 'motto' => $snapshot['motto'] ?? $school->motto,
-                'logo_url' => $snapshot['logo_url'] ?? $this->getLogoUrl($school),
-                'logo_base64' => $snapshot['logo_base64'] ?? $this->getLogoBase64($school),
-                'has_logo' => !empty($snapshot['logo_url']) || !empty($school->logo),
+                'logo_url' => $logoUrl,
+                'logo_base64' => $logoBase64,
+                'has_logo' => !empty($logoUrl) || !empty($logoBase64) || !empty($school->logo),
                 'address' => $snapshot['address'] ?? $school->address,
                 'postal_address' => $snapshot['postal_address'] ?? $school->postal_address,
                 'city' => $snapshot['city'] ?? $school->city,
@@ -169,11 +172,26 @@ class SchoolDocumentBrandingService
             return null;
         }
 
-        if (Storage::disk('public')->exists($school->logo)) {
-            return Storage::disk('public')->url($school->logo);
+        // 1. If it's already an absolute URL
+        if (str_starts_with($school->logo, 'http://') || str_starts_with($school->logo, 'https://')) {
+            return $school->logo;
         }
 
-        return null;
+        // 2. Check public disk
+        try {
+            if (Storage::disk('public')->exists($school->logo)) {
+                return Storage::disk('public')->url($school->logo);
+            }
+        } catch (\Throwable $e) {
+            // Ignore filesystem driver error
+        }
+
+        // 3. Fallback to standard Storage::url or asset
+        try {
+            return Storage::disk('public')->url($school->logo);
+        } catch (\Throwable $e) {
+            return asset('storage/' . ltrim($school->logo, '/'));
+        }
     }
 
     /**
@@ -185,10 +203,33 @@ class SchoolDocumentBrandingService
             return null;
         }
 
-        if (Storage::disk('public')->exists($school->logo)) {
-            $mime = Storage::disk('public')->mimeType($school->logo) ?: 'image/png';
-            $content = Storage::disk('public')->get($school->logo);
-            return 'data:' . $mime . ';base64,' . base64_encode($content);
+        try {
+            if (Storage::disk('public')->exists($school->logo)) {
+                $mime = Storage::disk('public')->mimeType($school->logo) ?: 'image/png';
+                $content = Storage::disk('public')->get($school->logo);
+                return 'data:' . $mime . ';base64,' . base64_encode($content);
+            }
+        } catch (\Throwable $e) {
+            // Fallback to direct path checks below
+        }
+
+        // Fallback: check standard storage paths
+        $candidatePaths = [
+            storage_path('app/public/' . ltrim($school->logo, '/')),
+            public_path('storage/' . ltrim($school->logo, '/')),
+            public_path(ltrim($school->logo, '/')),
+        ];
+
+        foreach ($candidatePaths as $path) {
+            if (file_exists($path)) {
+                try {
+                    $mime = mime_content_type($path) ?: 'image/png';
+                    $content = file_get_contents($path);
+                    return 'data:' . $mime . ';base64,' . base64_encode($content);
+                } catch (\Throwable $e) {
+                    // Continue
+                }
+            }
         }
 
         return null;

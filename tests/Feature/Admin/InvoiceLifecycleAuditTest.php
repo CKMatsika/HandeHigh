@@ -329,4 +329,39 @@ class InvoiceLifecycleAuditTest extends TestCase
         // Ensure layouts.app sidebar and global app footer are NOT present
         $response->assertDontSee('Betterlink Systems');
     }
+
+    public function test_invoice_print_view_picks_up_uploaded_school_logo(): void
+    {
+        // 1. Give the school an uploaded logo in the system
+        $this->school->update([
+            'logo' => 'schools/' . $this->school->id . '/branding/test_school_crest.png',
+        ]);
+
+        // 2. Create invoice with empty/null logo in snapshot (e.g. created prior to logo upload)
+        $invoice = Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'enrollment_id' => $this->enrollment->id,
+            'number' => 'INV-2026-000088',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'total_amount' => 490.00,
+            'balance' => 490.00,
+            'status' => 'unpaid',
+            'issued_at' => '2026-01-01',
+            'school_snapshot' => [
+                'name' => 'Hande High School',
+                'logo_url' => null,
+                'logo_base64' => null,
+            ],
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.print', $invoice));
+
+        $response->assertOk();
+        // Assert that the img tag with the school logo is rendered, NOT the fallback crest box
+        $response->assertSee('test_school_crest.png');
+        $response->assertSee('class="school-logo-img"', false);
+    }
 }

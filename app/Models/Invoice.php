@@ -39,8 +39,10 @@ class Invoice extends Model
      */
     public function getSchoolBrandingAttribute(): array
     {
+        $school = $this->school ?: (auth()->check() ? auth()->user()?->school : null) ?: School::find($this->school_id);
+
         return app(\App\Services\Branding\SchoolDocumentBrandingService::class)
-            ->getBrandingPayload($this->school, $this->school_snapshot);
+            ->getBrandingPayload($school ?? new School(), $this->school_snapshot);
     }
 
     public function school()

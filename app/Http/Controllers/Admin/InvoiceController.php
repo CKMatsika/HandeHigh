@@ -1389,7 +1389,7 @@ class InvoiceController extends Controller
             abort(403);
         }
 
-        $invoice->load(['student', 'guardian', 'enrollment', 'items', 'allocations.payment']);
+        $invoice->load(['school', 'student', 'guardian', 'enrollment', 'items', 'allocations.payment']);
 
         return view('admin.invoices.print', [
             'school' => $school,

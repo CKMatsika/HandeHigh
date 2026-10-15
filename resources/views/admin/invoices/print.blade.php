@@ -138,10 +138,12 @@
         }
 
         .school-logo-img {
-            max-height: 48px;
-            max-width: 48px;
+            max-height: 56px;
+            max-width: 56px;
+            height: auto;
+            width: auto;
             object-fit: contain;
-            border-radius: 8px;
+            border-radius: 6px;
             flex-shrink: 0;
         }
 
@@ -636,8 +638,27 @@
 <body>
     @php
         $totalPaid = (float) ($invoice->allocations?->sum('amount') ?? 0);
+        $schoolModel = $invoice->school ?: ($school ?? auth()->user()?->school);
         $branding = $invoice->school_branding;
         $status = strtolower($invoice->status);
+
+        // Robust logo resolution with multiple fallbacks to ensure uploaded school logo is displayed
+        $logoSrc = null;
+        if (!empty($branding['logo_base64'])) {
+            $logoSrc = $branding['logo_base64'];
+        } elseif (!empty($branding['logo_url'])) {
+            $logoSrc = $branding['logo_url'];
+        } elseif ($schoolModel && !empty($schoolModel->logo)) {
+            if (str_starts_with($schoolModel->logo, 'http://') || str_starts_with($schoolModel->logo, 'https://')) {
+                $logoSrc = $schoolModel->logo;
+            } else {
+                try {
+                    $logoSrc = \Illuminate\Support\Facades\Storage::disk('public')->url($schoolModel->logo);
+                } catch (\Throwable $e) {
+                    $logoSrc = asset('storage/' . ltrim($schoolModel->logo, '/'));
+                }
+            }
+        }
     @endphp
 
     <div class="screen-toolbar no-print">
@@ -659,9 +680,9 @@
         <!-- Top Header -->
         <div class="doc-header">
             <div class="school-identity">
-                @if(!empty($branding['logo_base64']) || !empty($branding['logo_url']))
-                    <img src="{{ $branding['logo_base64'] ?: $branding['logo_url'] }}" 
-                         alt="{{ $branding['name'] }}" 
+                @if(!empty($logoSrc))
+                    <img src="{{ $logoSrc }}" 
+                         alt="{{ $branding['display_name'] ?? $branding['name'] ?? 'School Logo' }}" 
                          class="school-logo-img">
                 @else
                     <div class="crest-box">
