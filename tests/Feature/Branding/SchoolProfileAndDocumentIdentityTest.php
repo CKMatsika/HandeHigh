@@ -344,4 +344,53 @@ class SchoolProfileAndDocumentIdentityTest extends TestCase
         $this->assertStringContainsString('Kwame Nkrumah Branch', $html);
         $this->assertStringContainsString('Official Computer-Generated Document', $html);
     }
+
+    public function test_dedicated_school_logo_streaming_endpoint_serves_image_and_never_404s(): void
+    {
+        $file = UploadedFile::fake()->image('brand_logo.png', 200, 200);
+        $this->brandingService->storeLogo($this->school, $file);
+
+        $response = $this->get(route('schools.logo', $this->school));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('image/', $response->headers->get('Content-Type'));
+        $this->assertNotEmpty($response->getContent());
+    }
+
+    public function test_logo_is_preserved_and_rehydrated_to_disk_after_simulated_container_redeploy(): void
+    {
+        $file = UploadedFile::fake()->image('persistent_logo.png', 200, 200);
+        $path = $this->brandingService->storeLogo($this->school, $file);
+        $this->school->refresh();
+
+        $this->assertNotNull($this->school->logo_base64);
+
+        // Simulate ephemeral container redeployment: disk file is wiped
+        Storage::disk('public')->delete($path);
+        Storage::disk('public')->assertMissing($path);
+
+        // Accessing the streaming endpoint must still succeed and rehydrate the file on disk
+        $response = $this->get(route('schools.logo', $this->school));
+        $response->assertOk();
+        $this->assertStringStartsWith('image/', $response->headers->get('Content-Type'));
+
+        // Verify the file was rehydrated to the public disk
+        Storage::disk('public')->assertExists($path);
+    }
+
+    public function test_school_without_logo_serves_heraldic_svg_crest_fallback_without_404(): void
+    {
+        $freshSchool = School::create([
+            'name' => 'St Marks High School',
+            'code' => 'SMH',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $response = $this->get(route('schools.logo', $freshSchool));
+
+        $response->assertOk();
+        $contentType = $response->headers->get('Content-Type');
+        $this->assertTrue(str_contains($contentType, 'image/svg+xml') || str_contains($contentType, 'image/png'));
+    }
 }

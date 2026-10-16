@@ -36,8 +36,11 @@
             <h2 class="text-lg font-semibold text-slate-50 mb-4">School Information</h2>
             <div class="space-y-3">
                 <div class="flex items-center gap-4">
-                    @if($school->logo)
-                        <img src="{{ Storage::url($school->logo) }}" alt="{{ $school->name }}" class="w-16 h-16 rounded-lg object-cover">
+                    @php
+                        $indexBranding = $school->branding_data;
+                    @endphp
+                    @if($indexBranding['has_logo'] || $school->logo || $school->logo_base64)
+                        <img src="{{ $indexBranding['logo_base64'] ?: $indexBranding['logo_url'] }}" alt="{{ $school->name }}" class="w-16 h-16 rounded-lg object-contain border border-slate-700 bg-slate-950 p-1">
                     @else
                         <div class="w-16 h-16 rounded-lg bg-slate-700 flex items-center justify-center">
                             <svg class="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

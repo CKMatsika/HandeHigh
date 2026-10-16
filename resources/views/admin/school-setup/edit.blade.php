@@ -163,10 +163,13 @@
                         @error('logo')
                             <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
                         @enderror
-                        @if($school->logo)
+                        @php
+                            $setupBranding = $school->branding_data;
+                        @endphp
+                        @if($setupBranding['has_logo'] || $school->logo || $school->logo_base64)
                             <div class="mt-2 flex items-center gap-2">
-                                <img src="{{ Storage::url($school->logo) }}" alt="Current logo" class="w-12 h-12 rounded object-cover">
-                                <span class="text-xs text-slate-400">Current logo</span>
+                                <img src="{{ $setupBranding['logo_base64'] ?: $setupBranding['logo_url'] }}" alt="Current logo" class="w-12 h-12 rounded object-contain border border-slate-700 bg-slate-900 p-0.5">
+                                <span class="text-xs text-emerald-400 font-medium">Permanently preserved across deployments</span>
                             </div>
                         @endif
                     </div>

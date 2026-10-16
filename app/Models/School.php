@@ -68,8 +68,12 @@ class School extends Model
     /**
      * Get base64 logo data for offline print/PDF.
      */
-    public function getLogoBase64Attribute(): ?string
+    public function getLogoBase64Attribute(?string $value = null): ?string
     {
+        if (!empty($value)) {
+            return $value;
+        }
+
         return app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getLogoBase64($this);
     }
 

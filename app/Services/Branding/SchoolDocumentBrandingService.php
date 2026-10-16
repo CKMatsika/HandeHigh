@@ -201,48 +201,21 @@ class SchoolDocumentBrandingService
     public function getLogoBase64(School $school): ?string
     {
         // 1. Direct from database (fastest, persists across cloud container redeployments)
-        if (!empty($school->logo_base64)) {
-            return $school->logo_base64;
+        $rawBase64 = $school->getAttributes()['logo_base64'] ?? null;
+        if (!empty($rawBase64)) {
+            $this->ensureFileOnDiskFromBase64($school);
+            return $rawBase64;
         }
 
-        if (!$school->logo) {
-            return null;
-        }
-
-        // 2. Check public storage disk
-        try {
-            if (Storage::disk('public')->exists($school->logo)) {
-                $mime = Storage::disk('public')->mimeType($school->logo) ?: 'image/png';
-                $content = Storage::disk('public')->get($school->logo);
-                $base64 = 'data:' . $mime . ';base64,' . base64_encode($content);
-
-                // Backfill into database
-                if ($school->id) {
-                    try {
-                        $school->updateQuietly(['logo_base64' => $base64]);
-                    } catch (\Throwable $e) {}
-                }
-
-                return $base64;
-            }
-        } catch (\Throwable $e) {
-            // Fallback to direct path checks below
-        }
-
-        // 3. Fallback: check standard storage paths on local filesystem
-        $candidatePaths = [
-            storage_path('app/public/' . ltrim($school->logo, '/')),
-            public_path('storage/' . ltrim($school->logo, '/')),
-            public_path(ltrim($school->logo, '/')),
-        ];
-
-        foreach ($candidatePaths as $path) {
-            if (file_exists($path)) {
-                try {
-                    $mime = mime_content_type($path) ?: 'image/png';
-                    $content = file_get_contents($path);
+        // 2. Check public storage disk if path exists
+        if ($school->logo) {
+            try {
+                if (Storage::disk('public')->exists($school->logo)) {
+                    $mime = Storage::disk('public')->mimeType($school->logo) ?: 'image/png';
+                    $content = Storage::disk('public')->get($school->logo);
                     $base64 = 'data:' . $mime . ';base64,' . base64_encode($content);
 
+                    // Backfill into database so it persists across container redeployments
                     if ($school->id) {
                         try {
                             $school->updateQuietly(['logo_base64' => $base64]);
@@ -250,13 +223,94 @@ class SchoolDocumentBrandingService
                     }
 
                     return $base64;
-                } catch (\Throwable $e) {
-                    // Continue
+                }
+            } catch (\Throwable $e) {
+                // Fallback to direct path checks below
+            }
+
+            // 3. Fallback: check standard storage paths on local filesystem
+            $candidatePaths = [
+                storage_path('app/public/' . ltrim($school->logo, '/')),
+                public_path('storage/' . ltrim($school->logo, '/')),
+                public_path(ltrim($school->logo, '/')),
+            ];
+
+            foreach ($candidatePaths as $path) {
+                if (file_exists($path)) {
+                    try {
+                        $mime = mime_content_type($path) ?: 'image/png';
+                        $content = file_get_contents($path);
+                        $base64 = 'data:' . $mime . ';base64,' . base64_encode($content);
+
+                        if ($school->id) {
+                            try {
+                                $school->updateQuietly(['logo_base64' => $base64]);
+                            } catch (\Throwable $e) {}
+                        }
+
+                        return $base64;
+                    } catch (\Throwable $e) {
+                        // Continue
+                    }
                 }
             }
         }
 
+        // 4. Bundled official school logo in repository for Hande High School (ensures documents never lose the logo)
+        $isHandeHigh = ($school->code === 'HHS') || str_contains(strtolower($school->name ?? ''), 'hande');
+        $bundledLogoPath = public_path('images/hande-high-logo.png');
+        if ($isHandeHigh && file_exists($bundledLogoPath)) {
+            try {
+                $content = file_get_contents($bundledLogoPath);
+                $base64 = 'data:image/png;base64,' . base64_encode($content);
+
+                if ($school->id && empty($school->logo)) {
+                    try {
+                        $targetPath = "schools/{$school->id}/branding/hande-high-logo.png";
+                        Storage::disk('public')->put($targetPath, $content);
+                        $school->updateQuietly([
+                            'logo' => $targetPath,
+                            'logo_base64' => $base64,
+                        ]);
+                    } catch (\Throwable $e) {}
+                }
+
+                return $base64;
+            } catch (\Throwable $e) {}
+        }
+
         return null;
+    }
+
+    /**
+     * Rehydrate the physical file on disk from the database base64 string.
+     * Guarantees that even after ephemeral container redeployment, file storage matches the database.
+     */
+    public function ensureFileOnDiskFromBase64(School $school, ?string $mimeType = null, ?string $binaryData = null): void
+    {
+        $rawBase64 = $school->getAttributes()['logo_base64'] ?? $school->logo_base64;
+        if (empty($rawBase64)) {
+            return;
+        }
+
+        try {
+            $expectedPath = $school->logo ?: ("schools/{$school->id}/branding/logo.png");
+            if (!Storage::disk('public')->exists($expectedPath)) {
+                if ($binaryData === null) {
+                    if (preg_match('/^data:(image\/[a-zA-Z0-9\+\-\.]+);base64,(.+)$/', $rawBase64, $matches)) {
+                        $binaryData = base64_decode($matches[2]);
+                    }
+                }
+                if ($binaryData) {
+                    Storage::disk('public')->put($expectedPath, $binaryData);
+                    if (!$school->logo) {
+                        $school->updateQuietly(['logo' => $expectedPath]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Non-blocking
+        }
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\School;
 use App\Services\Branding\SchoolDocumentBrandingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class SchoolProfileController extends Controller
 {
@@ -104,5 +105,95 @@ class SchoolProfileController extends Controller
         return redirect()->route('admin.school.profile')
             ->with('success', 'School profile and document branding updated successfully.')
             ->with('status', 'School profile and document branding updated successfully.');
+    }
+
+    /**
+     * Dedicated streaming endpoint for school logo.
+     * Guaranteed to never 404: decodes base64, rehydrates disk, falls back to bundled repository logo,
+     * or dynamically renders an official heraldic SVG crest.
+     */
+    public function streamLogo(School $school)
+    {
+        // 1. Direct from base64 stored in database (persists across ephemeral container deployments)
+        $rawBase64 = $school->getAttributes()['logo_base64'] ?? $school->logo_base64;
+        if (!empty($rawBase64)) {
+            if (preg_match('/^data:(image\/[a-zA-Z0-9\+\-\.]+);base64,(.+)$/', $rawBase64, $matches)) {
+                $mimeType = $matches[1];
+                $data = base64_decode($matches[2]);
+                if ($data !== false) {
+                    $this->brandingService->ensureFileOnDiskFromBase64($school, $mimeType, $data);
+
+                    return response($data, 200, [
+                        'Content-Type' => $mimeType,
+                        'Content-Length' => strlen($data),
+                        'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
+                        'ETag' => '"' . md5($rawBase64) . '"',
+                    ]);
+                }
+            }
+        }
+
+        // 2. Check public storage disk
+        if ($school->logo && Storage::disk('public')->exists($school->logo)) {
+            $content = Storage::disk('public')->get($school->logo);
+            $mimeType = Storage::disk('public')->mimeType($school->logo) ?: 'image/png';
+
+            return response($content, 200, [
+                'Content-Type' => $mimeType,
+                'Content-Length' => strlen($content),
+                'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
+            ]);
+        }
+
+        // 3. Check permanent repository bundled logo for Hande High School
+        $isHandeHigh = ($school->code === 'HHS') || str_contains(strtolower($school->name ?? ''), 'hande');
+        $bundledLogoPath = public_path('images/hande-high-logo.png');
+        if ($isHandeHigh && file_exists($bundledLogoPath)) {
+            $content = file_get_contents($bundledLogoPath);
+            return response($content, 200, [
+                'Content-Type' => 'image/png',
+                'Content-Length' => strlen($content),
+                'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
+            ]);
+        }
+
+        // 4. Dynamic Heraldic SVG crest fallback
+        $primaryColor = $school->primary_color ?: '#0b1e36';
+        $secondaryColor = $school->secondary_color ?: '#d97706';
+        $name = $school->display_name ?: $school->name ?: 'School';
+        $words = preg_split('/\s+/', trim($name));
+        $initials = '';
+        foreach (array_slice($words, 0, 2) as $w) {
+            $initials .= strtoupper(substr($w, 0, 1));
+        }
+        if (empty($initials)) {
+            $initials = 'HH';
+        }
+
+        $svg = <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+    <defs>
+        <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="{$primaryColor}" />
+            <stop offset="100%" stop-color="#020617" />
+        </linearGradient>
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fbbf24" />
+            <stop offset="100%" stop-color="{$secondaryColor}" />
+        </linearGradient>
+    </defs>
+    <circle cx="100" cy="100" r="92" fill="url(#shieldGrad)" stroke="url(#goldGrad)" stroke-width="6" />
+    <circle cx="100" cy="100" r="82" fill="none" stroke="url(#goldGrad)" stroke-width="1.5" stroke-dasharray="4 2" />
+    <path d="M 100 35 Q 145 35 155 70 Q 155 130 100 165 Q 45 130 45 70 Q 55 35 100 35 Z" fill="#0f172a" stroke="url(#goldGrad)" stroke-width="3" opacity="0.9" />
+    <text x="100" y="112" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="38" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">{$initials}</text>
+    <rect x="58" y="126" width="84" height="18" rx="9" fill="url(#goldGrad)" />
+    <text x="100" y="139" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="800" fill="#0f172a" text-anchor="middle" letter-spacing="1.5">EXCELLENCE</text>
+</svg>
+SVG;
+
+        return response($svg, 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Cache-Control' => 'public, max-age=86400, stale-while-revalidate=604800',
+        ]);
     }
 }

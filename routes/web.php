@@ -48,6 +48,9 @@ Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+// Dedicated school logo streaming endpoint (accessible for branding, document printing, parent receipts)
+Route::get('/schools/{school}/logo', [SchoolProfileController::class, 'streamLogo'])->name('schools.logo');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('tenant');
 

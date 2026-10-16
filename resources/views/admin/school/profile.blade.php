@@ -246,9 +246,9 @@
 
                     <div class="space-y-3 text-xs">
                         <div class="flex items-center gap-4">
-                            @if($branding['logo_url'])
+                            @if($branding['has_logo'] || !empty($branding['logo_base64']) || !empty($branding['logo_url']))
                                 <div class="relative group">
-                                    <img src="{{ $branding['logo_url'] }}" alt="{{ $school->name }}" class="h-20 w-20 rounded-xl object-contain border border-slate-700 bg-slate-950 p-1 shadow-lg">
+                                    <img src="{{ $branding['logo_base64'] ?: $branding['logo_url'] }}" alt="{{ $school->name }}" class="h-20 w-20 rounded-xl object-contain border border-slate-700 bg-slate-950 p-1 shadow-lg">
                                 </div>
                             @else
                                 <div class="h-20 w-20 rounded-xl bg-slate-950 border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-center text-[10px] p-2">
@@ -258,7 +258,15 @@
 
                             <div class="space-y-1">
                                 <div class="font-medium text-slate-200">Official Brand Mark</div>
-                                <p class="text-[11px] text-slate-400">
+                                <div class="flex items-center gap-1.5 pt-0.5">
+                                    <span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                        <svg class="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Permanently Preserved Across Deployments
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-400 pt-0.5">
                                     Accepted: PNG, JPEG, WEBP.<br>Max file size: 2MB.<br>SVGs are blocked for security.
                                 </p>
                             </div>
@@ -268,7 +276,7 @@
                             <input type="file" name="logo" accept="image/png,image/jpeg,image/jpg,image/webp"
                                    class="block w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer">
                             
-                            @if($school->logo)
+                            @if($school->logo || $school->logo_base64)
                                 <label class="inline-flex items-center gap-2 text-rose-400 cursor-pointer pt-1">
                                     <input type="checkbox" name="remove_logo" value="1" class="rounded border-slate-700 text-rose-500 focus:ring-rose-500">
                                     <span>Remove current logo</span>
