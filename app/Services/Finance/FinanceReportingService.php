@@ -926,22 +926,48 @@ class FinanceReportingService
      */
     public function getCashbookBankSummary(School $school): array
     {
-        $bankAccounts = BankAccount::where('school_id', $school->id)->get();
+        // Get active bank accounts from chart of accounts (asset accounts with bank category or 13xx codes)
+        $bankAccounts = Account::where('school_id', $school->id)
+            ->where('type', 'asset')
+            ->where(function ($query) {
+                $query->where('category', 'bank')
+                      ->orWhere('code', 'like', '13%');
+            })
+            ->where('is_active', true)
+            ->where('code', '!=', '1300') // Exclude generic parent category header
+            ->orderBy('code')
+            ->get();
+
+        // Fallback to legacy bank_accounts table if no accounts in chart of accounts
+        if ($bankAccounts->isEmpty()) {
+            $bankAccounts = BankAccount::where('school_id', $school->id)->get();
+        }
+
         $cashAccounts = Account::where('school_id', $school->id)
             ->where('type', 'asset')
-            ->whereIn('code', ['1100', '1301', '1302', '1303', '1010'])
+            ->where(function ($query) {
+                $query->where('category', 'cash')
+                      ->orWhereIn('code', ['1100', '1101', '1102', '1010']);
+            })
+            ->where('is_active', true)
+            ->orderBy('code')
             ->get();
 
         $recentCashbook = Cashbook::where('school_id', $school->id)
+            ->with(['account', 'relatedInvoice', 'relatedPayment'])
             ->latest('transaction_date')
-            ->take(15)
+            ->latest('id')
+            ->take(20)
             ->get();
 
-        $totalBankBalance = (float)$bankAccounts->sum('current_balance');
-        $totalCashReceipts = (float)Receipt::where('school_id', $school->id)->sum('grand_total');
-        $totalPayments = (float)Payment::where('school_id', $school->id)->sum('amount');
+        $totalBankBalance = (float) $bankAccounts->sum('current_balance');
+        $totalPosReceipts = (float) Receipt::where('school_id', $school->id)->sum('grand_total');
+        $totalCashPayments = (float) Payment::where('school_id', $school->id)->where('method', 'cash')->sum('amount');
+        $totalCashReceipts = $totalPosReceipts + $totalCashPayments;
+        $totalPayments = (float) Payment::where('school_id', $school->id)->sum('amount');
 
         return [
+            'school' => $school,
             'bank_accounts' => $bankAccounts,
             'cash_accounts' => $cashAccounts,
             'recent_cashbook' => $recentCashbook,

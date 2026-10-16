@@ -218,17 +218,74 @@ class Account extends Model
 
     public function getCurrentBalanceAttribute(): float
     {
+        $opening = (float) ($this->opening_balance ?? 0.0);
+
         // Calculate balance from journal entries
         $debits = (float) $this->journalEntries()->where('entry_type', 'debit')->sum('amount');
         $credits = (float) $this->journalEntries()->where('entry_type', 'credit')->sum('amount');
         
         // For assets and expenses: balance = debits - credits
         // For liabilities, equity, and revenue: balance = credits - debits
-        if (in_array($this->type, ['asset', 'expense'])) {
-            return $debits - $credits;
+        $journalNet = in_array($this->type, ['asset', 'expense'])
+            ? ($debits - $credits)
+            : ($credits - $debits);
+
+        if ($this->journalEntries()->exists()) {
+            return $opening + $journalNet;
         }
-        
-        return $credits - $debits;
+
+        // If no journal entries exist, check if there are cashbook entries
+        if ($this->cashbookEntries()->exists()) {
+            $latestCashbookBalance = $this->cashbookEntries()
+                ->orderBy('transaction_date', 'desc')
+                ->orderBy('id', 'desc')
+                ->value('balance_after');
+
+            if ($latestCashbookBalance !== null) {
+                return (float) $latestCashbookBalance;
+            }
+        }
+
+        return $opening;
+    }
+
+    public function getBankNameAttribute(): string
+    {
+        if (!empty($this->attributes['bank_name'])) {
+            return $this->attributes['bank_name'];
+        }
+        if (!empty($this->description) && preg_match('/Bank:\s*([^|]+)/i', $this->description, $matches)) {
+            return trim($matches[1]);
+        }
+        if (preg_match('/\(([^)]+)\)$/', $this->name, $matches)) {
+            return trim($matches[1]);
+        }
+        return $this->name;
+    }
+
+    public function getAccountNumberAttribute(): string
+    {
+        if (!empty($this->attributes['account_number'])) {
+            return $this->attributes['account_number'];
+        }
+        if (!empty($this->description) && preg_match('/Acc(?:ount)?(?:\s+No)?:\s*([^|]+)/i', $this->description, $matches)) {
+            return trim($matches[1]);
+        }
+        return $this->code;
+    }
+
+    public function getBranchAttribute(): string
+    {
+        if (!empty($this->attributes['branch'])) {
+            return $this->attributes['branch'];
+        }
+        if (!empty($this->attributes['branch_name'])) {
+            return $this->attributes['branch_name'];
+        }
+        if (!empty($this->description) && preg_match('/Branch:\s*([^|]+)/i', $this->description, $matches)) {
+            return trim($matches[1]);
+        }
+        return 'Main';
     }
 
     /**

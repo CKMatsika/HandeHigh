@@ -59,12 +59,12 @@
             @forelse($bank_accounts as $acc)
                 <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-bold text-slate-200">{{ $acc->bank_name }}</span>
+                        <span class="text-xs font-bold text-slate-200">{{ $acc->bank_name ?? $acc->name }}</span>
                         <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">{{ $acc->currency ?? 'USD' }}</span>
                     </div>
-                    <div class="text-[11px] text-slate-400 font-mono mt-1">Acc: {{ $acc->account_number }}</div>
+                    <div class="text-[11px] text-slate-400 font-mono mt-1">Acc: {{ $acc->account_number ?? $acc->code }}</div>
                     <div class="text-lg font-bold text-emerald-400 font-mono mt-3">${{ number_format($acc->current_balance, 2) }}</div>
-                    <div class="text-[10px] text-slate-500 mt-1">Branch: {{ $acc->branch ?? 'Main' }}</div>
+                    <div class="text-[10px] text-slate-500 mt-1">Branch: {{ $acc->branch ?? $acc->branch_name ?? 'Main' }}</div>
                 </div>
             @empty
                 <div class="col-span-3 text-center py-6 text-slate-500 text-xs">No bank accounts registered.</div>
@@ -91,11 +91,16 @@
                     @forelse($recent_cashbook as $entry)
                         <tr class="hover:bg-slate-800/30 transition">
                             <td class="px-4 py-3 font-mono text-slate-300 whitespace-nowrap">{{ $entry->transaction_date ? $entry->transaction_date->format('Y-m-d') : 'N/A' }}</td>
-                            <td class="px-4 py-3 text-slate-200">{{ $entry->description }}</td>
-                            <td class="px-4 py-3 font-mono text-blue-400">{{ $entry->reference ?? '-' }}</td>
+                            <td class="px-4 py-3 text-slate-200">
+                                <div>{{ $entry->description }}</div>
+                                @if($entry->account)
+                                    <div class="text-[10px] text-slate-400 font-mono">{{ $entry->account->name }} ({{ $entry->account->code }})</div>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 font-mono text-blue-400">{{ $entry->reference ?? $entry->reference_number ?? '-' }}</td>
                             <td class="px-4 py-3 text-right font-mono text-emerald-400">{{ $entry->debit > 0 ? '$' . number_format($entry->debit, 2) : '-' }}</td>
                             <td class="px-4 py-3 text-right font-mono text-red-400">{{ $entry->credit > 0 ? '$' . number_format($entry->credit, 2) : '-' }}</td>
-                            <td class="px-4 py-3 text-right font-mono font-bold text-slate-200">${{ number_format($entry->running_balance ?? 0, 2) }}</td>
+                            <td class="px-4 py-3 text-right font-mono font-bold text-slate-200">${{ number_format($entry->running_balance ?? $entry->balance_after ?? 0, 2) }}</td>
                         </tr>
                     @empty
                         <tr>

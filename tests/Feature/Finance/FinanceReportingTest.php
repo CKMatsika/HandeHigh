@@ -4,6 +4,7 @@ namespace Tests\Feature\Finance;
 
 use App\Models\Account;
 use App\Models\BankAccount;
+use App\Models\Cashbook;
 use App\Models\CreditNote;
 use App\Models\FeeStructure;
 use App\Models\Invoice;
@@ -569,5 +570,125 @@ class FinanceReportingTest extends TestCase
         $response = $this->actingAs($this->bursarA)->get(route('admin.reports.income-expenditure.export'));
         $response->assertOk();
         $response->assertHeader('content-disposition');
+    }
+
+    public function test_cashbook_bank_summary_aggregations_and_render(): void
+    {
+        // 1. Create a bank account in Chart of Accounts
+        $bankAccount = Account::create([
+            'school_id' => $this->schoolA->id,
+            'code' => '1301',
+            'name' => 'CBZ Operating Account (CBZ Bank)',
+            'type' => 'asset',
+            'category' => 'bank',
+            'opening_balance' => 1000.00,
+            'currency' => 'USD',
+            'is_active' => true,
+            'is_postable' => true,
+            'description' => 'Bank: CBZ Bank | Acc No: 987654321 | Branch: Main',
+        ]);
+
+        // 2. Create student, invoice, and payment
+        $student = Student::create([
+            'school_id' => $this->schoolA->id,
+            'first_name' => 'Tatenda',
+            'last_name' => 'Chiwara',
+            'admission_number' => 'ADM-099',
+            'grade' => 'Form 1',
+            'class_name' => '1A',
+        ]);
+
+        $invoice = Invoice::create([
+            'school_id' => $this->schoolA->id,
+            'student_id' => $student->id,
+            'number' => 'INV-2026-000027',
+            'total_amount' => 450.00,
+            'balance' => 0.00,
+            'issued_at' => '2026-01-15',
+            'due_date' => '2026-01-31',
+            'status' => 'paid',
+        ]);
+
+        $payment = Payment::create([
+            'school_id' => $this->schoolA->id,
+            'student_id' => $student->id,
+            'account_id' => $bankAccount->id,
+            'method' => 'cash',
+            'reference' => 'PAY-2026-000027',
+            'amount' => 450.00,
+            'paid_at' => '2026-01-31',
+            'status' => 'completed',
+        ]);
+
+        // 3. Create cashbook entry for payment
+        $cashbookEntry = Cashbook::create([
+            'school_id' => $this->schoolA->id,
+            'account_id' => $bankAccount->id,
+            'transaction_type' => 'income',
+            'category' => 'fees',
+            'description' => 'Payment for invoice INV-2026-000027',
+            'amount' => 450.00,
+            'balance_after' => 1450.00,
+            'transaction_date' => '2026-01-31',
+            'reference_number' => 'PAY-2026-000027',
+            'payment_method' => 'cash',
+            'related_invoice_id' => $invoice->id,
+            'related_payment_id' => $payment->id,
+            'created_by' => $this->bursarA->id,
+        ]);
+
+        // 4. Request the Cashbook Summary report
+        $response = $this->actingAs($this->bursarA)->get(route('admin.reports.cashbook-summary'));
+
+        $response->assertOk();
+        $response->assertViewIs('admin.reports.cashbook-summary');
+        $response->assertViewHas('total_bank_balance');
+        $response->assertViewHas('total_cash_receipts');
+        $response->assertViewHas('total_payments');
+        $response->assertViewHas('bank_accounts');
+        $response->assertViewHas('recent_cashbook');
+
+        // Check KPI values
+        $this->assertEquals(1450.00, $response->viewData('total_bank_balance'));
+        $this->assertEquals(450.00, $response->viewData('total_cash_receipts'));
+        $this->assertEquals(450.00, $response->viewData('total_payments'));
+        $this->assertCount(1, $response->viewData('bank_accounts'));
+
+        // Check HTML renders accurate bank account cards and cashbook rows
+        $response->assertSee('CBZ Bank');
+        $response->assertSee('987654321');
+        $response->assertSee('1,450.00');
+        $response->assertSee('Payment for invoice INV-2026-000027');
+        $response->assertSee('PAY-2026-000027');
+        $response->assertSee('$450.00'); // Debit column
+    }
+
+    public function test_cashbook_model_accessors(): void
+    {
+        $incomeEntry = new Cashbook([
+            'transaction_type' => 'income',
+            'amount' => 250.00,
+            'balance_after' => 1250.00,
+            'reference_number' => 'REF-123',
+        ]);
+
+        $this->assertEquals(250.00, $incomeEntry->debit);
+        $this->assertEquals(0.00, $incomeEntry->credit);
+        $this->assertEquals(1250.00, $incomeEntry->running_balance);
+        $this->assertEquals('REF-123', $incomeEntry->reference);
+
+        $expenseEntry = new Cashbook([
+            'transaction_type' => 'expense',
+            'amount' => 75.00,
+            'balance_after' => 1175.00,
+            'reference_number' => null,
+            'category' => 'opening_balance',
+            'account_id' => 99,
+        ]);
+
+        $this->assertEquals(0.00, $expenseEntry->debit);
+        $this->assertEquals(75.00, $expenseEntry->credit);
+        $this->assertEquals(1175.00, $expenseEntry->running_balance);
+        $this->assertEquals('OP-BAL-99', $expenseEntry->reference);
     }
 }

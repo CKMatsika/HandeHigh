@@ -71,6 +71,53 @@ class Cashbook extends Model
         return $prefix . number_format($this->amount, 2);
     }
 
+    public function getDebitAttribute(): float
+    {
+        if (in_array(strtolower($this->transaction_type ?? ''), ['income', 'debit'])) {
+            return (float) $this->amount;
+        }
+        return 0.0;
+    }
+
+    public function getCreditAttribute(): float
+    {
+        if (in_array(strtolower($this->transaction_type ?? ''), ['expense', 'credit'])) {
+            return (float) $this->amount;
+        }
+        return 0.0;
+    }
+
+    public function getRunningBalanceAttribute(): float
+    {
+        if ($this->balance_after !== null && (float) $this->balance_after != 0.0) {
+            return (float) $this->balance_after;
+        }
+        return (float) ($this->balance_after ?? $this->amount ?? 0.0);
+    }
+
+    public function getReferenceAttribute(): ?string
+    {
+        if (!empty($this->reference_number)) {
+            return $this->reference_number;
+        }
+        if ($this->relatedPayment && !empty($this->relatedPayment->reference)) {
+            return $this->relatedPayment->reference;
+        }
+        if ($this->related_payment_id) {
+            return 'PAY-' . $this->related_payment_id;
+        }
+        if ($this->category === 'opening_balance') {
+            return 'OP-BAL' . ($this->account_id ? '-' . $this->account_id : '');
+        }
+        if ($this->relatedInvoice && !empty($this->relatedInvoice->number)) {
+            return $this->relatedInvoice->number;
+        }
+        if (preg_match('/(INV-[\w-]+)/i', $this->description ?? '', $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+
     public function scopeIncome($query)
     {
         return $query->where('transaction_type', 'income');
