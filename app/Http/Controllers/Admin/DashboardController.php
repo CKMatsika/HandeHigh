@@ -19,7 +19,7 @@ class DashboardController extends Controller
     public function headmaster()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $user?->school ?: ($user?->hasRole('super-admin') ? \App\Models\School::first() : null);
 
         if (!$school) {
             abort(403);
@@ -81,7 +81,7 @@ class DashboardController extends Controller
     public function deputyHeadmaster()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $user?->school ?: ($user?->hasRole('super-admin') ? \App\Models\School::first() : null);
 
         if (!$school) {
             abort(403);
@@ -155,7 +155,7 @@ class DashboardController extends Controller
     public function drilldown(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $user?->school ?: ($user?->hasRole('super-admin') ? \App\Models\School::first() : null);
 
         if (!$school) {
             return response()->json(['success' => false, 'message' => 'School context not found.'], 403);
@@ -171,7 +171,7 @@ class DashboardController extends Controller
     public function accountsClerk()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $user?->school ?: ($user?->hasRole('super-admin') ? \App\Models\School::first() : null);
 
         if (!$school) {
             abort(403);
@@ -181,39 +181,84 @@ class DashboardController extends Controller
         $currentDate = now();
         $startOfMonth = $currentDate->copy()->startOfMonth();
         
-        // Get invoices and payments data
-        $invoices = Invoice::where('school_id', $school->id);
-        $payments = Payment::where('school_id', $school->id);
-        $bills = Bill::where('school_id', $school->id);
-        $cashbookEntries = Cashbook::where('school_id', $school->id);
-        
-        // Current period data
-        $currentInvoices = $invoices->where('invoice_date', '>=', $startOfMonth)->get();
-        $currentPayments = $payments->where('paid_at', '>=', $startOfMonth)->get();
-        $currentBills = $bills->where('bill_date', '>=', $startOfMonth)->get();
-        $todayPayments = $payments->where('paid_at', '>=', $currentDate->copy()->startOfDay())->get();
-        $todayInvoices = $invoices->where('invoice_date', '>=', $currentDate->copy()->startOfDay())->get();
+        // Current period invoices (support issued_at or created_at)
+        $currentInvoices = Invoice::where('school_id', $school->id)
+            ->where(function ($q) use ($startOfMonth) {
+                $q->where('issued_at', '>=', $startOfMonth)
+                  ->orWhere('created_at', '>=', $startOfMonth);
+            })
+            ->get();
+
+        $currentPayments = Payment::where('school_id', $school->id)
+            ->where('paid_at', '>=', $startOfMonth)
+            ->get();
+
+        $currentBills = Bill::where('school_id', $school->id)
+            ->where(function ($q) use ($startOfMonth) {
+                $q->where('bill_date', '>=', $startOfMonth)
+                  ->orWhere('created_at', '>=', $startOfMonth);
+            })
+            ->get();
+
+        $todayPayments = Payment::where('school_id', $school->id)
+            ->where('paid_at', '>=', $currentDate->copy()->startOfDay())
+            ->get();
+
+        $todayInvoices = Invoice::where('school_id', $school->id)
+            ->where(function ($q) use ($currentDate) {
+                $q->where('issued_at', '>=', $currentDate->copy()->startOfDay())
+                  ->orWhere('created_at', '>=', $currentDate->copy()->startOfDay());
+            })
+            ->get();
         
         // Calculate financial metrics
-        $totalRevenue = $currentInvoices->sum('total_amount');
-        $totalExpenses = $currentBills->sum('total_amount');
+        $totalRevenue = (float) $currentInvoices->sum('total_amount');
+        if ($totalRevenue == 0) {
+            $totalRevenue = (float) Invoice::where('school_id', $school->id)->sum('total_amount');
+        }
+
+        $totalExpenses = (float) $currentBills->sum('total_amount');
+        if ($totalExpenses == 0) {
+            $totalExpenses = (float) Bill::where('school_id', $school->id)->sum('total_amount');
+        }
+
         $netIncome = $totalRevenue - $totalExpenses;
         
-        // Get accounts receivable
-        $outstandingBalance = $invoices->where('status', '!=', 'paid')->sum('balance');
-        $collectedFees = $currentPayments->sum('amount');
-        $totalFees = $currentInvoices->sum('total_amount');
+        // Accounts receivable
+        $outstandingBalance = (float) Invoice::where('school_id', $school->id)
+            ->where('status', '!=', 'paid')
+            ->sum('balance');
+
+        $collectedFees = (float) $currentPayments->sum('amount');
+        if ($collectedFees == 0) {
+            $collectedFees = (float) Payment::where('school_id', $school->id)->sum('amount');
+        }
+
+        $totalFees = (float) Invoice::where('school_id', $school->id)->sum('total_amount');
         $collectionRate = $totalFees > 0 ? round(($collectedFees / $totalFees) * 100, 1) : 0;
         
         // Aging breakdown
-        $over30Days = $invoices->where('status', '!=', 'paid')->where('due_date', '<', $currentDate->copy()->subDays(30))->sum('balance');
-        $over60Days = $invoices->where('status', '!=', 'paid')->where('due_date', '<', $currentDate->copy()->subDays(60))->sum('balance');
-        $over90Days = $invoices->where('status', '!=', 'paid')->where('due_date', '<', $currentDate->copy()->subDays(90))->sum('balance');
+        $over30Days = (float) Invoice::where('school_id', $school->id)
+            ->where('status', '!=', 'paid')
+            ->where('due_date', '<', $currentDate->copy()->subDays(30))
+            ->sum('balance');
+
+        $over60Days = (float) Invoice::where('school_id', $school->id)
+            ->where('status', '!=', 'paid')
+            ->where('due_date', '<', $currentDate->copy()->subDays(60))
+            ->sum('balance');
+
+        $over90Days = (float) Invoice::where('school_id', $school->id)
+            ->where('status', '!=', 'paid')
+            ->where('due_date', '<', $currentDate->copy()->subDays(90))
+            ->sum('balance');
         
         // Today's transactions
         $paymentsToday = $todayPayments->count();
         $invoicesToday = $todayInvoices->count();
-        $receiptsToday = $cashbookEntries->where('transaction_date', '>=', $currentDate->copy()->startOfDay())->count();
+        $receiptsToday = Cashbook::where('school_id', $school->id)
+            ->where('transaction_date', '>=', $currentDate->copy()->startOfDay())
+            ->count();
 
         // Get statistics for accounts clerk dashboard
         $stats = [
@@ -247,7 +292,7 @@ class DashboardController extends Controller
     public function bursar()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $user?->school ?: ($user?->hasRole('super-admin') ? \App\Models\School::first() : null);
 
         if (!$school) {
             abort(403);
@@ -561,7 +606,7 @@ class DashboardController extends Controller
     public function procurementOfficer()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $user?->school ?: ($user?->hasRole('super-admin') ? \App\Models\School::first() : null);
 
         if (!$school) {
             abort(403);

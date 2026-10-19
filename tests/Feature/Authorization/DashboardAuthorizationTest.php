@@ -55,6 +55,15 @@ class DashboardAuthorizationTest extends TestCase
         }
     }
 
+    public function test_super_admin_without_explicit_school_can_reach_every_role_specific_admin_dashboard(): void
+    {
+        $user = $this->userWithRole('super-admin', false);
+
+        foreach ($this->adminDashboards as $route) {
+            $this->actingAs($user)->get(route($route))->assertOk();
+        }
+    }
+
     public function test_school_admin_does_not_receive_role_specific_dashboard_permissions(): void
     {
         $user = $this->userWithRole('school-admin');

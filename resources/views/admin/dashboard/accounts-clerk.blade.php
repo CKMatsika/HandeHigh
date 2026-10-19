@@ -81,7 +81,7 @@
     </div>
 
     <!-- AI Finance Advisor -->
-    <a href="{{ route('admin.ai-finance.dashboard') }}" class="block rounded-2xl border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 p-6 hover:from-violet-500/20 hover:to-indigo-500/20 transition">
+    <a href="{{ Route::has('admin.ai-finance.dashboard') ? route('admin.ai-finance.dashboard') : url('/admin/ai-finance') }}" class="block rounded-2xl border border-violet-500/30 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 p-6 hover:from-violet-500/20 hover:to-indigo-500/20 transition">
         <div class="flex items-center gap-4">
             <div class="w-14 h-14 rounded-2xl bg-violet-500/20 flex items-center justify-center flex-shrink-0">
                 <svg class="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

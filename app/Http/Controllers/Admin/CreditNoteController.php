@@ -70,7 +70,7 @@ class CreditNoteController extends Controller
             ->orderBy('first_name')->get();
         $invoices  = Invoice::where('school_id', $school->id)
             ->whereIn('status', ['sent', 'partial', 'overdue'])
-            ->orderByDesc('invoice_date')
+            ->orderByDesc('issued_at')
             ->get();
 
         return view('admin.credit-notes.create', compact('customers', 'students', 'invoices'));
@@ -164,7 +164,7 @@ class CreditNoteController extends Controller
             ->orderBy('first_name')->get();
         $invoices  = Invoice::where('school_id', $school->id)
             ->whereIn('status', ['sent', 'partial', 'overdue'])
-            ->orderByDesc('invoice_date')
+            ->orderByDesc('issued_at')
             ->get();
 
         return view('admin.credit-notes.edit', compact('creditNote', 'customers', 'students', 'invoices'));
