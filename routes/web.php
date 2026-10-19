@@ -134,6 +134,7 @@ Route::middleware(['auth'])->group(function () {
                 ->middlewareFor(['edit', 'update'], 'can:update,enrollment');
 
             Route::get('fees/print', [FeeStructureController::class, 'print'])->name('fees.print');
+            Route::post('fees/sync-hande', [FeeStructureController::class, 'syncHandeSchedule'])->name('fees.sync-hande');
             Route::get('fees/{fee}', [FeeStructureController::class, 'show'])->name('fees.show')->middleware('can:view,fee');
             Route::resource('fees', FeeStructureController::class)->only(['index', 'store', 'update', 'destroy'])
                 ->middlewareFor(['update'], 'can:update,fee')
@@ -151,7 +152,11 @@ Route::middleware(['auth'])->group(function () {
                 ->middlewareFor('destroy', 'can:delete,invoice');
             Route::get('invoices/{invoice}/payments/create', [PaymentController::class, 'create'])->name('payments.create');
             Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
+            Route::post('invoices/{invoice}/apply-advance', [PaymentController::class, 'applyAdvance'])->name('invoices.apply-advance');
+            Route::get('payments/advance/create', [PaymentController::class, 'createAdvance'])->name('payments.advance.create');
+            Route::post('payments/advance', [PaymentController::class, 'storeAdvance'])->name('payments.advance.store');
             Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->name('payments.receipt');
+            Route::get('payments/{payment}/receipt-mopse', [PaymentController::class, 'receiptMopse'])->name('payments.receipt-mopse');
             Route::get('students/{student}/statement', [StatementController::class, 'create'])->name('students.statement.create')->middleware('can:view,student');
             Route::post('students/{student}/statement', [StatementController::class, 'show'])->name('students.statement.show')->middleware('can:view,student');
             Route::get('students/{student}/statement/print', [StatementController::class, 'print'])->name('students.statement.print')->middleware('can:view,student');
@@ -301,6 +306,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/profit-and-loss', [FinancialReportController::class, 'projectProfitAndLoss'])->name('reports.profit-and-loss');
             Route::get('reports/profit-and-loss/export', [FinancialReportController::class, 'exportProjectProfitAndLoss'])->name('reports.profit-and-loss.export');
             Route::get('reports/cashbook-summary', [FinancialReportController::class, 'cashbookSummary'])->name('reports.cashbook-summary');
+            Route::get('reports/daily-banking-handover', [FinancialReportController::class, 'dailyBankingHandover'])->name('reports.daily-banking-handover');
+            Route::get('reports/daily-banking-handover/export', [FinancialReportController::class, 'exportDailyBankingHandover'])->name('reports.daily-banking-handover.export');
 
             Route::get('reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->name('reports.trial-balance');
             Route::get('reports/income-statement', [FinancialReportController::class, 'incomeStatement'])->name('reports.income-statement');

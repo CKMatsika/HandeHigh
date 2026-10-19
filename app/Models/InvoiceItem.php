@@ -46,4 +46,19 @@ class InvoiceItem extends Model
     {
         return $this->belongsTo(Department::class, 'cost_center_id');
     }
+
+    public function allocations()
+    {
+        return $this->hasMany(PaymentAllocation::class, 'invoice_item_id');
+    }
+
+    public function getPaidAmountAttribute(): float
+    {
+        return (float) $this->allocations()->sum('amount');
+    }
+
+    public function getBalanceAttribute(): float
+    {
+        return max(0.0, (float) $this->line_total - $this->paid_amount);
+    }
 }

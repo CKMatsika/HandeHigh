@@ -33,15 +33,24 @@ class FeeStructureController extends Controller
         }
 
         $feeStructures = $query
-            ->with(['revenueAccount', 'project', 'costCenter'])
+            ->with(['revenueAccount', 'project', 'costCenter', 'parent', 'subVotes'])
+            ->orderByRaw('parent_id IS NULL DESC')
             ->orderBy('grade')
             ->orderBy('category')
+            ->orderBy('allocation_priority')
             ->orderBy('code')
-            ->paginate(25)
+            ->paginate(35)
             ->appends($request->only(['academic_year', 'term']));
+
+        $parentFees = FeeStructure::where('school_id', $school->id)
+            ->where('academic_year', $academicYear)
+            ->whereNull('parent_id')
+            ->orderBy('label')
+            ->get();
 
         $terms = ['Term 1', 'Term 2', 'Term 3'];
         $categories = ['tuition', 'levy', 'subject', 'boarding', 'transport', 'other'];
+        $standardVotes = \App\Services\Finance\HandeFeeVotesService::getStandardVotes();
         $revenueAccounts = Account::where('school_id', $school->id)
             ->where('is_active', true)
             ->orderBy('code')
@@ -52,6 +61,8 @@ class FeeStructureController extends Controller
         return view('admin.fees.index', [
             'school' => $school,
             'feeStructures' => $feeStructures,
+            'parentFees' => $parentFees,
+            'standardVotes' => $standardVotes,
             'academicYear' => $academicYear,
             'term' => $term,
             'terms' => $terms,
@@ -89,7 +100,7 @@ class FeeStructureController extends Controller
         }
 
         $academicYear = $request->input('academic_year', now()->format('Y'));
-        $term = $request->input('term');
+        $term = $request->input('term', 'Term 3');
 
         $query = FeeStructure::where('school_id', $school->id)
             ->where('academic_year', $academicYear);
@@ -99,17 +110,45 @@ class FeeStructureController extends Controller
         }
 
         $feeStructures = $query
-            ->orderBy('grade')
-            ->orderBy('category')
+            ->with('subVotes')
+            ->orderByRaw('parent_id IS NULL DESC')
+            ->orderBy('allocation_priority')
             ->orderBy('code')
             ->get();
+
+        $boardingParent = $feeStructures->first(fn($f) => $f->parent_id === null && ($f->residency_type === 'boarding' || str_contains(strtolower($f->label), 'boarding')));
+        $dayParent = $feeStructures->first(fn($f) => $f->parent_id === null && ($f->residency_type === 'day' || str_contains(strtolower($f->label), 'day')));
+
+        $signatories = \App\Services\Finance\HandeFeeVotesService::getAuthorisedSignatories();
 
         return view('admin.fees.print', [
             'school' => $school,
             'feeStructures' => $feeStructures,
+            'boardingParent' => $boardingParent,
+            'dayParent' => $dayParent,
+            'signatories' => $signatories,
             'academicYear' => $academicYear,
             'term' => $term,
         ]);
+    }
+
+    public function syncHandeSchedule(Request $request)
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (! $school) {
+            abort(403, 'No school context available for this user.');
+        }
+
+        $academicYear = $request->input('academic_year', '2026');
+        $term = $request->input('term', 'Term 3');
+
+        \App\Services\Finance\HandeFeeVotesService::syncSchoolVotes($school, $academicYear, $term);
+
+        return redirect()
+            ->route('admin.fees.index', ['academic_year' => $academicYear, 'term' => $term])
+            ->with('status', "Official Hande High School {$academicYear} {$term} Fee Votes Schedule synchronized successfully.");
     }
 
     public function store(Request $request)
@@ -126,6 +165,10 @@ class FeeStructureController extends Controller
             'term' => ['required', 'string', 'max:20'],
             'grade' => ['nullable', 'string', 'max:50'],
             'category' => ['required', 'string', 'max:50'],
+            'parent_id' => ['nullable', Rule::exists('fee_structures', 'id')->where('school_id', $school->id)],
+            'residency_type' => ['nullable', 'string', 'in:all,boarding,day'],
+            'vote_code' => ['nullable', 'string', 'max:50'],
+            'allocation_priority' => ['nullable', 'integer', 'min:1'],
             'code' => [
                 'required',
                 'string',
@@ -154,6 +197,10 @@ class FeeStructureController extends Controller
             'academic_year' => $validated['academic_year'],
             'term' => $validated['term'],
             'grade' => $validated['grade'] ?? null,
+            'parent_id' => $validated['parent_id'] ?? null,
+            'residency_type' => $validated['residency_type'] ?? 'all',
+            'vote_code' => $validated['vote_code'] ?? null,
+            'allocation_priority' => $validated['allocation_priority'] ?? 10,
             'category' => $validated['category'],
             'code' => $validated['code'],
             'label' => $validated['label'],
@@ -192,6 +239,10 @@ class FeeStructureController extends Controller
             'term' => ['required', 'string', 'max:20'],
             'grade' => ['nullable', 'string', 'max:50'],
             'category' => ['required', 'string', 'max:50'],
+            'parent_id' => ['nullable', Rule::exists('fee_structures', 'id')->where('school_id', $school->id)],
+            'residency_type' => ['nullable', 'string', 'in:all,boarding,day'],
+            'vote_code' => ['nullable', 'string', 'max:50'],
+            'allocation_priority' => ['nullable', 'integer', 'min:1'],
             'code' => [
                 'required',
                 'string',
@@ -219,6 +270,10 @@ class FeeStructureController extends Controller
             'academic_year' => $validated['academic_year'],
             'term' => $validated['term'],
             'grade' => $validated['grade'] ?? null,
+            'parent_id' => $validated['parent_id'] ?? null,
+            'residency_type' => $validated['residency_type'] ?? ($fee->residency_type ?? 'all'),
+            'vote_code' => $validated['vote_code'] ?? null,
+            'allocation_priority' => $validated['allocation_priority'] ?? 10,
             'category' => $validated['category'],
             'code' => $validated['code'],
             'label' => $validated['label'],

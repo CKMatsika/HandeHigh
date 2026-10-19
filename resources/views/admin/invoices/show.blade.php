@@ -97,51 +97,90 @@
         @endif
     </div>
 
-    @if(session('receipt_url'))
-        <div class="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-center justify-between text-xs text-emerald-200">
+    @if(session('receipt_url') || session('receipt_mopse_url'))
+        <div class="mb-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-200">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-300 shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
                 <div>
                     <p class="font-semibold text-emerald-100">{{ session('status', 'Payment recorded successfully!') }}</p>
-                    <p class="text-[11px] text-emerald-300/80">Official student fee receipt is ready for printing and records.</p>
+                    <p class="text-[11px] text-emerald-300/80">Official MOPSE printed voucher and fee receipts are ready.</p>
                 </div>
             </div>
-            <a href="{{ session('receipt_url') }}" target="_blank" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-600 transition gap-1.5">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                Print Official Receipt
-            </a>
+            <div class="flex items-center gap-2">
+                @if(session('receipt_mopse_url'))
+                    <a href="{{ session('receipt_mopse_url') }}" target="_blank" class="inline-flex items-center rounded-full bg-emerald-500 hover:bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        Print MOPSE Voucher
+                    </a>
+                @endif
+                @if(session('receipt_url'))
+                    <a href="{{ session('receipt_url') }}" target="_blank" class="inline-flex items-center rounded-full border border-emerald-500/60 bg-emerald-950/40 px-3.5 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-900 transition">
+                        Computer Receipt
+                    </a>
+                @endif
+            </div>
         </div>
     @endif
 
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4 mt-4">
-        <h2 class="text-sm font-semibold text-slate-100 mb-3">Payments</h2>
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-slate-100">Payments & Receipts</h2>
+            @if($invoice->balance > 0 && $invoice->status !== 'cancelled')
+                <a href="{{ route('admin.payments.create', $invoice) }}" class="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-600 hover:text-white transition">
+                    + Receive Payment
+                </a>
+            @endif
+        </div>
         @if($invoice->allocations->count())
             <table class="min-w-full text-xs text-slate-100">
                 <thead>
                     <tr class="border-b border-slate-800 text-slate-400">
                         <th class="text-left py-2 font-medium">Date</th>
+                        <th class="text-left py-2 font-medium">MOPSE Serial #</th>
                         <th class="text-left py-2 font-medium">Method</th>
                         <th class="text-left py-2 font-medium">Account</th>
-                        <th class="text-left py-2 font-medium">Reference</th>
+                        <th class="text-left py-2 font-medium">Vote / Ref</th>
                         <th class="text-right py-2 font-medium">Amount</th>
-                        <th class="text-right py-2 font-medium">Receipt</th>
+                        <th class="text-right py-2 font-medium">Receipts</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($invoice->allocations as $allocation)
                         <tr class="border-b border-slate-800/70">
                             <td class="py-2 align-middle">{{ $allocation->payment?->paid_at?->format('Y-m-d') ?? '—' }}</td>
+                            <td class="py-2 align-middle">
+                                @if($allocation->payment?->mopse_receipt_number)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                        #{{ $allocation->payment->mopse_receipt_number }}
+                                    </span>
+                                @else
+                                    <span class="text-slate-500 font-mono">PAY-{{ $allocation->payment_id }}</span>
+                                @endif
+                            </td>
                             <td class="py-2 align-middle">{{ $allocation->payment?->method ? ucfirst(str_replace('_', ' ', $allocation->payment->method)) : '—' }}</td>
                             <td class="py-2 align-middle text-slate-400">{{ $allocation->payment?->account ? ($allocation->payment->account->code . ' · ' . $allocation->payment->account->name) : 'Cash/Bank' }}</td>
-                            <td class="py-2 align-middle">{{ $allocation->payment?->reference ?: '—' }}</td>
-                            <td class="py-2 align-middle text-right font-medium text-emerald-400">{{ number_format($allocation->amount, 2) }}</td>
+                            <td class="py-2 align-middle">
+                                @if($allocation->vote_code)
+                                    <span class="text-slate-300 font-medium">{{ $allocation->vote_code }}</span>
+                                @elseif($allocation->invoiceItem)
+                                    <span class="text-slate-300">{{ $allocation->invoiceItem->description }}</span>
+                                @else
+                                    <span class="text-slate-400">{{ $allocation->payment?->reference ?: 'General' }}</span>
+                                @endif
+                            </td>
+                            <td class="py-2 align-middle text-right font-medium text-emerald-400">${{ number_format($allocation->amount, 2) }}</td>
                             <td class="py-2 align-middle text-right">
                                 @if($allocation->payment)
-                                    <a href="{{ route('admin.payments.receipt', $allocation->payment) }}" target="_blank" class="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-1 text-[11px] font-medium text-emerald-300 hover:bg-emerald-600 hover:text-white transition">
-                                        Print Receipt
-                                    </a>
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <a href="{{ route('admin.payments.receipt-mopse', $allocation->payment) }}" target="_blank" class="inline-flex items-center rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-600 hover:text-white transition">
+                                            MOPSE Voucher
+                                        </a>
+                                        <a href="{{ route('admin.payments.receipt', $allocation->payment) }}" target="_blank" class="inline-flex items-center rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[10px] font-medium text-slate-300 hover:bg-slate-700 transition">
+                                            Receipt
+                                        </a>
+                                    </div>
                                 @endif
                             </td>
                         </tr>

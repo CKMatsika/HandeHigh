@@ -12,6 +12,8 @@ class PaymentAllocation extends Model
     protected $fillable = [
         'payment_id',
         'invoice_id',
+        'invoice_item_id',
+        'vote_code',
         'amount',
     ];
 
@@ -27,5 +29,10 @@ class PaymentAllocation extends Model
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function invoiceItem()
+    {
+        return $this->belongsTo(InvoiceItem::class, 'invoice_item_id');
     }
 }

@@ -667,6 +667,15 @@
             <div class="toolbar-subtitle">Official student tuition & fees billing document</div>
         </div>
         <div class="toolbar-actions">
+            @if(request('display', 'summary') === 'summary')
+                <a href="{{ route('admin.invoices.print', [$invoice, 'display' => 'itemized']) }}" class="btn btn-secondary" title="View individual vote breakdown lines">
+                    Show Itemized Votes
+                </a>
+            @else
+                <a href="{{ route('admin.invoices.print', [$invoice, 'display' => 'summary']) }}" class="btn btn-secondary" title="View single package total line">
+                    Show Package Total Only
+                </a>
+            @endif
             <button type="button" onclick="window.print()" class="btn btn-primary">
                 Print Invoice
             </button>
@@ -772,8 +781,16 @@
             </div>
         </div>
 
+        @php
+            $displayMode = request('display', 'summary');
+            $hasSubVotes = $invoice->items->contains(fn($it) => !empty($it->feeStructure?->parent_id) || ($it->feeStructure?->subVotes?->count() ?? 0) > 0);
+            $parentStructure = $invoice->items->first(fn($it) => $it->feeStructure?->parent !== null)?->feeStructure?->parent 
+                ?? $invoice->items->first(fn($it) => ($it->feeStructure?->subVotes?->count() ?? 0) > 0)?->feeStructure;
+            $isSummary = $displayMode === 'summary' && ($hasSubVotes || $parentStructure);
+        @endphp
+
         <!-- Itemised Fee Charges Table -->
-        <div class="section-heading">ITEMISED FEE CHARGES</div>
+        <div class="section-heading">{{ $isSummary ? 'FEE CHARGES SUMMARY' : 'ITEMISED FEE CHARGES' }}</div>
         <table class="items-table">
             <thead>
                 <tr>
@@ -784,21 +801,35 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($invoice->items as $item)
+                @if($isSummary)
                     <tr>
-                        <td class="col-desc">{{ $item->description }}</td>
-                        <td class="col-qty">{{ $item->quantity }}</td>
-                        <td class="col-price">${{ number_format($item->unit_amount, 2) }}</td>
-                        <td class="col-amount">${{ number_format($item->line_total, 2) }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td class="col-desc">School Tuition & General Fees</td>
+                        <td class="col-desc">
+                            <strong>{{ $parentStructure?->label ?? ($invoice->student?->is_boarding ? 'Boarding Student Fees Package' : 'Day-Scholar Student Fees Package') }}</strong>
+                            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+                                Comprehensive school fees package including Tuition, Building Fund, GPF, Sports, ICT, Science Levy & {{ $invoice->student?->is_boarding ? 'Boarding' : 'Lunch Meals' }}.
+                            </div>
+                        </td>
                         <td class="col-qty">1</td>
                         <td class="col-price">${{ number_format($invoice->total_amount, 2) }}</td>
                         <td class="col-amount">${{ number_format($invoice->total_amount, 2) }}</td>
                     </tr>
-                @endforelse
+                @else
+                    @forelse($invoice->items as $item)
+                        <tr>
+                            <td class="col-desc">{{ $item->description }}</td>
+                            <td class="col-qty">{{ $item->quantity }}</td>
+                            <td class="col-price">${{ number_format($item->unit_amount, 2) }}</td>
+                            <td class="col-amount">${{ number_format($item->line_total, 2) }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td class="col-desc">School Tuition & General Fees</td>
+                            <td class="col-qty">1</td>
+                            <td class="col-price">${{ number_format($invoice->total_amount, 2) }}</td>
+                            <td class="col-amount">${{ number_format($invoice->total_amount, 2) }}</td>
+                        </tr>
+                    @endforelse
+                @endif
             </tbody>
         </table>
 

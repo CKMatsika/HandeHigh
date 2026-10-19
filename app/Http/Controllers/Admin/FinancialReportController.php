@@ -13,6 +13,7 @@ use App\Models\Budget;
 use App\Models\Department;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Student;
 use App\Services\Finance\FinanceReportingService;
@@ -903,5 +904,165 @@ class FinancialReportController extends Controller
                     'balance' => $balance,
                 ];
             });
+    }
+
+    /**
+     * Daily Cash Collection & Banking Handover Report
+     * Accounts clerk handover of cash received to senior person for bank deposit
+     */
+    public function dailyBankingHandover(Request $request)
+    {
+        $school = Auth::user()?->school ?? \App\Models\School::first();
+        if (! $school) {
+            abort(403);
+        }
+
+        $date = $request->input('date', now()->toDateString());
+        $method = $request->input('method', 'cash');
+        $bankingRef = $request->input('banking_ref', '');
+        $bankAccountId = $request->input('bank_account_id');
+
+        $query = Payment::where('school_id', $school->id)
+            ->whereDate('paid_at', $date);
+
+        if ($method !== 'all') {
+            $query->where('method', $method);
+        }
+
+        $payments = $query->with([
+            'student',
+            'creator',
+            'account',
+            'allocations.invoiceItem.feeStructure',
+        ])->orderBy('id')->get();
+
+        $standardVotes = \App\Services\Finance\HandeFeeVotesService::getStandardVotes();
+        $voteCategories = [];
+        foreach ($standardVotes as $code => $info) {
+            $voteCategories[$code] = [
+                'name' => $info['name'],
+                'label' => $info['name'],
+                'category' => $info['category'] ?? 'levy',
+                'amount' => 0.0,
+            ];
+        }
+
+        foreach ($payments as $payment) {
+            $allocated = false;
+            foreach ($payment->allocations as $alloc) {
+                $code = $alloc->vote_code ?? $alloc->invoiceItem?->feeStructure?->vote_code;
+                if (!$code) {
+                    $desc = strtolower($alloc->invoiceItem?->description ?? '');
+                    if (str_contains($desc, 'tuition')) $code = 'TUITION';
+                    elseif (str_contains($desc, 'bld') || str_contains($desc, 'building')) $code = 'BUILDING_FUND';
+                    elseif (str_contains($desc, 'sport')) $code = 'SPORTS';
+                    elseif (str_contains($desc, 'ict') || str_contains($desc, 'practic')) $code = 'PRACTICALS_ICT';
+                    elseif (str_contains($desc, 'general') || str_contains($desc, 'gpf') || str_contains($desc, 'admin')) $code = 'GPF_ADMIN';
+                    elseif (str_contains($desc, 'board')) $code = 'BOARDING_FEES';
+                    elseif (str_contains($desc, 'food') || str_contains($desc, 'lunch')) $code = 'FOOD';
+                    elseif (str_contains($desc, 'science')) $code = 'SCIENCE_LEVY';
+                }
+
+                if ($code && isset($voteCategories[$code])) {
+                    $voteCategories[$code]['amount'] += (float) $alloc->amount;
+                    $allocated = true;
+                }
+            }
+
+            if (!$allocated) {
+                // If not item-allocated, map to general categories
+                if ($payment->student?->is_boarding) {
+                    $voteCategories['BOARDING_FEES']['amount'] += (float) $payment->amount;
+                } else {
+                    $voteCategories['TUITION']['amount'] += (float) $payment->amount;
+                }
+            }
+        }
+
+        $totalCash = (float) $payments->sum('amount');
+        $totalInWords = \App\Services\Finance\CurrencyWordsService::toWords($totalCash);
+
+        $bankAccounts = Account::where('school_id', $school->id)
+            ->where('type', 'asset')
+            ->where(function ($query) {
+                $query->whereIn('category', ['bank', 'cash'])
+                    ->orWhere('code', 'like', '13%')
+                    ->orWhereIn('code', ['1100', '1101', '1102']);
+            })
+            ->active()
+            ->orderBy('code')
+            ->get();
+
+        $selectedBankAccount = $bankAccountId ? $bankAccounts->firstWhere('id', (int) $bankAccountId) : $bankAccounts->firstWhere('category', 'bank');
+
+        return view('admin.reports.daily-banking-handover', [
+            'school' => $school,
+            'date' => $date,
+            'method' => $method,
+            'bankingRef' => $bankingRef,
+            'payments' => $payments,
+            'voteCategories' => $voteCategories,
+            'totalCash' => $totalCash,
+            'totalInWords' => $totalInWords,
+            'bankAccounts' => $bankAccounts,
+            'selectedBankAccount' => $selectedBankAccount,
+            'clerkUser' => Auth::user(),
+        ]);
+    }
+
+    /**
+     * Export Daily Banking Handover to CSV
+     */
+    public function exportDailyBankingHandover(Request $request)
+    {
+        $school = Auth::user()?->school ?? \App\Models\School::first();
+        if (! $school) {
+            abort(403);
+        }
+
+        $date = $request->input('date', now()->toDateString());
+        $method = $request->input('method', 'cash');
+
+        $query = Payment::where('school_id', $school->id)
+            ->whereDate('paid_at', $date);
+
+        if ($method !== 'all') {
+            $query->where('method', $method);
+        }
+
+        $payments = $query->with(['student', 'creator', 'account'])->orderBy('id')->get();
+
+        $filename = "daily-banking-handover-{$date}.csv";
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($school, $date, $payments) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['HANDE SECONDARY SCHOOL - DAILY CASH BANKING HANDOVER REPORT']);
+            fputcsv($out, ['Date:', $date]);
+            fputcsv($out, ['Total Receipts:', $payments->count()]);
+            fputcsv($out, ['Total Amount ($):', number_format($payments->sum('amount'), 2)]);
+            fputcsv($out, []);
+            fputcsv($out, ['Receipt ID', 'MOPSE Serial #', 'Time', 'Student Name', 'Admission #', 'Form / Grade', 'Method', 'Account', 'Amount ($)']);
+
+            foreach ($payments as $p) {
+                fputcsv($out, [
+                    'PAY-' . $p->id,
+                    $p->mopse_receipt_number ?? 'N/A',
+                    $p->created_at?->format('H:i') ?? '—',
+                    ($p->student?->last_name ?? '') . ' ' . ($p->student?->first_name ?? ''),
+                    $p->student?->admission_number ?? '—',
+                    ($p->student?->grade ?? '') . ' ' . ($p->student?->class_name ?? ''),
+                    ucfirst(str_replace('_', ' ', $p->method)),
+                    $p->account?->name ?? 'Cash/Bank',
+                    number_format($p->amount, 2),
+                ]);
+            }
+            fclose($out);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }

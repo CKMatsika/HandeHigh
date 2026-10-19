@@ -708,6 +708,10 @@ class AccountingService
         
         // Calculate new balance
         $newBalance = $lastBalance + $payment->amount;
+        $studentName = $payment->student ? ($payment->student->first_name . ' ' . $payment->student->last_name) : 'Student';
+        $desc = $invoice 
+            ? 'Payment for invoice ' . $invoice->number 
+            : 'Advance fee payment' . ($payment->mopse_receipt_number ? ' (MOPSE: ' . $payment->mopse_receipt_number . ')' : '') . ' - ' . $studentName;
         
         // Create cashbook entry (legacy cashbook model)
         \App\Models\Cashbook::create([
@@ -715,16 +719,16 @@ class AccountingService
             'account_id' => $cashAccount->id,
             'transaction_type' => 'income',
             'category' => 'fees',
-            'description' => 'Payment for invoice ' . $invoice->number,
+            'description' => $desc,
             'amount' => $payment->amount,
             'balance_after' => $newBalance,
             'transaction_date' => $payment->paid_at,
-            'reference_number' => $payment->reference ?? 'PAY-' . $payment->id,
+            'reference_number' => $payment->mopse_receipt_number ?? ($payment->reference ?? 'PAY-' . $payment->id),
             'payment_method' => $payment->method,
-            'related_invoice_id' => $invoice->id,
+            'related_invoice_id' => $invoice?->id,
             'related_payment_id' => $payment->id,
             'created_by' => auth()->id() ?? $payment->created_by,
-            'notes' => 'Student fee payment - ' . ($invoice->student ? ($invoice->student->first_name . ' ' . $invoice->student->last_name) : 'Student'),
+            'notes' => 'Student fee receipt - ' . $studentName,
         ]);
 
         // Dual sync: Create CashbookTransaction entry for bank reconciliation
@@ -734,8 +738,8 @@ class AccountingService
             'school_id' => $school->id,
             'account_id' => $cashAccount->id,
             'transaction_date' => $payment->paid_at,
-            'reference_number' => $payment->reference ?? 'PAY-' . $payment->id,
-            'description' => 'Fee Payment for invoice ' . $invoice->number . ($invoice->student ? ' - ' . $invoice->student->first_name . ' ' . $invoice->student->last_name : ''),
+            'reference_number' => $payment->mopse_receipt_number ?? ($payment->reference ?? 'PAY-' . $payment->id),
+            'description' => $desc,
             'amount' => $payment->amount,
             'transaction_type' => 'debit',
             'category' => 'income',
@@ -743,6 +747,182 @@ class AccountingService
             'status' => 'unmatched',
             'created_by' => auth()->id() ?? $payment->created_by,
             'notes' => 'Payment method: ' . $payment->method,
+        ]);
+    }
+
+    /**
+     * Post student advance payment (prepayment received before invoice exists)
+     */
+    public function postAdvancePayment($payment, $selectedAccountId = null): JournalBatch
+    {
+        $school = $payment->school;
+
+        $cashAccount = null;
+        $targetAccountId = $selectedAccountId ?? $payment->account_id;
+        if ($targetAccountId) {
+            $cashAccount = Account::where('school_id', $school->id)
+                ->where('id', $targetAccountId)
+                ->first();
+        }
+
+        if (!$cashAccount) {
+            $cashAccountCode = match($payment->method) {
+                'cash' => '1102',
+                'bank' => '1301',
+                'mobile_money' => '1303',
+                default => '1102',
+            };
+
+            $cashAccount = Account::where('school_id', $school->id)
+                ->where('code', $cashAccountCode)
+                ->first();
+
+            if (!$cashAccount) {
+                $cashAccount = Account::where('school_id', $school->id)
+                    ->whereIn('code', ['1101', '1102', '1100', '1301', '1300'])
+                    ->first();
+            }
+
+            if (!$cashAccount) {
+                $cashAccount = Account::create([
+                    'school_id' => $school->id,
+                    'code' => $cashAccountCode,
+                    'name' => match($payment->method) {
+                        'bank' => 'Main Operating Account',
+                        'mobile_money' => 'Mobile Money Account',
+                        default => 'Petty Cash',
+                    },
+                    'type' => 'asset',
+                    'category' => match($payment->method) {
+                        'bank', 'mobile_money' => 'bank',
+                        default => 'cash',
+                    },
+                    'currency' => 'USD',
+                    'is_active' => true,
+                    'is_postable' => true,
+                ]);
+            }
+        }
+
+        if (empty($payment->account_id) && $cashAccount) {
+            $payment->updateQuietly(['account_id' => $cashAccount->id]);
+        }
+
+        // Prepaid fees liability account
+        $prepaidFeesAccount = Account::where('school_id', $school->id)
+            ->whereIn('code', ['2105', '2100', '2101'])
+            ->first();
+
+        if (!$prepaidFeesAccount) {
+            $prepaidFeesAccount = Account::where('school_id', $school->id)
+                ->where('type', 'liability')
+                ->where(function ($q) {
+                    $q->where('category', 'prepaid')
+                      ->orWhere('name', 'like', '%prepaid%')
+                      ->orWhere('name', 'like', '%advance%');
+                })
+                ->first();
+        }
+
+        if (!$prepaidFeesAccount) {
+            $prepaidFeesAccount = Account::create([
+                'school_id' => $school->id,
+                'code' => '2105',
+                'name' => 'Prepaid Student Fees (Fees in Advance)',
+                'type' => 'liability',
+                'category' => 'current_liability',
+                'currency' => 'USD',
+                'is_active' => true,
+                'is_postable' => true,
+            ]);
+        }
+
+        $studentName = $payment->student ? ($payment->student->first_name . ' ' . $payment->student->last_name) : 'Student';
+        $ref = $payment->mopse_receipt_number ?? ($payment->reference ?? 'PAY-' . $payment->id);
+
+        $journalBatch = $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => $payment->paid_at,
+            'reference_number' => $ref,
+            'description' => 'Prepaid fee receipt for ' . $studentName . ' (MOPSE: ' . ($payment->mopse_receipt_number ?? 'N/A') . ')',
+            'source_type' => 'payment',
+            'source_id' => $payment->id,
+            'status' => 'posted',
+            'created_by' => auth()->id() ?? $payment->created_by,
+            'entries' => [
+                [
+                    'account_id' => $cashAccount->id,
+                    'entry_type' => 'debit',
+                    'amount' => $payment->amount,
+                    'memo' => 'Advance payment received from ' . $studentName,
+                ],
+                [
+                    'account_id' => $prepaidFeesAccount->id,
+                    'entry_type' => 'credit',
+                    'amount' => $payment->amount,
+                    'memo' => 'Prepaid fees unallocated credit for ' . $studentName,
+                ],
+            ],
+        ]);
+
+        $this->createCashbookEntry($payment, null, $cashAccount, $journalBatch);
+
+        return $journalBatch;
+    }
+
+    /**
+     * Post advance payment allocation to invoice
+     */
+    public function postAdvanceAllocation($payment, $invoice, float $amount): JournalBatch
+    {
+        $school = $payment->school;
+
+        $prepaidFeesAccount = Account::where('school_id', $school->id)
+            ->whereIn('code', ['2105', '2100', '2101'])
+            ->first();
+
+        if (!$prepaidFeesAccount) {
+            $prepaidFeesAccount = Account::where('school_id', $school->id)
+                ->where('type', 'liability')
+                ->first();
+        }
+
+        $feesReceivableAccount = Account::where('school_id', $school->id)
+            ->whereIn('code', ['1201', '1200'])
+            ->first();
+
+        if (!$feesReceivableAccount) {
+            $feesReceivableAccount = Account::where('school_id', $school->id)
+                ->where('type', 'asset')
+                ->where('category', 'receivable')
+                ->first();
+        }
+
+        $studentName = $payment->student ? ($payment->student->first_name . ' ' . $payment->student->last_name) : 'Student';
+
+        return $this->createJournalBatch([
+            'school_id' => $school->id,
+            'transaction_date' => now()->toDateString(),
+            'reference_number' => 'ALLOC-ADV-' . $payment->id . '-' . $invoice->id,
+            'description' => 'Applied advance fees credit from PAY-' . $payment->id . ' to invoice ' . $invoice->number,
+            'source_type' => 'payment',
+            'source_id' => $payment->id,
+            'status' => 'posted',
+            'created_by' => auth()->id() ?? $payment->created_by,
+            'entries' => [
+                [
+                    'account_id' => $prepaidFeesAccount->id,
+                    'entry_type' => 'debit',
+                    'amount' => $amount,
+                    'memo' => 'Release prepaid fees for ' . $studentName . ' on invoice ' . $invoice->number,
+                ],
+                [
+                    'account_id' => $feesReceivableAccount->id,
+                    'entry_type' => 'credit',
+                    'amount' => $amount,
+                    'memo' => 'Clear fees receivable for ' . $studentName . ' on invoice ' . $invoice->number,
+                ],
+            ],
         ]);
     }
 

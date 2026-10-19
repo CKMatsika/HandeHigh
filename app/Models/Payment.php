@@ -13,18 +13,44 @@ class Payment extends Model
         'school_id',
         'student_id',
         'guardian_id',
+        'created_by',
         'method',
         'account_id',
         'reference',
+        'mopse_receipt_number',
         'amount',
         'paid_at',
         'status',
+        'is_advance',
+        'advance_balance',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'advance_balance' => 'decimal:2',
         'paid_at' => 'date',
+        'is_advance' => 'boolean',
     ];
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function itemAllocations()
+    {
+        return $this->hasMany(PaymentAllocation::class)->whereNotNull('invoice_item_id');
+    }
+
+    public function scopeAdvance($query)
+    {
+        return $query->where('is_advance', true);
+    }
+
+    public function scopeHasAdvanceBalance($query)
+    {
+        return $query->where('is_advance', true)->where('advance_balance', '>', 0);
+    }
 
     public function school()
     {
