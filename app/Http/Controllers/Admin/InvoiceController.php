@@ -10,8 +10,10 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\JournalBatch;
 use App\Models\LedgerEntry;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\User;
 use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
@@ -25,10 +27,27 @@ class InvoiceController extends Controller
     {
     }
 
+    private function resolveSchool(?User $user, ?Invoice $invoice = null): ?School
+    {
+        if ($user?->school) {
+            return $user->school;
+        }
+
+        if ($invoice && $invoice->school_id) {
+            return $invoice->school ?: School::find($invoice->school_id);
+        }
+
+        if ($user?->hasRole('super-admin')) {
+            return School::first();
+        }
+
+        return null;
+    }
+
     public function create()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -70,7 +89,7 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -194,7 +213,7 @@ class InvoiceController extends Controller
     public function destroy(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -286,7 +305,7 @@ class InvoiceController extends Controller
     public function cancel(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -351,7 +370,7 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -359,7 +378,7 @@ class InvoiceController extends Controller
 
         $status = $request->input('status');
 
-        $query = Invoice::with(['student', 'guardian', 'enrollment'])
+        $query = Invoice::with(['student', 'guardian', 'enrollment', 'allocations'])
             ->where('school_id', $school->id);
 
         if ($status) {
@@ -435,7 +454,7 @@ class InvoiceController extends Controller
     public function bulkCreate(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -780,7 +799,7 @@ class InvoiceController extends Controller
     public function bulkStore(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -1040,7 +1059,7 @@ class InvoiceController extends Controller
     public function autoGenerate()
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -1054,7 +1073,7 @@ class InvoiceController extends Controller
     public function processAutoGenerate(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(400, 'No school context available for this user.');
@@ -1193,7 +1212,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -1210,7 +1229,7 @@ class InvoiceController extends Controller
     public function edit(Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -1236,7 +1255,7 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -1398,7 +1417,7 @@ class InvoiceController extends Controller
     public function print(Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);

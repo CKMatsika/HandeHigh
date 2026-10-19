@@ -22,7 +22,7 @@
     @endif
 
     <div class="max-w-2xl">
-        <form method="POST" action="{{ route('payments.advance.store') }}" class="space-y-5 text-xs text-slate-100">
+        <form method="POST" action="{{ route('admin.payments.advance.store') }}" class="space-y-5 text-xs text-slate-100">
             @csrf
 
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-4">

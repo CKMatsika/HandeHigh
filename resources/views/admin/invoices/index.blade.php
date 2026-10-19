@@ -13,7 +13,7 @@
                 </svg>
                 Audit Trail
             </a>
-            <a href="{{ route('payments.advance.create') }}" class="inline-flex items-center rounded-full bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition gap-1.5" title="Receipt advance payment from parents without an existing invoice">
+            <a href="{{ route('admin.payments.advance.create') }}" class="inline-flex items-center rounded-full bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition gap-1.5" title="Receipt advance payment from parents without an existing invoice">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 Receive Advance Payment
             </a>

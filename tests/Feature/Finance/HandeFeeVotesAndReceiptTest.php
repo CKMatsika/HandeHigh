@@ -346,4 +346,42 @@ class HandeFeeVotesAndReceiptTest extends TestCase
         $csvResponse->assertStatus(200);
         $this->assertTrue(str_contains($csvResponse->headers->get('content-disposition'), 'daily-banking-handover'));
     }
+
+    public function test_admin_invoices_index_loads_successfully_and_renders_advance_button(): void
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Invoices');
+        $response->assertSee('Receive Advance Payment');
+        $response->assertSee(route('admin.payments.advance.create'));
+    }
+
+    public function test_super_admin_without_school_id_can_access_invoices_index(): void
+    {
+        $superAdmin = User::factory()->create([
+            'school_id' => null,
+            'name' => 'Global Super Admin',
+            'email' => 'superadmin@handehigh.test',
+        ]);
+        $superAdmin->assignRole('super-admin');
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('admin.invoices.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Invoices');
+        $response->assertSee('Receive Advance Payment');
+    }
+
+    public function test_advance_payment_create_form_loads_successfully(): void
+    {
+        $response = $this->actingAs($this->clerkUser)
+            ->get(route('admin.payments.advance.create'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Receive Advance Fee Payment');
+        $response->assertSee(route('admin.payments.advance.store'));
+    }
 }

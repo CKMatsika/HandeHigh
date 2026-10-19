@@ -8,7 +8,9 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\School;
 use App\Models\Student;
+use App\Models\User;
 use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use App\Services\Finance\CurrencyWordsService;
@@ -23,10 +25,31 @@ class PaymentController extends Controller
     {
     }
 
+    private function resolveSchool(?User $user, ?Invoice $invoice = null, ?Payment $payment = null): ?School
+    {
+        if ($user?->school) {
+            return $user->school;
+        }
+
+        if ($payment && $payment->school_id) {
+            return $payment->school ?: School::find($payment->school_id);
+        }
+
+        if ($invoice && $invoice->school_id) {
+            return $invoice->school ?: School::find($invoice->school_id);
+        }
+
+        if ($user?->hasRole('super-admin')) {
+            return School::first();
+        }
+
+        return null;
+    }
+
     public function create(Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -102,7 +125,7 @@ class PaymentController extends Controller
     public function store(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -215,7 +238,7 @@ class PaymentController extends Controller
     public function createAdvance(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(403);
@@ -261,7 +284,7 @@ class PaymentController extends Controller
     public function storeAdvance(Request $request)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user);
 
         if (! $school) {
             abort(403);
@@ -316,7 +339,7 @@ class PaymentController extends Controller
     public function applyAdvance(Request $request, Invoice $invoice)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, $invoice);
 
         if (! $school || $invoice->school_id !== $school->id) {
             abort(403);
@@ -409,7 +432,7 @@ class PaymentController extends Controller
     public function receipt(Payment $payment)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, null, $payment);
 
         if (! $school || $payment->school_id !== $school->id) {
             abort(403);
@@ -439,7 +462,7 @@ class PaymentController extends Controller
     public function receiptMopse(Payment $payment)
     {
         $user = Auth::user();
-        $school = $user?->school;
+        $school = $this->resolveSchool($user, null, $payment);
 
         if (! $school || $payment->school_id !== $school->id) {
             abort(403);
