@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Bill;
+use App\Models\Department;
+use App\Models\Project;
 use App\Models\Vendor;
 use App\Rules\TenantExists;
 use Illuminate\Http\Request;
@@ -25,16 +28,25 @@ class BillController extends Controller
         }
 
         $bills = Bill::where('school_id', $school->id)
-            ->with('vendor')
+            ->with(['vendor', 'project', 'costCenter'])
             ->when($request->status, function($query, $status) {
                 if ($status === 'pending') {
                     $query->where('status', 'pending');
                 }
             })
+            ->when($request->project_id, function($query, $projectId) {
+                $query->where('project_id', $projectId);
+            })
+            ->when($request->cost_center_id, function($query, $costCenterId) {
+                $query->where('cost_center_id', $costCenterId);
+            })
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        return view('admin.bills.index', compact('bills'));
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
+
+        return view('admin.bills.index', compact('bills', 'projects', 'costCenters'));
     }
 
     public function create()
@@ -55,8 +67,10 @@ class BillController extends Controller
             ->where('is_postable', true)
             ->orderBy('code')
             ->get();
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
 
-        return view('admin.bills.create', compact('vendors', 'expenseAccounts'));
+        return view('admin.bills.create', compact('vendors', 'expenseAccounts', 'projects', 'costCenters'));
     }
 
     public function store(Request $request)
@@ -71,6 +85,8 @@ class BillController extends Controller
         $validated = $request->validate([
             'vendor_id' => ['required', TenantExists::make('vendors')],
             'expense_account_id' => ['nullable', 'integer'],
+            'project_id' => ['nullable', 'integer'],
+            'cost_center_id' => ['nullable', 'integer'],
             'bill_number' => ['required', 'string', 'max:255'],
             'vendor_bill_number' => ['nullable', 'string', 'max:255'],
             'bill_date' => ['required', 'date'],
@@ -84,6 +100,8 @@ class BillController extends Controller
             'school_id' => $school->id,
             'vendor_id' => $validated['vendor_id'],
             'expense_account_id' => !empty($validated['expense_account_id']) ? (int) $validated['expense_account_id'] : null,
+            'project_id' => !empty($validated['project_id']) ? (int) $validated['project_id'] : null,
+            'cost_center_id' => !empty($validated['cost_center_id']) ? (int) $validated['cost_center_id'] : null,
             'bill_number' => $validated['bill_number'],
             'vendor_bill_number' => $validated['vendor_bill_number'] ?? null,
             'bill_date' => $validated['bill_date'],
@@ -112,7 +130,7 @@ class BillController extends Controller
     {
         $this->authorizeSchoolAccess($bill);
         
-        $bill->load(['vendor', 'items', 'payments', 'expenseAccount']);
+        $bill->load(['vendor', 'items', 'payments', 'expenseAccount', 'project', 'costCenter']);
         return view('admin.bills.show', compact('bill'));
     }
 
@@ -130,8 +148,10 @@ class BillController extends Controller
             ->where('is_postable', true)
             ->orderBy('code')
             ->get();
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
 
-        return view('admin.bills.edit', compact('bill', 'vendors', 'expenseAccounts'));
+        return view('admin.bills.edit', compact('bill', 'vendors', 'expenseAccounts', 'projects', 'costCenters'));
     }
 
     public function update(Request $request, Bill $bill)
@@ -141,6 +161,8 @@ class BillController extends Controller
         $validated = $request->validate([
             'vendor_id' => ['required', TenantExists::make('vendors')],
             'expense_account_id' => ['nullable', 'integer'],
+            'project_id' => ['nullable', 'integer'],
+            'cost_center_id' => ['nullable', 'integer'],
             'bill_number' => ['required', 'string', 'max:255'],
             'vendor_bill_number' => ['nullable', 'string', 'max:255'],
             'bill_date' => ['required', 'date'],
@@ -151,6 +173,8 @@ class BillController extends Controller
         ]);
 
         $validated['expense_account_id'] = !empty($validated['expense_account_id']) ? (int) $validated['expense_account_id'] : null;
+        $validated['project_id'] = !empty($validated['project_id']) ? (int) $validated['project_id'] : null;
+        $validated['cost_center_id'] = !empty($validated['cost_center_id']) ? (int) $validated['cost_center_id'] : null;
 
         $bill->update($validated);
 
@@ -164,6 +188,7 @@ class BillController extends Controller
             ->route('admin.bills.index')
             ->with('status', 'Bill updated successfully');
     }
+
 
     private function authorizeSchoolAccess($model)
     {

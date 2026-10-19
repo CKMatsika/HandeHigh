@@ -21,6 +21,31 @@
         </div>
     @endif
 
+    <form method="GET" action="{{ route('admin.receipts.index') }}" class="mb-4 flex flex-wrap gap-3 items-end text-xs">
+        <div>
+            <label class="block text-slate-400 mb-1">Project</label>
+            <select name="project_id" class="rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-slate-200">
+                <option value="">All Projects</option>
+                @foreach($projects as $p)
+                    <option value="{{ $p->id }}" {{ request('project_id') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="block text-slate-400 mb-1">Cost Center</label>
+            <select name="cost_center_id" class="rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-slate-200">
+                <option value="">All Cost Centers</option>
+                @foreach($costCenters as $cc)
+                    <option value="{{ $cc->id }}" {{ request('cost_center_id') == $cc->id ? 'selected' : '' }}>{{ $cc->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <button type="submit" class="rounded-full bg-slate-800 border border-slate-700 px-4 py-1.5 text-slate-200 hover:bg-slate-700 transition">Filter</button>
+        @if(request()->hasAny(['project_id', 'cost_center_id']))
+            <a href="{{ route('admin.receipts.index') }}" class="rounded-full bg-slate-900 border border-slate-800 px-3 py-1.5 text-slate-400 hover:text-white transition">Reset</a>
+        @endif
+    </form>
+
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
@@ -29,6 +54,7 @@
                         <th class="px-4 py-3 text-left font-medium">Number</th>
                         <th class="px-4 py-3 text-left font-medium">Date</th>
                         <th class="px-4 py-3 text-left font-medium">Customer</th>
+                        <th class="px-4 py-3 text-left font-medium">Project / Cost Center</th>
                         <th class="px-4 py-3 text-left font-medium">Method</th>
                         <th class="px-4 py-3 text-right font-medium">Total</th>
                         <th class="px-4 py-3 text-left font-medium">Status</th>
@@ -45,6 +71,25 @@
                             </td>
                             <td class="px-4 py-3">{{ $receipt->receipt_date->format('M j, Y') }}</td>
                             <td class="px-4 py-3">{{ $receipt->customer?->name ?? $receipt->customer_name ?? 'Walk-in' }}</td>
+                            <td class="px-4 py-3">
+                                <div class="flex flex-col gap-1">
+                                    @if($receipt->project)
+                                        <span class="inline-flex items-center gap-1 rounded bg-indigo-950/60 border border-indigo-700/50 px-2 py-0.5 text-[10px] text-indigo-300 font-medium">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                            {{ $receipt->project->name }}
+                                        </span>
+                                    @endif
+                                    @if($receipt->costCenter)
+                                        <span class="inline-flex items-center gap-1 rounded bg-purple-950/60 border border-purple-700/50 px-2 py-0.5 text-[10px] text-purple-300 font-medium">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                            {{ $receipt->costCenter->name }}
+                                        </span>
+                                    @endif
+                                    @if(!$receipt->project && !$receipt->costCenter)
+                                        <span class="text-slate-500">—</span>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="px-4 py-3 capitalize">{{ str_replace('_',' ', $receipt->payment_method) }}</td>
                             <td class="px-4 py-3 text-right font-mono">${{ number_format($receipt->grand_total, 2) }}</td>
                             <td class="px-4 py-3">

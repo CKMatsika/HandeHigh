@@ -24,6 +24,8 @@ class KioskSale extends Model
         'cashier_id',
         'customer_name',
         'notes',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -36,6 +38,16 @@ class KioskSale extends Model
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 
     public function items(): HasMany

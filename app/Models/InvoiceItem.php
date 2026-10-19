@@ -17,6 +17,8 @@ class InvoiceItem extends Model
         'quantity',
         'unit_amount',
         'line_total',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -33,5 +35,15 @@ class InvoiceItem extends Model
     public function feeStructure()
     {
         return $this->belongsTo(FeeStructure::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 }

@@ -94,6 +94,40 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="project_id" class="block text-xs font-medium text-slate-300 mb-2">Project / Enterprise (P&L Tracking)</label>
+                        <select id="project_id" name="project_id"
+                                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                            <option value="">-- General / No Project --</option>
+                            @foreach($projects as $project)
+                                <option value="{{ $project->id }}" {{ old('project_id', $receipt->project_id) == $project->id ? 'selected' : '' }}>
+                                    {{ $project->name }} ({{ ucfirst(str_replace('_', ' ', $project->status)) }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('project_id')
+                            <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="cost_center_id" class="block text-xs font-medium text-slate-300 mb-2">Cost Center / Department</label>
+                        <select id="cost_center_id" name="cost_center_id"
+                                class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                            <option value="">-- General School Operations --</option>
+                            @foreach($costCenters as $costCenter)
+                                <option value="{{ $costCenter->id }}" {{ old('cost_center_id', $receipt->cost_center_id) == $costCenter->id ? 'selected' : '' }}>
+                                    {{ $costCenter->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('cost_center_id')
+                            <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
                 <div>
                     <label for="description" class="block text-xs font-medium text-slate-300 mb-2">Description</label>
                     <textarea id="description" name="description" rows="3"

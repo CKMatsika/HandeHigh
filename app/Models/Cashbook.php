@@ -26,6 +26,8 @@ class Cashbook extends Model
         'related_payment_id',
         'created_by',
         'notes',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -37,6 +39,16 @@ class Cashbook extends Model
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 
     public function bankAccount()

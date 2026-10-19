@@ -821,15 +821,24 @@ class FinanceReportingService
     {
         $startDate = !empty($filters['start_date']) ? Carbon::parse($filters['start_date'])->startOfDay() : now()->startOfYear()->startOfDay();
         $endDate = !empty($filters['end_date']) ? Carbon::parse($filters['end_date'])->endOfDay() : now()->endOfDay();
+        $projectId = !empty($filters['project_id']) ? (int) $filters['project_id'] : null;
+        $costCenterId = !empty($filters['cost_center_id']) ? (int) $filters['cost_center_id'] : null;
 
         // Revenue Accounts
         $revenueAccounts = Account::where('school_id', $school->id)
             ->where('type', 'revenue')
-            ->with(['journalEntries' => function ($q) use ($school, $startDate, $endDate) {
+            ->with(['journalEntries' => function ($q) use ($school, $startDate, $endDate, $projectId, $costCenterId) {
                 $q->whereHas('batch', function ($bQ) use ($school, $startDate, $endDate) {
                     $bQ->where('school_id', $school->id)
+                        ->where('status', 'posted')
                         ->whereBetween('transaction_date', [$startDate, $endDate]);
                 });
+                if ($projectId) {
+                    $q->where('project_id', $projectId);
+                }
+                if ($costCenterId) {
+                    $q->where('cost_center_id', $costCenterId);
+                }
             }])
             ->orderBy('code')
             ->get()
@@ -858,11 +867,18 @@ class FinanceReportingService
         // Expense Accounts
         $expenseAccounts = Account::where('school_id', $school->id)
             ->where('type', 'expense')
-            ->with(['journalEntries' => function ($q) use ($school, $startDate, $endDate) {
+            ->with(['journalEntries' => function ($q) use ($school, $startDate, $endDate, $projectId, $costCenterId) {
                 $q->whereHas('batch', function ($bQ) use ($school, $startDate, $endDate) {
                     $bQ->where('school_id', $school->id)
+                        ->where('status', 'posted')
                         ->whereBetween('transaction_date', [$startDate, $endDate]);
                 });
+                if ($projectId) {
+                    $q->where('project_id', $projectId);
+                }
+                if ($costCenterId) {
+                    $q->where('cost_center_id', $costCenterId);
+                }
             }])
             ->orderBy('code')
             ->get()
@@ -920,6 +936,241 @@ class FinanceReportingService
             'net_surplus_deficit' => $netSurplusDeficit,
         ];
     }
+
+    /**
+     * Generate periodic Profit and Loss Account Statement for a Project or Cost Center
+     * e.g., Bus Operations, Tuckshop / Kiosk, Truck Hire, Poultry, Canteen.
+     */
+    public function getProjectProfitAndLoss(School $school, array $filters = []): array
+    {
+        $period = $filters['period'] ?? 'this_year';
+        $now = now();
+        
+        switch ($period) {
+            case 'today':
+                $startDate = $now->copy()->startOfDay();
+                $endDate = $now->copy()->endOfDay();
+                $periodLabel = 'Today (' . $now->format('d M Y') . ')';
+                break;
+            case 'this_month':
+                $startDate = $now->copy()->startOfMonth()->startOfDay();
+                $endDate = $now->copy()->endOfMonth()->endOfDay();
+                $periodLabel = 'This Month (' . $now->format('F Y') . ')';
+                break;
+            case 'last_month':
+                $lastMonth = $now->copy()->subMonth();
+                $startDate = $lastMonth->copy()->startOfMonth()->startOfDay();
+                $endDate = $lastMonth->copy()->endOfMonth()->endOfDay();
+                $periodLabel = 'Last Month (' . $lastMonth->format('F Y') . ')';
+                break;
+            case 'term_1':
+                $year = $filters['year'] ?? $now->year;
+                $startDate = Carbon::create($year, 1, 1)->startOfDay();
+                $endDate = Carbon::create($year, 4, 30)->endOfDay();
+                $periodLabel = "Term 1 {$year}";
+                break;
+            case 'term_2':
+                $year = $filters['year'] ?? $now->year;
+                $startDate = Carbon::create($year, 5, 1)->startOfDay();
+                $endDate = Carbon::create($year, 8, 31)->endOfDay();
+                $periodLabel = "Term 2 {$year}";
+                break;
+            case 'term_3':
+                $year = $filters['year'] ?? $now->year;
+                $startDate = Carbon::create($year, 9, 1)->startOfDay();
+                $endDate = Carbon::create($year, 12, 31)->endOfDay();
+                $periodLabel = "Term 3 {$year}";
+                break;
+            case 'last_year':
+                $startDate = $now->copy()->subYear()->startOfYear()->startOfDay();
+                $endDate = $now->copy()->subYear()->endOfYear()->endOfDay();
+                $periodLabel = 'Last Year (' . $startDate->year . ')';
+                break;
+            case 'all_time':
+                $startDate = Carbon::create(2020, 1, 1)->startOfDay();
+                $endDate = $now->copy()->endOfDay();
+                $periodLabel = 'All Time';
+                break;
+            case 'custom':
+            default:
+                if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
+                    $startDate = Carbon::parse($filters['start_date'])->startOfDay();
+                    $endDate = Carbon::parse($filters['end_date'])->endOfDay();
+                    $periodLabel = $startDate->format('d M Y') . ' - ' . $endDate->format('d M Y');
+                } else {
+                    $startDate = $now->copy()->startOfYear()->startOfDay();
+                    $endDate = $now->copy()->endOfDay();
+                    $periodLabel = 'This Year (' . $now->year . ')';
+                }
+                break;
+        }
+
+        $projectId = !empty($filters['project_id']) ? (int) $filters['project_id'] : null;
+        $costCenterId = !empty($filters['cost_center_id']) ? (int) $filters['cost_center_id'] : null;
+
+        $project = $projectId ? \App\Models\Project::where('school_id', $school->id)->find($projectId) : null;
+        $costCenter = $costCenterId ? \App\Models\Department::where('school_id', $school->id)->find($costCenterId) : null;
+
+        // Query journal entries linked to this project and/or cost center in date range
+        $entriesQuery = JournalEntry::whereHas('batch', function ($bQ) use ($school, $startDate, $endDate) {
+            $bQ->where('school_id', $school->id)
+                ->where('status', 'posted')
+                ->whereBetween('transaction_date', [$startDate, $endDate]);
+        })->with(['batch', 'account']);
+
+        if ($projectId) {
+            $entriesQuery->where('project_id', $projectId);
+        }
+        if ($costCenterId) {
+            $entriesQuery->where('cost_center_id', $costCenterId);
+        }
+
+        $allEntries = $entriesQuery->get();
+
+        // Separate into Revenue Entries and Expense Entries
+        $revenueEntries = $allEntries->filter(fn($e) => $e->account && $e->account->type === 'revenue');
+        $expenseEntries = $allEntries->filter(fn($e) => $e->account && $e->account->type === 'expense');
+
+        // Revenue Breakdown by Account
+        $revenueByAccount = $revenueEntries->groupBy('account_id')->map(function ($items) {
+            $acc = $items->first()->account;
+            $credits = (float) $items->where('entry_type', 'credit')->sum('amount');
+            $debits = (float) $items->where('entry_type', 'debit')->sum('amount');
+            $net = $credits - $debits;
+            return [
+                'account_id' => $acc->id,
+                'code' => $acc->code,
+                'name' => $acc->name,
+                'category' => $acc->category ?? 'Operating Revenue',
+                'amount' => $net,
+                'entries_count' => $items->count(),
+            ];
+        })->filter(fn($item) => abs($item['amount']) > 0.001)->values();
+
+        // Expense Breakdown by Account
+        $expenseByAccount = $expenseEntries->groupBy('account_id')->map(function ($items) {
+            $acc = $items->first()->account;
+            $debits = (float) $items->where('entry_type', 'debit')->sum('amount');
+            $credits = (float) $items->where('entry_type', 'credit')->sum('amount');
+            $net = $debits - $credits;
+            
+            $cat = strtolower($acc->category ?? '');
+            $name = strtolower($acc->name ?? '');
+            $isDirect = in_array($cat, ['cogs', 'cost_of_sales', 'supplies', 'supply_expense', 'fuel', 'vehicle_maintenance', 'inventory']) 
+                || str_contains($name, 'fuel') 
+                || str_contains($name, 'diesel')
+                || str_contains($name, 'petrol')
+                || str_contains($name, 'repair')
+                || str_contains($name, 'stock')
+                || str_contains($name, 'direct');
+
+            return [
+                'account_id' => $acc->id,
+                'code' => $acc->code,
+                'name' => $acc->name,
+                'category' => $acc->category ?? 'Operating Expense',
+                'amount' => $net,
+                'is_direct' => $isDirect,
+                'entries_count' => $items->count(),
+            ];
+        })->filter(fn($item) => abs($item['amount']) > 0.001)->values();
+
+        $totalRevenue = (float) $revenueByAccount->sum('amount');
+        
+        $directCosts = (float) $expenseByAccount->where('is_direct', true)->sum('amount');
+        $overheadCosts = (float) $expenseByAccount->where('is_direct', false)->sum('amount');
+        $totalExpenditure = $directCosts + $overheadCosts;
+
+        $grossProfit = $totalRevenue - $directCosts;
+        $grossMarginPercent = $totalRevenue > 0 ? round(($grossProfit / $totalRevenue) * 100, 1) : 0.0;
+
+        $netProfitLoss = $totalRevenue - $totalExpenditure;
+        $netMarginPercent = $totalRevenue > 0 ? round(($netProfitLoss / $totalRevenue) * 100, 1) : 0.0;
+
+        // Budget comparison
+        $budgetAmount = (float) ($project ? $project->budget_amount : ($costCenter ? $costCenter->budget : 0));
+        $budgetVariance = $budgetAmount > 0 ? ($budgetAmount - $totalExpenditure) : null;
+        $budgetUtilizationPercent = $budgetAmount > 0 ? round(($totalExpenditure / $budgetAmount) * 100, 1) : null;
+
+        // Monthly Trend
+        $monthlyTrend = [];
+        $cursor = $startDate->copy()->startOfMonth();
+        $endCursor = $endDate->copy()->endOfMonth();
+        while ($cursor->lte($endCursor)) {
+            $mKey = $cursor->format('Y-m');
+            $mLabel = $cursor->format('M Y');
+            $mRev = $revenueEntries->filter(function ($e) use ($mKey) {
+                return $e->batch && substr($e->batch->transaction_date, 0, 7) === $mKey;
+            });
+            $mExp = $expenseEntries->filter(function ($e) use ($mKey) {
+                return $e->batch && substr($e->batch->transaction_date, 0, 7) === $mKey;
+            });
+
+            $mRevTotal = (float) ($mRev->where('entry_type', 'credit')->sum('amount') - $mRev->where('entry_type', 'debit')->sum('amount'));
+            $mExpTotal = (float) ($mExp->where('entry_type', 'debit')->sum('amount') - $mExp->where('entry_type', 'credit')->sum('amount'));
+
+            $monthlyTrend[] = [
+                'month' => $mKey,
+                'label' => $mLabel,
+                'revenue' => $mRevTotal,
+                'expenditure' => $mExpTotal,
+                'net' => $mRevTotal - $mExpTotal,
+            ];
+            $cursor->addMonth();
+        }
+
+        // Drilldown Records
+        $drilldown = $allEntries->map(function ($e) {
+            $isRev = $e->account && $e->account->type === 'revenue';
+            $isExp = $e->account && $e->account->type === 'expense';
+            $amount = (float) $e->amount;
+            
+            return [
+                'id' => $e->id,
+                'date' => $e->batch?->transaction_date,
+                'batch_number' => $e->batch?->batch_number,
+                'reference' => $e->batch?->reference_number ?? $e->reference,
+                'source_type' => $e->batch?->source_type ?? 'journal',
+                'source_id' => $e->batch?->source_id,
+                'account_code' => $e->account?->code,
+                'account_name' => $e->account?->name,
+                'account_type' => $e->account?->type,
+                'entry_type' => $e->entry_type,
+                'amount' => $amount,
+                'revenue_effect' => $isRev ? ($e->entry_type === 'credit' ? $amount : -$amount) : 0,
+                'expense_effect' => $isExp ? ($e->entry_type === 'debit' ? $amount : -$amount) : 0,
+                'memo' => $e->memo ?? $e->batch?->description,
+                'project_id' => $e->project_id,
+                'cost_center_id' => $e->cost_center_id,
+            ];
+        })->sortByDesc('date')->values();
+
+        return [
+            'school' => $school,
+            'project' => $project,
+            'cost_center' => $costCenter,
+            'period' => $period,
+            'period_label' => $periodLabel,
+            'start_date' => $startDate->format('Y-m-d'),
+            'end_date' => $endDate->format('Y-m-d'),
+            'total_revenue' => $totalRevenue,
+            'direct_costs' => $directCosts,
+            'overhead_costs' => $overheadCosts,
+            'total_expenditure' => $totalExpenditure,
+            'gross_profit' => $grossProfit,
+            'gross_margin_percent' => $grossMarginPercent,
+            'net_profit_loss' => $netProfitLoss,
+            'net_margin_percent' => $netMarginPercent,
+            'budget_amount' => $budgetAmount,
+            'budget_variance' => $budgetVariance,
+            'budget_utilization_percent' => $budgetUtilizationPercent,
+            'revenue_by_account' => $revenueByAccount,
+            'expense_by_account' => $expenseByAccount,
+            'monthly_trend' => $monthlyTrend,
+            'drilldown' => $drilldown,
+        ];
+    }
+
 
     /**
      * Cashbook & Bank Summary for tenant school.

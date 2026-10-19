@@ -24,6 +24,8 @@ class Bill extends Model
         'description',
         'notes',
         'created_by',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -47,6 +49,16 @@ class Bill extends Model
     public function expenseAccount()
     {
         return $this->belongsTo(Account::class, 'expense_account_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 
     public function items()

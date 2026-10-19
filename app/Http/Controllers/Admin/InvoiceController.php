@@ -139,7 +139,12 @@ class InvoiceController extends Controller
                 $lineTotal = (float) $item['quantity'] * (float) $item['unit_amount'];
                 $totalAmount += $lineTotal;
 
+                $feeStructure = !empty($item['fee_structure_id']) ? FeeStructure::find($item['fee_structure_id']) : null;
+                $projectId = $item['project_id'] ?? $feeStructure?->project_id;
+                $costCenterId = $item['cost_center_id'] ?? $feeStructure?->cost_center_id;
+
                 InvoiceItem::create([
+                    'school_id' => $invoice->school_id,
                     'invoice_id' => $invoice->id,
                     'fee_structure_id' => !empty($item['fee_structure_id']) ? (int)$item['fee_structure_id'] : null,
                     'description' => $item['description'],
@@ -147,6 +152,8 @@ class InvoiceController extends Controller
                     'quantity' => (int) $item['quantity'],
                     'unit_amount' => (float) $item['unit_amount'],
                     'line_total' => $lineTotal,
+                    'project_id' => $projectId,
+                    'cost_center_id' => $costCenterId,
                 ]);
             }
 
@@ -940,6 +947,8 @@ class InvoiceController extends Controller
                             'quantity' => 1,
                             'unit_amount' => $amount,
                             'line_total' => $amount,
+                            'project_id' => $fee->project_id,
+                            'cost_center_id' => $fee->cost_center_id,
                         ];
                     }
 
@@ -961,6 +970,8 @@ class InvoiceController extends Controller
                             'quantity' => 1,
                             'unit_amount' => $amount,
                             'line_total' => $amount,
+                            'project_id' => null,
+                            'cost_center_id' => null,
                         ];
                     }
 
@@ -997,6 +1008,8 @@ class InvoiceController extends Controller
                             'quantity' => $itemData['quantity'],
                             'unit_amount' => $itemData['unit_amount'],
                             'line_total' => $itemData['line_total'],
+                            'project_id' => $itemData['project_id'] ?? null,
+                            'cost_center_id' => $itemData['cost_center_id'] ?? null,
                         ]);
                     }
 
@@ -1152,6 +1165,8 @@ class InvoiceController extends Controller
                             'quantity' => 1,
                             'unit_amount' => (float) $feeStructure->amount,
                             'line_total' => $lineTotal,
+                            'project_id' => $feeStructure->project_id,
+                            'cost_center_id' => $feeStructure->cost_center_id,
                         ]);
                     }
 

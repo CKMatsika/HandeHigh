@@ -75,6 +75,36 @@
                         <div class="text-xs text-slate-400 mb-1">Payment Method</div>
                         <div class="text-sm text-slate-200">{{ ucfirst(str_replace('_', ' ', $receipt->payment_method)) }}</div>
                     </div>
+
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">Project / Enterprise</div>
+                        <div class="text-sm text-slate-200">
+                            @if($receipt->project)
+                                <a href="{{ route('admin.reports.profit-and-loss', ['project_id' => $receipt->project_id]) }}" class="inline-flex items-center gap-1.5 rounded bg-indigo-950/60 border border-indigo-700/60 px-2.5 py-1 text-xs text-indigo-300 font-medium hover:bg-indigo-900/60 transition">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                    {{ $receipt->project->name }}
+                                    <span class="text-[10px] text-indigo-400 font-normal">→ View P&L</span>
+                                </a>
+                            @else
+                                <span class="text-slate-500">—</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">Cost Center / Dept</div>
+                        <div class="text-sm text-slate-200">
+                            @if($receipt->costCenter)
+                                <a href="{{ route('admin.reports.profit-and-loss', ['cost_center_id' => $receipt->cost_center_id]) }}" class="inline-flex items-center gap-1.5 rounded bg-purple-950/60 border border-purple-700/60 px-2.5 py-1 text-xs text-purple-300 font-medium hover:bg-purple-900/60 transition">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                    {{ $receipt->costCenter->name }}
+                                    <span class="text-[10px] text-purple-400 font-normal">→ View P&L</span>
+                                </a>
+                            @else
+                                <span class="text-slate-500">—</span>
+                            @endif
+                        </div>
+                    </div>
                 </div>
             </div>
             

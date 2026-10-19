@@ -370,6 +370,7 @@ class EnrollmentController extends Controller
                 $invoiceTotal += $lineTotal;
 
                 InvoiceItem::create([
+                    'school_id' => $school->id,
                     'invoice_id' => $invoice->id,
                     'fee_structure_id' => $fee->id,
                     'description' => $fee->label,
@@ -377,6 +378,8 @@ class EnrollmentController extends Controller
                     'quantity' => $quantity,
                     'unit_amount' => $fee->amount,
                     'line_total' => $lineTotal,
+                    'project_id' => $fee->project_id,
+                    'cost_center_id' => $fee->cost_center_id,
                 ]);
             }
 

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\Cashbook;
 use App\Models\Account;
+use App\Models\Department;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\Project;
 use App\Rules\TenantExists;
 use Illuminate\Http\Request;
 
@@ -18,7 +20,7 @@ class CashbookController extends Controller
         $school = auth()->user()->school;
         
         $query = Cashbook::where('school_id', $school->id)
-            ->with('account', 'relatedInvoice', 'relatedPayment', 'createdBy');
+            ->with('account', 'relatedInvoice', 'relatedPayment', 'createdBy', 'project', 'costCenter');
 
         // Filters
         if ($request->filled('transaction_type')) {
@@ -31,6 +33,14 @@ class CashbookController extends Controller
         
         if ($request->filled('category')) {
             $query->where('category', $request->category);
+        }
+
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->project_id);
+        }
+
+        if ($request->filled('cost_center_id')) {
+            $query->where('cost_center_id', $request->cost_center_id);
         }
         
         if ($request->filled('date_from')) {
@@ -54,10 +64,13 @@ class CashbookController extends Controller
             ->orderBy('code')
             ->get();
         
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
+        
         $categories = ['fees', 'salaries', 'supplies', 'maintenance', 'utilities', 'rent', 'opening_balance', 'transfer', 'other'];
         $transactionTypes = ['income', 'expense', 'transfer'];
 
-        return view('admin.cashbook.index', compact('transactions', 'bankAccounts', 'categories', 'transactionTypes'));
+        return view('admin.cashbook.index', compact('transactions', 'bankAccounts', 'categories', 'transactionTypes', 'projects', 'costCenters'));
     }
 
     public function create()
@@ -75,10 +88,13 @@ class CashbookController extends Controller
             ->orderBy('code')
             ->get();
             
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
+
         $categories = ['fees', 'salaries', 'supplies', 'maintenance', 'utilities', 'rent', 'opening_balance', 'transfer', 'other'];
         $paymentMethods = ['cash', 'bank_transfer', 'check', 'credit_card', 'mobile_money'];
         
-        return view('admin.cashbook.create', compact('bankAccounts', 'categories', 'paymentMethods'));
+        return view('admin.cashbook.create', compact('bankAccounts', 'categories', 'paymentMethods', 'projects', 'costCenters'));
     }
 
     public function store(Request $request)
@@ -90,6 +106,8 @@ class CashbookController extends Controller
 
         $request->validate([
             'account_id' => ['required', TenantExists::make('accounts')],
+            'project_id' => ['nullable', 'integer'],
+            'cost_center_id' => ['nullable', 'integer'],
             'transaction_type' => 'required|in:income,expense,transfer',
             'category' => 'required|string',
             'description' => 'required|string|max:255',
@@ -111,6 +129,8 @@ class CashbookController extends Controller
         $transaction = Cashbook::create([
             'school_id' => $school->id,
             'account_id' => $account->id,
+            'project_id' => !empty($request->project_id) ? (int) $request->project_id : null,
+            'cost_center_id' => !empty($request->cost_center_id) ? (int) $request->cost_center_id : null,
             'transaction_type' => $request->transaction_type,
             'category' => $request->category,
             'description' => $request->description,
@@ -133,6 +153,7 @@ class CashbookController extends Controller
         return redirect()->route('admin.cashbook.index')
             ->with('success', 'Transaction recorded successfully.');
     }
+
 
     public function show(Cashbook $cashbook)
     {

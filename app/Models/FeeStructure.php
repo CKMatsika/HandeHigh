@@ -22,6 +22,8 @@ class FeeStructure extends Model
         'subject_name',
         'service_type',
         'revenue_account_id',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -37,6 +39,16 @@ class FeeStructure extends Model
     public function revenueAccount()
     {
         return $this->belongsTo(Account::class, 'revenue_account_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 
     public function invoiceItems()

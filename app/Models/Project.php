@@ -79,15 +79,51 @@ class Project extends Model
         return $query->where('status', 'active');
     }
 
+    public function invoiceItems()
+    {
+        return $this->hasMany(InvoiceItem::class);
+    }
+
+    public function billItems()
+    {
+        return $this->hasMany(BillItem::class);
+    }
+
+    public function receiptItems()
+    {
+        return $this->hasMany(ReceiptItem::class);
+    }
+
+    public function cashbookEntries()
+    {
+        return $this->hasMany(Cashbook::class);
+    }
+
     public function getTotalSpentAttribute()
     {
-        // Calculate total expenses for this project
-        return $this->journalEntries()
+        // Calculate total expenses for this project from GL
+        return (float) $this->journalEntries()
             ->whereHas('account', function($q) {
                 $q->where('type', 'expense');
             })
             ->where('entry_type', 'debit')
             ->sum('amount');
+    }
+
+    public function getTotalRevenueAttribute()
+    {
+        // Calculate total revenue for this project from GL
+        return (float) $this->journalEntries()
+            ->whereHas('account', function($q) {
+                $q->where('type', 'revenue');
+            })
+            ->where('entry_type', 'credit')
+            ->sum('amount');
+    }
+
+    public function getNetProfitLossAttribute()
+    {
+        return $this->total_revenue - $this->total_spent;
     }
 
     public function getRemainingBudgetAttribute()

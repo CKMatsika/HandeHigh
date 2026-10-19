@@ -488,7 +488,12 @@
                                     <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                                     <span>Income Statement (P&L)</span>
                                 </a>
+                                <a href="{{ route('admin.reports.profit-and-loss') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.profit-and-loss') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span>Project &amp; Cost Center P&amp;L</span>
+                                </a>
                                 <a href="{{ route('admin.reports.balance-sheet') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.balance-sheet') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+
                                     <span class="h-2 w-2 rounded-full bg-blue-400"></span>
                                     <span>Balance Sheet</span>
                                 </a>

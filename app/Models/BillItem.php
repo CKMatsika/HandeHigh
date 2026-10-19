@@ -17,6 +17,8 @@ class BillItem extends Model
         'quantity',
         'unit_price',
         'line_total',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -33,5 +35,15 @@ class BillItem extends Model
     public function expenseAccount()
     {
         return $this->belongsTo(Account::class, 'expense_account_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 }

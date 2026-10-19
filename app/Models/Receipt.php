@@ -26,6 +26,8 @@ class Receipt extends Model
         'notes',
         'school_snapshot',
         'created_by',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -62,6 +64,16 @@ class Receipt extends Model
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 
     public function customer()

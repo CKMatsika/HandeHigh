@@ -35,8 +35,55 @@ class Department extends Model
         return $this->hasMany(Employee::class);
     }
 
+    public function journalEntries(): HasMany
+    {
+        return $this->hasMany(JournalEntry::class, 'cost_center_id');
+    }
+
+    public function invoiceItems(): HasMany
+    {
+        return $this->hasMany(InvoiceItem::class, 'cost_center_id');
+    }
+
+    public function billItems(): HasMany
+    {
+        return $this->hasMany(BillItem::class, 'cost_center_id');
+    }
+
+    public function receiptItems(): HasMany
+    {
+        return $this->hasMany(ReceiptItem::class, 'cost_center_id');
+    }
+
+    public function cashbookEntries(): HasMany
+    {
+        return $this->hasMany(Cashbook::class, 'cost_center_id');
+    }
+
+    public function getTotalRevenueAttribute(): float
+    {
+        return (float) $this->journalEntries()
+            ->whereHas('account', fn($q) => $q->where('type', 'revenue'))
+            ->where('entry_type', 'credit')
+            ->sum('amount');
+    }
+
+    public function getTotalExpenditureAttribute(): float
+    {
+        return (float) $this->journalEntries()
+            ->whereHas('account', fn($q) => $q->where('type', 'expense'))
+            ->where('entry_type', 'debit')
+            ->sum('amount');
+    }
+
+    public function getNetProfitLossAttribute(): float
+    {
+        return $this->total_revenue - $this->total_expenditure;
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 }
+

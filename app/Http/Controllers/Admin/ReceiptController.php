@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\Customer;
+use App\Models\Department;
+use App\Models\Project;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
 use App\Rules\TenantExists;
@@ -18,19 +20,28 @@ class ReceiptController extends Controller
     {
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $school = Auth::user()?->school;
         if (! $school) {
             abort(403);
         }
 
-        $receipts = Receipt::where('school_id', $school->id)
-            ->with('customer', 'creator')
-            ->orderByDesc('receipt_date')
-            ->paginate(25);
+        $query = Receipt::where('school_id', $school->id)
+            ->with(['customer', 'creator', 'project', 'costCenter']);
 
-        return view('admin.receipts.index', compact('receipts'));
+        if ($request->filled('project_id')) {
+            $query->where('project_id', $request->input('project_id'));
+        }
+        if ($request->filled('cost_center_id')) {
+            $query->where('cost_center_id', $request->input('cost_center_id'));
+        }
+
+        $receipts = $query->orderByDesc('receipt_date')->paginate(25)->withQueryString();
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
+
+        return view('admin.receipts.index', compact('receipts', 'projects', 'costCenters'));
     }
 
     public function create()
@@ -42,8 +53,10 @@ class ReceiptController extends Controller
 
         $customers = Customer::where('school_id', $school->id)->active()->orderBy('name')->get();
         $bankAccounts = BankAccount::where('school_id', $school->id)->active()->get();
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
 
-        return view('admin.receipts.create', compact('customers', 'bankAccounts'));
+        return view('admin.receipts.create', compact('customers', 'bankAccounts', 'projects', 'costCenters'));
     }
 
     public function store(Request $request)
@@ -58,6 +71,8 @@ class ReceiptController extends Controller
             'type' => ['required', 'in:sale,service,other'],
             'customer_id' => ['nullable', TenantExists::make('customers')],
             'customer_name' => ['nullable', 'string', 'max:255'],
+            'project_id' => ['nullable', TenantExists::make('projects')],
+            'cost_center_id' => ['nullable', TenantExists::make('departments')],
             'payment_method' => ['required', 'in:cash,bank_transfer,check,credit_card,mobile_money'],
             'bank_account_id' => ['nullable', TenantExists::make('bank_accounts')],
             'reference' => ['nullable', 'string', 'max:100'],
@@ -68,6 +83,8 @@ class ReceiptController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.project_id' => ['nullable', TenantExists::make('projects')],
+            'items.*.cost_center_id' => ['nullable', TenantExists::make('departments')],
         ]);
 
         $total = 0;
@@ -89,6 +106,8 @@ class ReceiptController extends Controller
             'type' => $validated['type'],
             'customer_id' => $validated['customer_id'] ?? null,
             'customer_name' => $validated['customer_name'] ?? null,
+            'project_id' => $validated['project_id'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
             'total_amount' => $total,
             'tax_amount' => $tax,
             'grand_total' => $grand,
@@ -111,6 +130,8 @@ class ReceiptController extends Controller
                 'unit_price' => $item['unit_price'],
                 'tax_rate' => $item['tax_rate'] ?? 0,
                 'line_total' => $lineTotal,
+                'project_id' => $item['project_id'] ?? $validated['project_id'] ?? null,
+                'cost_center_id' => $item['cost_center_id'] ?? $validated['cost_center_id'] ?? null,
             ]);
         }
 
@@ -123,7 +144,7 @@ class ReceiptController extends Controller
     {
         $this->authorizeReceipt($receipt);
         
-        $receipt->load(['customer', 'items', 'creator', 'journalBatch.entries.account']);
+        $receipt->load(['customer', 'items', 'creator', 'project', 'costCenter', 'journalBatch.entries.account']);
         
         return view('admin.receipts.show', compact('receipt'));
     }
@@ -141,10 +162,12 @@ class ReceiptController extends Controller
         $school = Auth::user()?->school;
         $customers = Customer::where('school_id', $school->id)->active()->orderBy('name')->get();
         $bankAccounts = BankAccount::where('school_id', $school->id)->active()->get();
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
         
         $receipt->load('items');
         
-        return view('admin.receipts.edit', compact('receipt', 'customers', 'bankAccounts'));
+        return view('admin.receipts.edit', compact('receipt', 'customers', 'bankAccounts', 'projects', 'costCenters'));
     }
 
     public function update(Request $request, Receipt $receipt)
@@ -162,6 +185,8 @@ class ReceiptController extends Controller
             'type' => ['required', 'in:sale,service,other'],
             'customer_id' => ['nullable', TenantExists::make('customers')],
             'customer_name' => ['nullable', 'string', 'max:255'],
+            'project_id' => ['nullable', TenantExists::make('projects')],
+            'cost_center_id' => ['nullable', TenantExists::make('departments')],
             'payment_method' => ['required', 'in:cash,bank_transfer,check,credit_card,mobile_money'],
             'bank_account_id' => ['nullable', TenantExists::make('bank_accounts')],
             'reference' => ['nullable', 'string', 'max:100'],
@@ -172,6 +197,8 @@ class ReceiptController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.project_id' => ['nullable', TenantExists::make('projects')],
+            'items.*.cost_center_id' => ['nullable', TenantExists::make('departments')],
         ]);
 
         $total = 0;
@@ -190,6 +217,8 @@ class ReceiptController extends Controller
             'type' => $validated['type'],
             'customer_id' => $validated['customer_id'] ?? null,
             'customer_name' => $validated['customer_name'] ?? null,
+            'project_id' => $validated['project_id'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
             'total_amount' => $total,
             'tax_amount' => $tax,
             'grand_total' => $grand,
@@ -213,6 +242,8 @@ class ReceiptController extends Controller
                 'unit_price' => $item['unit_price'],
                 'tax_rate' => $item['tax_rate'] ?? 0,
                 'line_total' => $lineTotal,
+                'project_id' => $item['project_id'] ?? $validated['project_id'] ?? null,
+                'cost_center_id' => $item['cost_center_id'] ?? $validated['cost_center_id'] ?? null,
             ]);
         }
 

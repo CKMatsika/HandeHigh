@@ -195,6 +195,8 @@ class GenerateScheduledInvoices extends Command
                             'quantity' => 1,
                             'unit_amount' => (float) $feeStructure->amount,
                             'line_total' => $lineTotal,
+                            'project_id' => $feeStructure->project_id,
+                            'cost_center_id' => $feeStructure->cost_center_id,
                         ]);
                     }
 

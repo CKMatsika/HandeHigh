@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\Department;
 use App\Models\FeeStructure;
+use App\Models\Project;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -31,7 +33,7 @@ class FeeStructureController extends Controller
         }
 
         $feeStructures = $query
-            ->with('revenueAccount')
+            ->with(['revenueAccount', 'project', 'costCenter'])
             ->orderBy('grade')
             ->orderBy('category')
             ->orderBy('code')
@@ -44,6 +46,8 @@ class FeeStructureController extends Controller
             ->where('is_active', true)
             ->orderBy('code')
             ->get();
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
 
         return view('admin.fees.index', [
             'school' => $school,
@@ -53,6 +57,8 @@ class FeeStructureController extends Controller
             'terms' => $terms,
             'categories' => $categories,
             'revenueAccounts' => $revenueAccounts,
+            'projects' => $projects,
+            'costCenters' => $costCenters,
         ]);
     }
 
@@ -64,6 +70,8 @@ class FeeStructureController extends Controller
         if (! $school || $fee->school_id !== $school->id) {
             abort(403);
         }
+
+        $fee->load(['revenueAccount', 'project', 'costCenter']);
 
         return view('admin.fees.show', [
             'school' => $school,
@@ -135,6 +143,8 @@ class FeeStructureController extends Controller
             'subject_name' => ['nullable', 'string', 'max:255'],
             'service_type' => ['nullable', 'string', 'max:50'],
             'revenue_account_id' => ['nullable', Rule::exists('accounts', 'id')->where('school_id', $school->id)],
+            'project_id' => ['nullable', Rule::exists('projects', 'id')->where('school_id', $school->id)],
+            'cost_center_id' => ['nullable', Rule::exists('departments', 'id')->where('school_id', $school->id)],
         ]);
 
         $isOptional = $request->boolean('is_optional');
@@ -152,6 +162,8 @@ class FeeStructureController extends Controller
             'subject_name' => $validated['subject_name'] ?? null,
             'service_type' => $validated['service_type'] ?? null,
             'revenue_account_id' => $validated['revenue_account_id'] ?? null,
+            'project_id' => $validated['project_id'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
         ]);
 
         return redirect()
@@ -197,6 +209,8 @@ class FeeStructureController extends Controller
             'subject_name' => ['nullable', 'string', 'max:255'],
             'service_type' => ['nullable', 'string', 'max:50'],
             'revenue_account_id' => ['nullable', Rule::exists('accounts', 'id')->where('school_id', $school->id)],
+            'project_id' => ['nullable', Rule::exists('projects', 'id')->where('school_id', $school->id)],
+            'cost_center_id' => ['nullable', Rule::exists('departments', 'id')->where('school_id', $school->id)],
         ]);
 
         $isOptional = $request->boolean('is_optional');
@@ -213,6 +227,8 @@ class FeeStructureController extends Controller
             'subject_name' => $validated['subject_name'] ?? null,
             'service_type' => $validated['service_type'] ?? null,
             'revenue_account_id' => $validated['revenue_account_id'] ?? null,
+            'project_id' => $validated['project_id'] ?? null,
+            'cost_center_id' => $validated['cost_center_id'] ?? null,
         ]);
 
         return redirect()

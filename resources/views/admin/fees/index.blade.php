@@ -112,6 +112,28 @@
                     @endforeach
                 </select>
             </div>
+            <div>
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="new_project_id">Project (P&L Tag)</label>
+                <select id="new_project_id" name="project_id" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">-- None / General --</option>
+                    @foreach($projects ?? [] as $proj)
+                        <option value="{{ $proj->id }}" {{ old('project_id') == $proj->id ? 'selected' : '' }}>
+                            {{ $proj->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="new_cost_center_id">Cost Center / Dept</label>
+                <select id="new_cost_center_id" name="cost_center_id" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">-- None / General --</option>
+                    @foreach($costCenters ?? [] as $cc)
+                        <option value="{{ $cc->id }}" {{ old('cost_center_id') == $cc->id ? 'selected' : '' }}>
+                            {{ $cc->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
             <div class="flex items-center mt-5">
                 <label class="inline-flex items-center gap-2 text-[11px] text-slate-300">
                     <input type="checkbox" name="is_optional" value="1" {{ old('is_optional') ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
@@ -139,6 +161,7 @@
                         <th class="text-left py-2 font-medium">Label</th>
                         <th class="text-left py-2 font-medium">Amount</th>
                         <th class="text-left py-2 font-medium">Revenue Account</th>
+                        <th class="text-left py-2 font-medium">Project / Cost Center</th>
                         <th class="text-left py-2 font-medium">Service</th>
                         <th class="text-left py-2 font-medium">Optional</th>
                         <th class="text-left py-2 font-medium">Actions</th>
@@ -166,6 +189,25 @@
                                         Auto ({{ ucfirst($fee->category) }})
                                     </span>
                                 @endif
+                            </td>
+                            <td class="py-2 align-middle">
+                                <div class="flex flex-col gap-1">
+                                    @if($fee->project)
+                                        <span class="inline-flex items-center gap-1 rounded bg-indigo-950/60 border border-indigo-700/50 px-1.5 py-0.5 text-[10px] text-indigo-300">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                                            {{ $fee->project->name }}
+                                        </span>
+                                    @endif
+                                    @if($fee->costCenter)
+                                        <span class="inline-flex items-center gap-1 rounded bg-purple-950/60 border border-purple-700/50 px-1.5 py-0.5 text-[10px] text-purple-300">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                            {{ $fee->costCenter->name }}
+                                        </span>
+                                    @endif
+                                    @if(!$fee->project && !$fee->costCenter)
+                                        <span class="text-slate-500 text-[11px]">—</span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="py-2 align-middle">
                                 @if($fee->service_type)
@@ -206,6 +248,8 @@
                                         </select>
                                         <input type="hidden" name="subject_name" value="{{ $fee->subject_name }}">
                                         <input type="hidden" name="service_type" value="{{ $fee->service_type }}">
+                                        <input type="hidden" name="project_id" value="{{ $fee->project_id }}">
+                                        <input type="hidden" name="cost_center_id" value="{{ $fee->cost_center_id }}">
                                         <label class="inline-flex items-center gap-1 text-[11px] text-slate-300 ml-1">
                                             <input type="checkbox" name="is_optional" value="1" {{ $fee->is_optional ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
                                             <span>Opt</span>

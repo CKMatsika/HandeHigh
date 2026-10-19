@@ -24,6 +24,8 @@ class Invoice extends Model
         'due_date',
         'status',
         'school_snapshot',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -48,6 +50,16 @@ class Invoice extends Model
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 
     public function student()

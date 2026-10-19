@@ -24,7 +24,9 @@
                     Duration: <span class="text-slate-300">{{ $project->start_date->format('M d, Y') }} &mdash; {{ $project->end_date->format('M d, Y') }}</span>
                 </p>
             </div>
-            <div class="flex items-center gap-3">
+                <a href="{{ route('admin.reports.profit-and-loss', ['project_id' => $project->id]) }}" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-2 rounded-lg transition font-medium shadow-sm shadow-emerald-600/20">
+                    📊 View Profit &amp; Loss &rarr;
+                </a>
                 <a href="{{ route('admin.projects.index') }}" class="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-lg border border-slate-700 transition">
                     &larr; Projects
                 </a>
@@ -38,6 +40,7 @@
                 @endif
             </div>
         </div>
+
 
         <!-- Navigation Tabs -->
         <div class="flex border-b border-slate-800 space-x-2">
@@ -256,20 +259,31 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Budget Overview Card -->
                 <div class="bg-slate-900/80 rounded-xl border border-slate-800 p-6 md:col-span-2 space-y-4">
-                    <h3 class="text-base font-semibold text-slate-50">Project Budget & Expenditure</h3>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800">
-                            <span class="text-xs text-slate-400">Total Budget</span>
-                            <p class="text-xl font-bold text-slate-100 mt-1">${{ number_format($project->budget_amount, 2) }}</p>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-semibold text-slate-50">Project Budget &amp; Financial Performance</h3>
+                        <a href="{{ route('admin.reports.profit-and-loss', ['project_id' => $project->id]) }}" 
+                           class="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-medium">
+                            Full Profit &amp; Loss Statement &rarr;
+                        </a>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                            <span class="text-[11px] text-slate-400">Total Budget</span>
+                            <p class="text-lg font-bold text-slate-100 mt-1">${{ number_format($project->budget_amount, 2) }}</p>
                         </div>
-                        <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800">
-                            <span class="text-xs text-slate-400">Spent to Date</span>
-                            <p class="text-xl font-bold text-red-400 mt-1">${{ number_format($project->total_spent, 2) }}</p>
+                        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                            <span class="text-[11px] text-slate-400">Revenue Earned</span>
+                            <p class="text-lg font-bold text-emerald-400 mt-1">${{ number_format($project->total_revenue, 2) }}</p>
                         </div>
-                        <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800">
-                            <span class="text-xs text-slate-400">Remaining</span>
-                            <p class="text-xl font-bold {{ $project->remaining_budget >= 0 ? 'text-emerald-400' : 'text-red-400' }} mt-1">
-                                ${{ number_format($project->remaining_budget, 2) }}
+                        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                            <span class="text-[11px] text-slate-400">Total Spent</span>
+                            <p class="text-lg font-bold text-rose-400 mt-1">${{ number_format($project->total_spent, 2) }}</p>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                            <span class="text-[11px] text-slate-400">Net Profit / (Loss)</span>
+                            <p class="text-lg font-bold {{ $project->net_profit_loss >= 0 ? 'text-emerald-400' : 'text-rose-400' }} mt-1">
+                                ${{ number_format($project->net_profit_loss, 2) }}
                             </p>
                         </div>
                     </div>
@@ -277,14 +291,15 @@
                     <!-- Utilization Bar -->
                     <div class="space-y-1.5 pt-2">
                         <div class="flex justify-between text-xs text-slate-400">
-                            <span>Budget Utilization</span>
-                            <span>{{ round($project->budget_amount > 0 ? ($project->total_spent / $project->budget_amount * 100) : 0) }}%</span>
+                            <span>Budget Utilization (${{ number_format($project->total_spent, 2) }} of ${{ number_format($project->budget_amount, 2) }})</span>
+                            <span class="font-semibold text-slate-200">{{ round($project->budget_amount > 0 ? ($project->total_spent / $project->budget_amount * 100) : 0) }}%</span>
                         </div>
                         <div class="w-full bg-slate-800 rounded-full h-2.5">
-                            <div class="bg-red-500 h-2.5 rounded-full" style="width: {{ $project->budget_amount > 0 ? min(100, ($project->total_spent / $project->budget_amount * 100)) : 0 }}%"></div>
+                            <div class="bg-gradient-to-r from-emerald-500 to-amber-500 h-2.5 rounded-full" style="width: {{ $project->budget_amount > 0 ? min(100, ($project->total_spent / $project->budget_amount * 100)) : 0 }}%"></div>
                         </div>
                     </div>
                 </div>
+
 
                 <!-- Record Income Card -->
                 <div class="bg-slate-900/80 rounded-xl border border-slate-800 p-6 space-y-4">

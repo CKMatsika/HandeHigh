@@ -62,6 +62,33 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-slate-400 text-xs mb-1">Project / Enterprise (P&L Tracking)</label>
+                    <select name="project_id" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100">
+                        <option value="">-- General / No Project --</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}" {{ old('project_id') == $project->id ? 'selected' : '' }}>
+                                {{ $project->name }} ({{ ucfirst(str_replace('_', ' ', $project->status)) }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-[11px] text-slate-500 mt-0.5">e.g., Bus Operations, Tuckshop / Kiosk, Poultry, Truck Hire</p>
+                </div>
+                <div>
+                    <label class="block text-slate-400 text-xs mb-1">Cost Center / Department</label>
+                    <select name="cost_center_id" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100">
+                        <option value="">-- General School Operations --</option>
+                        @foreach($costCenters as $costCenter)
+                            <option value="{{ $costCenter->id }}" {{ old('cost_center_id') == $costCenter->id ? 'selected' : '' }}>
+                                {{ $costCenter->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-[11px] text-slate-500 mt-0.5">e.g., Transport, Canteen, Boarding, Grounds</p>
+                </div>
+            </div>
+
             <div class="rounded-xl border border-slate-800 bg-slate-950/40">
                 <div class="flex items-center justify-between px-4 py-3 text-xs text-slate-300">
                     <div class="font-semibold">Items</div>

@@ -49,6 +49,26 @@
                 </select>
             </div>
             <div>
+                <select name="project_id" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Projects</option>
+                    @foreach($projects ?? [] as $p)
+                        <option value="{{ $p->id }}" {{ request('project_id') == $p->id ? 'selected' : '' }}>
+                            📁 {{ $p->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <select name="cost_center_id" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Cost Centers</option>
+                    @foreach($costCenters ?? [] as $cc)
+                        <option value="{{ $cc->id }}" {{ request('cost_center_id') == $cc->id ? 'selected' : '' }}>
+                            🏢 {{ $cc->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
                 <input type="date" name="date_from" value="{{ request('date_from') }}"
                        class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                        placeholder="From">
@@ -77,7 +97,43 @@
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Date</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Description</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Project / Cost Center</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Category</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Account</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Type</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-300">Amount</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-300">Balance</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                    @forelse($transactions as $transaction)
+                        <tr class="hover:bg-slate-800/50 transition-colors">
+                            <td class="px-4 py-3 text-xs text-slate-300">
+                                {{ $transaction->transaction_date->format('M d, Y') }}
+                            </td>
+                            <td class="px-4 py-3 text-xs text-slate-300">
+                                <div>
+                                    <div class="font-medium">{{ $transaction->description }}</div>
+                                    @if($transaction->reference_number)
+                                        <div class="text-slate-400">Ref: {{ $transaction->reference_number }}</div>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-xs text-slate-300">
+                                @if($transaction->project)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        📁 {{ $transaction->project->name }}
+                                    </span>
+                                @elseif($transaction->costCenter)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                        🏢 {{ $transaction->costCenter->name }}
+                                    </span>
+                                @else
+                                    <span class="text-slate-500 text-[11px]">-</span>
+                                @endif
+                            </td>
+
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Account</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Type</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-300">Amount</th>

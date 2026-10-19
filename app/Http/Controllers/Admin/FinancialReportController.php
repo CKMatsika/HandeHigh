@@ -6,18 +6,21 @@ use App\Exports\DebtorsAgingExport;
 use App\Exports\FeeCollectionsExport;
 use App\Exports\IncomeExpenditureExport;
 use App\Exports\OutstandingFeesExport;
+use App\Exports\ProjectProfitAndLossExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Budget;
 use App\Models\Department;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
+use App\Models\Project;
 use App\Models\Student;
 use App\Services\Finance\FinanceReportingService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
+
 
 class FinancialReportController extends Controller
 {
@@ -264,12 +267,12 @@ class FinancialReportController extends Controller
      */
     public function incomeExpenditure(Request $request)
     {
-        $school = Auth::user()?->school;
+        $school = Auth::user()?->school ?? \App\Models\School::first();
         if (! $school) {
             abort(403);
         }
 
-        $filters = $request->only(['start_date', 'end_date']);
+        $filters = $request->only(['start_date', 'end_date', 'project_id', 'cost_center_id']);
         $reportData = $this->reportingService->getIncomeExpenditure($school, $filters);
 
         return view('admin.reports.income-statement', array_merge($reportData, [
@@ -291,17 +294,68 @@ class FinancialReportController extends Controller
      */
     public function exportIncomeExpenditure(Request $request)
     {
-        $school = Auth::user()?->school;
+        $school = Auth::user()?->school ?? \App\Models\School::first();
         if (! $school) {
             abort(403);
         }
 
-        $filters = $request->only(['start_date', 'end_date']);
+        $filters = $request->only(['start_date', 'end_date', 'project_id', 'cost_center_id']);
         $reportData = $this->reportingService->getIncomeExpenditure($school, $filters);
         $filename = 'income-expenditure-' . ($reportData['start_date'] ?? now()->toDateString()) . '-to-' . ($reportData['end_date'] ?? now()->toDateString()) . '.xlsx';
 
         return Excel::download(new IncomeExpenditureExport($reportData, $school), $filename);
     }
+
+    /**
+     * Profit & Loss Statement for Projects & Cost Centers
+     * (e.g. Bus, Tuckshop / Kiosk, Truck Hire, Poultry, Canteen)
+     */
+    public function projectProfitAndLoss(Request $request)
+    {
+        $school = Auth::user()?->school ?? \App\Models\School::first();
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'project_id', 'cost_center_id', 'period', 'year', 'start_date', 'end_date'
+        ]);
+
+        $reportData = $this->reportingService->getProjectProfitAndLoss($school, $filters);
+
+        $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
+        $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
+
+        return view('admin.reports.profit-and-loss', array_merge($reportData, [
+            'projects' => $projects,
+            'costCenters' => $costCenters,
+            'selectedProjectId' => $filters['project_id'] ?? null,
+            'selectedCostCenterId' => $filters['cost_center_id'] ?? null,
+            'selectedPeriod' => $filters['period'] ?? 'this_year',
+            'school' => $school,
+        ]));
+    }
+
+    /**
+     * Export Project Profit & Loss Statement to Excel/CSV
+     */
+    public function exportProjectProfitAndLoss(Request $request)
+    {
+        $school = Auth::user()?->school ?? \App\Models\School::first();
+        if (! $school) {
+            abort(403);
+        }
+
+        $filters = $request->only([
+            'project_id', 'cost_center_id', 'period', 'year', 'start_date', 'end_date'
+        ]);
+
+        $reportData = $this->reportingService->getProjectProfitAndLoss($school, $filters);
+        $filename = 'profit-and-loss-' . ($reportData['start_date'] ?? now()->toDateString()) . '-to-' . ($reportData['end_date'] ?? now()->toDateString()) . '.xlsx';
+
+        return Excel::download(new ProjectProfitAndLossExport($reportData, $school), $filename);
+    }
+
 
     /**
      * Cashbook and Bank Accounts Summary

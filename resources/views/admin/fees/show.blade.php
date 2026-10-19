@@ -23,6 +23,26 @@
             <div><span class="text-slate-400">Optional:</span> {{ $fee->is_optional ? 'Yes' : 'No' }}</div>
             <div><span class="text-slate-400">Service type:</span> {{ $fee->service_type ?: '—' }}</div>
             <div><span class="text-slate-400">Subject name:</span> {{ $fee->subject_name ?: '—' }}</div>
+            <div>
+                <span class="text-slate-400">Project (P&L):</span>
+                @if($fee->project)
+                    <span class="inline-flex items-center gap-1 rounded bg-indigo-950/60 border border-indigo-700/50 px-2 py-0.5 text-xs text-indigo-300 font-medium">
+                        {{ $fee->project->name }}
+                    </span>
+                @else
+                    <span class="text-slate-500">—</span>
+                @endif
+            </div>
+            <div>
+                <span class="text-slate-400">Cost Center:</span>
+                @if($fee->costCenter)
+                    <span class="inline-flex items-center gap-1 rounded bg-purple-950/60 border border-purple-700/50 px-2 py-0.5 text-xs text-purple-300 font-medium">
+                        {{ $fee->costCenter->name }}
+                    </span>
+                @else
+                    <span class="text-slate-500">—</span>
+                @endif
+            </div>
         </div>
     </div>
 @endsection

@@ -88,9 +88,9 @@
                     <label class="block text-xs font-medium text-slate-300 mb-2">Amount *</label>
                     <input type="number" name="amount" required step="0.01" min="0.01"
                            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           placeholder="0.oma">
+                           placeholder="0.00">
                     @error('amount')
-                        <p class="mt-1 text-xs text-red-400">{{ $message }}</ description
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
                     @enderror
                 </div>
 
@@ -107,11 +107,34 @@
                     <label class="block text-xs font-medium text-slate-300 mb-2">Reference Number</label>
                     <input type="text" name="reference_number"
                            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                           placeholder="e.g., INV-001">
+                           placeholder="e.g., INV-001 / REC-001">
                     @error('reference_number')
                         <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
                     @enderror
                 </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Project (e.g. Bus, Tuckshop, Truck)</label>
+                    <select name="project_id"
+                            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">-- General / No Project --</option>
+                        @foreach($projects ?? [] as $proj)
+                            <option value="{{ $proj->id }}">📁 {{ $proj->name }} ({{ $proj->code ?? 'PRJ-' . $proj->id }})</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Cost Center (Department)</label>
+                    <select name="cost_center_id"
+                            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">-- General / Unallocated --</option>
+                        @foreach($costCenters ?? [] as $cc)
+                            <option value="{{ $cc->id }}">🏢 {{ $cc->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
 
                 <div class="md:col-span-2">
                     <label class="block text-xs font-medium text-slate-300 mb-2">Notes</label>

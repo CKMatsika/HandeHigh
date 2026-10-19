@@ -17,6 +17,8 @@ class ReceiptItem extends Model
         'unit_price',
         'tax_rate',
         'line_total',
+        'project_id',
+        'cost_center_id',
     ];
 
     protected $casts = [
@@ -29,5 +31,15 @@ class ReceiptItem extends Model
     public function receipt()
     {
         return $this->belongsTo(Receipt::class);
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function costCenter()
+    {
+        return $this->belongsTo(Department::class, 'cost_center_id');
     }
 }

@@ -258,7 +258,7 @@ class AccountingService
         $totalItemizedCredits = 0.0;
 
         if ($invoice->items && $invoice->items->count() > 0) {
-            // Group items by resolved revenue account
+            // Group items by resolved revenue account, project, and cost center
             $accountGroups = [];
             foreach ($invoice->items as $item) {
                 $account = $resolver->resolveAccountForItem($school, $item);
@@ -267,13 +267,19 @@ class AccountingService
                     continue;
                 }
 
-                if (! isset($accountGroups[$account->id])) {
-                    $accountGroups[$account->id] = [
+                $itemProjectId = $item->project_id ?? $item->feeStructure?->project_id ?? $invoice->project_id ?? null;
+                $itemCostCenterId = $item->cost_center_id ?? $item->feeStructure?->cost_center_id ?? $invoice->cost_center_id ?? null;
+                $groupKey = "{$account->id}_{$itemProjectId}_{$itemCostCenterId}";
+
+                if (! isset($accountGroups[$groupKey])) {
+                    $accountGroups[$groupKey] = [
                         'account' => $account,
                         'total' => 0.0,
+                        'project_id' => $itemProjectId,
+                        'cost_center_id' => $itemCostCenterId,
                     ];
                 }
-                $accountGroups[$account->id]['total'] += $amount;
+                $accountGroups[$groupKey]['total'] += $amount;
             }
 
             foreach ($accountGroups as $group) {
@@ -282,6 +288,8 @@ class AccountingService
                     'entry_type' => 'credit',
                     'amount' => $group['total'],
                     'memo' => "Invoice {$invoice->number} - {$group['account']->name}",
+                    'project_id' => $group['project_id'],
+                    'cost_center_id' => $group['cost_center_id'],
                 ];
                 $totalItemizedCredits += $group['total'];
             }
@@ -305,6 +313,8 @@ class AccountingService
                 'entry_type' => 'credit',
                 'amount' => $invoice->total_amount,
                 'memo' => "Invoice {$invoice->number} - General Revenue",
+                'project_id' => $invoice->project_id ?? null,
+                'cost_center_id' => $invoice->cost_center_id ?? null,
             ];
             $totalItemizedCredits = (float) $invoice->total_amount;
         }
@@ -322,6 +332,8 @@ class AccountingService
                 'entry_type' => 'debit',
                 'amount' => $invoiceTotal,
                 'memo' => 'Invoice ' . $invoice->number,
+                'project_id' => $invoice->project_id ?? null,
+                'cost_center_id' => $invoice->cost_center_id ?? null,
             ],
         ], $creditEntries);
         
@@ -340,6 +352,7 @@ class AccountingService
             }
             return $existingBatch->fresh(['entries.account']);
         }
+
 
         return $this->createJournalBatch([
             'school_id' => $school->id,
@@ -410,6 +423,39 @@ class AccountingService
 
         $creditEntries = [];
         $kioskSale->loadMissing(['items.product.revenueAccount']);
+
+        // Auto-resolve project or cost center for Kiosk if not explicitly tagged
+        $projectId = $kioskSale->project_id;
+        $costCenterId = $kioskSale->cost_center_id;
+        if (! $projectId) {
+            $kioskProject = \App\Models\Project::where('school_id', $school->id)
+                ->where(function ($q) {
+                    $q->where('name', 'LIKE', '%kiosk%')
+                      ->orWhere('name', 'LIKE', '%tuckshop%')
+                      ->orWhere('name', 'LIKE', '%canteen%');
+                })
+                ->first();
+            $projectId = $kioskProject?->id;
+        }
+        if (! $costCenterId) {
+            $canteenDept = \App\Models\Department::where('school_id', $school->id)
+                ->where(function ($q) {
+                    $q->where('name', 'LIKE', '%canteen%')
+                      ->orWhere('name', 'LIKE', '%tuckshop%')
+                      ->orWhere('name', 'LIKE', '%kiosk%')
+                      ->orWhere('name', 'LIKE', '%catering%');
+                })
+                ->first();
+            $costCenterId = $canteenDept?->id;
+        }
+
+        if (($projectId && $kioskSale->project_id !== $projectId) || ($costCenterId && $kioskSale->cost_center_id !== $costCenterId)) {
+            $kioskSale->update([
+                'project_id' => $projectId,
+                'cost_center_id' => $costCenterId,
+            ]);
+        }
+
         if ($kioskSale->items && $kioskSale->items->count() > 0) {
             $accountGroups = [];
             foreach ($kioskSale->items as $item) {
@@ -436,6 +482,8 @@ class AccountingService
                     'entry_type' => 'credit',
                     'amount' => $group['total'],
                     'memo' => 'Kiosk Sale ' . $kioskSale->receipt_number . ' - ' . $group['account']->name,
+                    'project_id' => $projectId,
+                    'cost_center_id' => $costCenterId,
                 ];
             }
         }
@@ -446,6 +494,8 @@ class AccountingService
                 'entry_type' => 'credit',
                 'amount' => $kioskSale->grand_total,
                 'memo' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+                'project_id' => $projectId,
+                'cost_center_id' => $costCenterId,
             ];
         }
 
@@ -464,6 +514,8 @@ class AccountingService
                     'entry_type' => 'debit',
                     'amount' => $kioskSale->grand_total,
                     'memo' => 'Kiosk Sale ' . $kioskSale->receipt_number,
+                    'project_id' => $projectId,
+                    'cost_center_id' => $costCenterId,
                 ],
             ], $creditEntries),
         ]);
@@ -502,7 +554,10 @@ class AccountingService
             'payment_method' => $kioskSale->payment_method,
             'created_by' => $kioskSale->cashier_id ?? auth()->id(),
             'notes' => 'Kiosk / Canteen retail sale',
+            'project_id' => $kioskSale->project_id,
+            'cost_center_id' => $kioskSale->cost_center_id,
         ]);
+
 
         $debitEntryId = $journalBatch?->entries->firstWhere('account_id', $cashAccount->id)?->id;
 
@@ -715,6 +770,38 @@ class AccountingService
             ->orderBy('code')
             ->firstOrFail();
 
+        $receipt->loadMissing(['items']);
+        $projectId = $receipt->project_id;
+        $costCenterId = $receipt->cost_center_id;
+
+        $creditEntries = [];
+        if ($receipt->items && $receipt->items->count() > 0) {
+            foreach ($receipt->items as $item) {
+                $itemAccId = $item->account_id ?? $revenueAccount->id;
+                $itemProjectId = $item->project_id ?? $projectId;
+                $itemCostCenterId = $item->cost_center_id ?? $costCenterId;
+                $creditEntries[] = [
+                    'account_id' => $itemAccId,
+                    'entry_type' => 'credit',
+                    'amount' => (float) ($item->total ?? $item->amount ?? 0),
+                    'memo' => 'Receipt ' . $receipt->receipt_number . ($item->description ? ' - ' . $item->description : ''),
+                    'project_id' => $itemProjectId,
+                    'cost_center_id' => $itemCostCenterId,
+                ];
+            }
+        }
+
+        if (empty($creditEntries)) {
+            $creditEntries[] = [
+                'account_id' => $revenueAccount->id,
+                'entry_type' => 'credit',
+                'amount' => $receipt->grand_total,
+                'memo' => 'Receipt ' . $receipt->receipt_number,
+                'project_id' => $projectId,
+                'cost_center_id' => $costCenterId,
+            ];
+        }
+
         // Create journal batch
         $journalBatch = $this->createJournalBatch([
             'school_id' => $school->id,
@@ -725,20 +812,16 @@ class AccountingService
             'source_id' => $receipt->id,
             'status' => 'posted',
             'created_by' => auth()->id(),
-            'entries' => [
+            'entries' => array_merge([
                 [
                     'account_id' => $cashAccount->id,
                     'entry_type' => 'debit',
                     'amount' => $receipt->grand_total,
                     'memo' => 'Receipt ' . $receipt->receipt_number,
+                    'project_id' => $projectId,
+                    'cost_center_id' => $costCenterId,
                 ],
-                [
-                    'account_id' => $revenueAccount->id,
-                    'entry_type' => 'credit',
-                    'amount' => $receipt->grand_total,
-                    'memo' => 'Receipt ' . $receipt->receipt_number,
-                ],
-            ],
+            ], $creditEntries),
         ]);
         
         // Create cashbook entry for receipt
@@ -778,7 +861,10 @@ class AccountingService
             'payment_method' => $receipt->payment_method,
             'created_by' => auth()->id(),
             'notes' => $receipt->notes ?? 'General receipt',
+            'project_id' => $receipt->project_id,
+            'cost_center_id' => $receipt->cost_center_id,
         ]);
+
 
         $debitEntryId = $journalBatch?->entries->firstWhere('account_id', $cashAccount->id)?->id;
 
@@ -1030,15 +1116,20 @@ class AccountingService
                     'entry_type' => 'debit',
                     'amount' => $cashbook->amount,
                     'memo' => $cashbook->description,
+                    'project_id' => $cashbook->project_id ?? null,
+                    'cost_center_id' => $cashbook->cost_center_id ?? null,
                 ],
                 [
                     'account_id' => $creditAccountId,
                     'entry_type' => 'credit',
                     'amount' => $cashbook->amount,
                     'memo' => $cashbook->description,
+                    'project_id' => $cashbook->project_id ?? null,
+                    'cost_center_id' => $cashbook->cost_center_id ?? null,
                 ],
             ],
         ]);
+
 
         // Dual sync: Ensure CashbookTransaction exists for bank reconciliation
         $entry = $batch->entries->firstWhere('account_id', $cashAccount->id);
@@ -1231,13 +1322,19 @@ class AccountingService
                 }
 
                 $amount = (float) $item->line_total;
-                if (! isset($accountGroups[$expAcc->id])) {
-                    $accountGroups[$expAcc->id] = [
+                $itemProjectId = $item->project_id ?? $bill->project_id ?? null;
+                $itemCostCenterId = $item->cost_center_id ?? $bill->cost_center_id ?? null;
+                $groupKey = "{$expAcc->id}_{$itemProjectId}_{$itemCostCenterId}";
+
+                if (! isset($accountGroups[$groupKey])) {
+                    $accountGroups[$groupKey] = [
                         'account' => $expAcc,
                         'total' => 0.0,
+                        'project_id' => $itemProjectId,
+                        'cost_center_id' => $itemCostCenterId,
                     ];
                 }
-                $accountGroups[$expAcc->id]['total'] += $amount;
+                $accountGroups[$groupKey]['total'] += $amount;
             }
 
             foreach ($accountGroups as $group) {
@@ -1246,6 +1343,8 @@ class AccountingService
                     'entry_type' => 'debit',
                     'amount' => $group['total'],
                     'memo' => 'Bill ' . $bill->bill_number . ' - ' . $group['account']->name,
+                    'project_id' => $group['project_id'],
+                    'cost_center_id' => $group['cost_center_id'],
                 ];
                 $totalItemizedDebits += $group['total'];
             }
@@ -1270,6 +1369,8 @@ class AccountingService
                 'entry_type' => 'debit',
                 'amount' => (float) $bill->total_amount,
                 'memo' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->description ?? $expenseAccount->name),
+                'project_id' => $bill->project_id ?? null,
+                'cost_center_id' => $bill->cost_center_id ?? null,
             ];
             $totalItemizedDebits = (float) $bill->total_amount;
         }
@@ -1287,6 +1388,8 @@ class AccountingService
                 'entry_type' => 'credit',
                 'amount' => $billTotal,
                 'memo' => 'Bill ' . $bill->bill_number . ' - ' . ($bill->vendor->name ?? 'Vendor'),
+                'project_id' => $bill->project_id ?? null,
+                'cost_center_id' => $bill->cost_center_id ?? null,
             ],
         ]);
 
@@ -1383,15 +1486,20 @@ class AccountingService
                     'entry_type' => 'debit',
                     'amount' => (float) $payment->amount,
                     'memo' => 'Payment for bill ' . ($bill ? $bill->bill_number : $payment->id),
+                    'project_id' => $bill?->project_id ?? null,
+                    'cost_center_id' => $bill?->cost_center_id ?? null,
                 ],
                 [
                     'account_id' => $cashAccount->id,
                     'entry_type' => 'credit',
                     'amount' => (float) $payment->amount,
                     'memo' => 'Payment for bill ' . ($bill ? $bill->bill_number : $payment->id),
+                    'project_id' => $bill?->project_id ?? null,
+                    'cost_center_id' => $bill?->cost_center_id ?? null,
                 ],
             ],
         ]);
+
     }
 
     /**

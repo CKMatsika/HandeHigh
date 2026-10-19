@@ -34,6 +34,30 @@
                         <p class="text-slate-100 mt-1">{{ $bill->due_date?->format('M d, Y') ?? '-' }}</p>
                     </div>
                     <div>
+                        <span class="text-slate-400">Project</span>
+                        <p class="text-slate-100 mt-1">
+                            @if($bill->project)
+                                <a href="{{ route('admin.projects.show', $bill->project) }}" class="inline-flex items-center gap-1 text-emerald-400 hover:underline">
+                                    📁 {{ $bill->project->name }}
+                                </a>
+                            @else
+                                <span class="text-slate-500">None / General</span>
+                            @endif
+                        </p>
+                    </div>
+                    <div>
+                        <span class="text-slate-400">Cost Center</span>
+                        <p class="text-slate-100 mt-1">
+                            @if($bill->costCenter)
+                                <span class="inline-flex items-center gap-1 text-blue-400">
+                                    🏢 {{ $bill->costCenter->name }}
+                                </span>
+                            @else
+                                <span class="text-slate-500">Unallocated</span>
+                            @endif
+                        </p>
+                    </div>
+                    <div>
                         <span class="text-slate-400">Description</span>
                         <p class="text-slate-100 mt-1">{{ $bill->description ?? '-' }}</p>
                     </div>
@@ -43,6 +67,7 @@
                     </div>
                 </div>
             </div>
+
 
             @if($bill->items->count())
                 <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">

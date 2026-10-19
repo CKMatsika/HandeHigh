@@ -61,6 +61,32 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-slate-400 text-xs mb-1">Project (e.g. Bus, Tuckshop, Truck Hire)</label>
+                    <select name="project_id" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100">
+                        <option value="">-- General / No Project --</option>
+                        @foreach($projects ?? [] as $proj)
+                            <option value="{{ $proj->id }}" {{ old('project_id') == $proj->id ? 'selected' : '' }}>
+                                📁 {{ $proj->name }} ({{ $proj->code ?? 'PRJ-' . $proj->id }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 text-xs mb-1">Cost Center (Department)</label>
+                    <select name="cost_center_id" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100">
+                        <option value="">-- General / Unallocated --</option>
+                        @foreach($costCenters ?? [] as $dept)
+                            <option value="{{ $dept->id }}" {{ old('cost_center_id') == $dept->id ? 'selected' : '' }}>
+                                🏢 {{ $dept->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+
             <div>
                 <label class="block text-slate-400 text-xs mb-1">Description</label>
                 <input name="description" value="{{ old('description') }}" class="w-full rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-slate-100" />
