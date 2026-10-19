@@ -29,7 +29,15 @@ class EmployeeController extends Controller
         if ($request->filled('status')) {
             $query->where('employment_status', $request->status);
         }
-        
+
+        if ($request->filled('employment_type')) {
+            $query->where('employment_type', $request->employment_type);
+        }
+
+        if ($request->filled('position')) {
+            $query->where('position', 'like', "%{$request->position}%");
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -40,7 +48,7 @@ class EmployeeController extends Controller
             });
         }
 
-        $employees = $query->latest()->paginate(50);
+        $employees = $query->latest()->paginate(50)->appends($request->query());
         $departments = Department::where('school_id', $school->id)->get();
 
         return view('admin.employees.index', compact('employees', 'departments'));

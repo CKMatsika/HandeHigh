@@ -25,6 +25,8 @@ class DashboardController extends Controller
             abort(403);
         }
 
+        $projects = Project::where('school_id', $school->id)->get();
+
         // Get statistics for headmaster dashboard
         $stats = [
             'total_students' => $school->students()->count(),
@@ -35,6 +37,14 @@ class DashboardController extends Controller
             'today_attendance' => $school->attendances()->whereDate('attendance_date', now()->toDateString())->count(),
             'total_fees_collected' => $school->payments()->sum('amount'),
             'pending_procurement' => 0,
+            'projects' => [
+                'active' => $projects->whereIn('status', ['active', 'in_progress', 'approved'])->count(),
+                'pending' => $projects->where('status', 'pending')->count(),
+                'total_budget' => (float) $projects->sum('budget_amount'),
+                'total_spent' => (float) $projects->sum('total_spent'),
+                'completed_this_month' => $projects->where('status', 'completed')->where('updated_at', '>=', now()->startOfMonth())->count(),
+                'overdue' => $projects->where('status', '!=', 'completed')->whereNotNull('end_date')->where('end_date', '<', now())->count(),
+            ],
         ];
 
         // Schemes of work stats
@@ -51,7 +61,21 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        return view('admin.dashboard.headmaster', compact('stats', 'schemesStats', 'recentSubmittedSchemes'));
+        $reportService = app(\App\Services\LeadershipDashboardReportService::class);
+        $enrollmentReport = $reportService->getEnrollmentReport($school);
+        $teachersReport = $reportService->getTeachersReport($school);
+        $employeesReport = $reportService->getEmployeesReport($school);
+        $bankBalanceSummary = $reportService->getBankBalanceSummary($school);
+
+        return view('admin.dashboard.headmaster', compact(
+            'stats',
+            'schemesStats',
+            'recentSubmittedSchemes',
+            'enrollmentReport',
+            'teachersReport',
+            'employeesReport',
+            'bankBalanceSummary'
+        ));
     }
 
     public function deputyHeadmaster()
@@ -63,6 +87,8 @@ class DashboardController extends Controller
             abort(403);
         }
 
+        $projects = Project::where('school_id', $school->id)->get();
+
         // Get statistics for deputy headmaster dashboard
         $stats = [
             'academic_performance' => [
@@ -72,7 +98,7 @@ class DashboardController extends Controller
             ],
             'teacher_performance' => [
                 'total_teachers' => $school->teachers()->count(),
-                'active_teachers' => $school->teachers()->where('status', 'active')->count(),
+                'active_teachers' => $school->teachers()->where('status', true)->count(),
                 'pending_evaluations' => 5,
             ],
             'curriculum_status' => [
@@ -85,6 +111,14 @@ class DashboardController extends Controller
                 'resolved_cases' => 8,
                 'pending_cases' => 4,
             ],
+            'projects' => [
+                'academic_active' => $projects->where('category', 'academic')->whereIn('status', ['active', 'in_progress', 'approved'])->count(),
+                'academic_completed' => $projects->where('category', 'academic')->where('status', 'completed')->count(),
+                'academic_total' => $projects->where('category', 'academic')->count(),
+                'infrastructure_active' => $projects->where('category', 'infrastructure')->whereIn('status', ['active', 'in_progress', 'approved'])->count(),
+                'infrastructure_budget' => (float) $projects->where('category', 'infrastructure')->sum('budget_amount'),
+                'infrastructure_spent' => (float) $projects->where('category', 'infrastructure')->sum('total_spent'),
+            ],
         ];
 
         // Schemes of work stats
@@ -101,7 +135,37 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        return view('admin.dashboard.deputy-headmaster', compact('stats', 'schemesStats', 'recentSubmittedSchemes'));
+        $reportService = app(\App\Services\LeadershipDashboardReportService::class);
+        $enrollmentReport = $reportService->getEnrollmentReport($school);
+        $teachersReport = $reportService->getTeachersReport($school);
+        $employeesReport = $reportService->getEmployeesReport($school);
+        $bankBalanceSummary = $reportService->getBankBalanceSummary($school);
+
+        return view('admin.dashboard.deputy-headmaster', compact(
+            'stats',
+            'schemesStats',
+            'recentSubmittedSchemes',
+            'enrollmentReport',
+            'teachersReport',
+            'employeesReport',
+            'bankBalanceSummary'
+        ));
+    }
+
+    public function drilldown(Request $request)
+    {
+        $user = Auth::user();
+        $school = $user?->school;
+
+        if (!$school) {
+            return response()->json(['success' => false, 'message' => 'School context not found.'], 403);
+        }
+
+        $type = (string) $request->input('type');
+        $reportService = app(\App\Services\LeadershipDashboardReportService::class);
+        $data = $reportService->getDrilldownData($school, $type, $request->all());
+
+        return response()->json($data);
     }
 
     public function accountsClerk()

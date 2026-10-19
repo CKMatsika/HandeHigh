@@ -19,7 +19,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class EnrollmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         $school = $user?->school;
@@ -28,10 +28,48 @@ class EnrollmentController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
-        $enrollments = Enrollment::with(['student.guardians', 'invoices'])
-            ->where('school_id', $school->id)
-            ->orderByDesc('enrollment_date')
-            ->paginate(15);
+        $query = Enrollment::with(['student.guardians', 'invoices', 'class'])
+            ->where('school_id', $school->id);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('student', function ($sq) use ($search) {
+                $sq->where('first_name', 'like', "%{$search}%")
+                   ->orWhere('last_name', 'like', "%{$search}%")
+                   ->orWhere('admission_number', 'like', "%{$search}%")
+                   ->orWhere('registration_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('grade')) {
+            $query->where('grade', $request->grade);
+        }
+
+        if ($request->filled('stream') || $request->filled('class_name')) {
+            $stream = $request->input('stream') ?: $request->input('class_name');
+            $query->where(function ($q) use ($stream) {
+                $q->where('class_name', $stream)
+                  ->orWhereHas('class', fn ($cq) => $cq->where('name', $stream));
+            });
+        }
+
+        if ($request->filled('gender')) {
+            $query->whereHas('student', fn ($sq) => $sq->where('gender', $request->gender));
+        }
+
+        if ($request->filled('status')) {
+            if ($request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
+        }
+
+        if ($request->filled('student_type')) {
+            $query->where('student_type', $request->student_type);
+        }
+
+        $enrollments = $query->orderByDesc('enrollment_date')
+            ->paginate(15)
+            ->appends($request->query());
 
         return view('admin.enrollments.index', [
             'school' => $school,

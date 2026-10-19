@@ -56,8 +56,25 @@ class StudentController extends Controller
             $query->where('grade', $request->grade);
         }
 
+        if ($request->filled('stream') || $request->filled('class_name')) {
+            $stream = $request->input('stream') ?: $request->input('class_name');
+            $query->where(function ($q) use ($stream) {
+                $q->where('class_name', $stream)
+                  ->orWhereHas('enrollments', function ($eq) use ($stream) {
+                      $eq->where('class_name', $stream)
+                         ->orWhereHas('class', fn ($cq) => $cq->where('name', $stream));
+                  });
+            });
+        }
+
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->gender);
+        }
+
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            if ($request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
         } else {
             $query->where('status', 'active');
         }
@@ -66,7 +83,7 @@ class StudentController extends Controller
             $query->where('is_boarding', $request->boarding === 'yes');
         }
 
-        $students = $query->latest()->paginate(20);
+        $students = $query->latest()->paginate(20)->appends($request->query());
 
         return view('admin.students.index', compact('school', 'students'));
     }

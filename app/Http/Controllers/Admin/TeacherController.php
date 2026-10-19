@@ -37,14 +37,22 @@ class TeacherController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->status === 'active');
+            $query->where('status', in_array($request->status, ['active', '1', 1, true], true));
         }
 
         if ($request->filled('specialization')) {
             $query->where('specialization', $request->specialization);
         }
 
-        $teachers = $query->latest()->paginate(15);
+        if ($request->filled('gender')) {
+            $query->where('gender', $request->gender);
+        }
+
+        if ($request->filled('qualification')) {
+            $query->where('qualification', 'like', "%{$request->qualification}%");
+        }
+
+        $teachers = $query->latest()->paginate(15)->appends($request->query());
         $specializations = Teacher::where('school_id', $school->id)
             ->whereNotNull('specialization')
             ->distinct()->pluck('specialization');

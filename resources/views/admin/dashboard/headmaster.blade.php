@@ -1,30 +1,58 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-8">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-slate-50">Headmaster Dashboard</h1>
-            <p class="text-slate-400 mt-1">School overview and management insights</p>
+            <h1 class="text-2xl font-black text-slate-50 tracking-tight">Headmaster Dashboard</h1>
+            <p class="text-slate-400 mt-1 text-sm">Executive school oversight, academic reports, workforce analytics & financial liquidity</p>
         </div>
         <div class="flex items-center gap-3">
-            <select class="rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-                <option>This Term</option>
+            <select class="rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm shadow-sm focus:outline-none focus:border-indigo-500">
+                <option>This Term (Current)</option>
                 <option>Last Term</option>
-                <option>This Year</option>
+                <option>Current Academic Year</option>
             </select>
         </div>
     </div>
 
-    <!-- Key Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+    <!-- Quick Navigation Bar for Executive Reports -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800/80 text-xs scrollbar-none">
+        <a href="#overview-section" class="px-3.5 py-1.5 rounded-lg bg-indigo-600/30 text-indigo-200 border border-indigo-500/30 hover:bg-indigo-600/50 font-semibold transition shrink-0 flex items-center gap-1.5">
+            <span>⚡ Overview</span>
+        </a>
+        <a href="#enrollment-reports-section" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition shrink-0 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <span>Enrollment by Class, Stream & Gender</span>
+        </a>
+        <a href="#teachers-reports-section" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition shrink-0 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Teachers Report</span>
+        </a>
+        <a href="#employees-reports-section" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition shrink-0 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+            <span>Employees Report</span>
+        </a>
+        <a href="#bank-balances-section" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition shrink-0 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>Bank Balance Summary</span>
+        </a>
+        <a href="#projects-section" class="px-3.5 py-1.5 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition shrink-0 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span>Projects & Operations</span>
+        </a>
+    </div>
+
+    <!-- Key Metrics / Overview Section -->
+    <div id="overview-section" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 hover:border-slate-700 transition cursor-pointer group"
+             onclick="LeadershipDrilldown.open('students', { status: 'active' }, 'Total Enrolled Students', 'All active students in the institution', null, '{{ route('admin.students.index') }}')">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-slate-400">Total Students</p>
-                    <p class="text-2xl font-bold text-slate-50 mt-1">{{ $stats['total_students'] }}</p>
-                    <p class="text-xs text-green-400 mt-2">↑ 5% from last term</p>
+                    <p class="text-sm text-slate-400 group-hover:text-blue-400 transition">Total Students</p>
+                    <p class="text-3xl font-black text-slate-50 mt-1">{{ number_format($stats['total_students']) }}</p>
+                    <p class="text-xs text-blue-400 mt-2 font-medium">Click to inspect roster ↗</p>
                 </div>
                 <div class="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
                     <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -34,12 +62,13 @@
             </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 hover:border-slate-700 transition cursor-pointer group"
+             onclick="LeadershipDrilldown.open('teachers', { status: 1 }, 'Total Teaching Staff', 'All appointed academic educators', null, '{{ route('admin.teachers.index') }}')">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-slate-400">Total Teachers</p>
-                    <p class="text-2xl font-bold text-slate-50 mt-1">{{ $stats['total_teachers'] }}</p>
-                    <p class="text-xs text-green-400 mt-2">↑ 2 new this month</p>
+                    <p class="text-sm text-slate-400 group-hover:text-green-400 transition">Total Teachers</p>
+                    <p class="text-3xl font-black text-slate-50 mt-1">{{ number_format($stats['total_teachers']) }}</p>
+                    <p class="text-xs text-green-400 mt-2 font-medium">Click to inspect directory ↗</p>
                 </div>
                 <div class="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
                     <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,8 +82,8 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-slate-400">Total Classes</p>
-                    <p class="text-2xl font-bold text-slate-50 mt-1">{{ $stats['total_classes'] }}</p>
-                    <p class="text-xs text-slate-400 mt-2">Active this term</p>
+                    <p class="text-3xl font-black text-slate-50 mt-1">{{ number_format($stats['total_classes']) }}</p>
+                    <a href="#enrollment-reports-section" class="text-xs text-purple-400 mt-2 block font-medium hover:underline">View class breakdown ↓</a>
                 </div>
                 <div class="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
                     <svg class="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,8 +97,8 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-slate-400">Fees Collected</p>
-                    <p class="text-2xl font-bold text-slate-50 mt-1">${{ number_format($stats['total_fees_collected'], 0) }}</p>
-                    <p class="text-xs text-green-400 mt-2">↑ 12% from last month</p>
+                    <p class="text-3xl font-black text-slate-50 mt-1">${{ number_format($stats['total_fees_collected'], 0) }}</p>
+                    <a href="#bank-balances-section" class="text-xs text-yellow-400 mt-2 block font-medium hover:underline">View bank summary ↓</a>
                 </div>
                 <div class="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center">
                     <svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,8 +109,20 @@
         </div>
     </div>
 
+    <!-- 1. ENROLLMENT REPORTS BY CLASS, GENDER & STREAM -->
+    @include('admin.dashboard.partials.enrollment-report')
+
+    <!-- 2. TEACHERS REPORTS -->
+    @include('admin.dashboard.partials.teachers-report')
+
+    <!-- 3. EMPLOYEES REPORTS -->
+    @include('admin.dashboard.partials.employees-report')
+
+    <!-- 4. BANK BALANCE SUMMARY -->
+    @include('admin.dashboard.partials.bank-balance-summary')
+
     <!-- Project Management Overview -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div id="projects-section" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Active Projects -->
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
             <h3 class="text-lg font-semibold text-slate-50 mb-4">Active Projects</h3>
@@ -94,7 +135,7 @@
                     <span class="text-sm text-slate-300">Pending Approval</span>
                     <span class="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full text-xs font-medium">{{ $stats['projects']['pending'] ?? 0 }}</span>
                 </div>
-                <a href="{{ route('admin.projects.index') }}" class="w-full bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-600 transition">
+                <a href="{{ route('admin.projects.index') }}" class="w-full block text-center bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-600 transition">
                     View All Projects
                 </a>
             </div>
@@ -130,7 +171,7 @@
                     <span class="text-sm text-slate-300">Overdue</span>
                     <span class="bg-red-500/20 text-red-400 px-2 py-1 rounded-full text-xs font-medium">{{ $stats['projects']['overdue'] ?? 0 }}</span>
                 </div>
-                <a href="{{ route('admin.projects.index', ['status' => 'active']) }}" class="w-full bg-indigo-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-600 transition">
+                <a href="{{ route('admin.projects.index', ['status' => 'active']) }}" class="w-full block text-center bg-indigo-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-600 transition">
                     Track Progress
                 </a>
             </div>
@@ -155,7 +196,7 @@
                     <span class="text-sm text-slate-300">Approved</span>
                     <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-xs font-medium">{{ $schemesStats['approved'] }}</span>
                 </div>
-                <a href="{{ route('admin.schemes-of-work.index') }}" class="w-full bg-cyan-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-cyan-600 transition">
+                <a href="{{ route('admin.schemes-of-work.index') }}" class="w-full block text-center bg-cyan-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-cyan-600 transition">
                     Review Schemes
                 </a>
             </div>
@@ -169,9 +210,9 @@
                     <span class="text-sm text-slate-300">New Applications</span>
                     <span class="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full text-xs font-medium">{{ $stats['pending_enrollments'] }}</span>
                 </div>
-                <button class="w-full bg-blue-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-600 transition">
+                <a href="{{ route('admin.enrollments.index') }}" class="w-full block text-center bg-blue-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-600 transition">
                     Review Applications
-                </button>
+                </a>
             </div>
         </div>
 
@@ -186,45 +227,7 @@
                 <div class="w-full bg-slate-700 rounded-full h-2">
                     <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
                 </div>
-                <p class="text-xs text-slate-400">85% attendance rate</p>
-            </div>
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
-            <h3 class="text-lg font-semibold text-slate-50 mb-4">Quick Actions</h3>
-            <div class="space-y-2">
-                <a href="/admin/enrollments" class="block bg-slate-800 text-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-700 transition">
-                    Manage Enrollments
-                </a>
-                <a href="/admin/attendance" class="block bg-slate-800 text-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-700 transition">
-                    View Attendance
-                </a>
-                <a href="/admin/communication" class="block bg-slate-800 text-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-700 transition">
-                    Send Communications
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Activities -->
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
-        <h3 class="text-lg font-semibold text-slate-50 mb-4">Recent Activities</h3>
-        <div class="space-y-3">
-            <div class="flex items-center gap-3">
-                <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span class="text-sm text-slate-300">New enrollment application received</span>
-                <span class="text-xs text-slate-500 ml-auto">2 hours ago</span>
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span class="text-sm text-slate-300">Teacher evaluation completed</span>
-                <span class="text-xs text-slate-500 ml-auto">5 hours ago</span>
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span class="text-sm text-slate-300">Monthly fee collection report generated</span>
-                <span class="text-xs text-slate-500 ml-auto">1 day ago</span>
+                <a href="/admin/attendance" class="text-xs text-cyan-400 hover:underline block">View attendance records &rarr;</a>
             </div>
         </div>
     </div>
@@ -253,4 +256,7 @@
     </div>
     @endif
 </div>
+
+<!-- Interactive Drilldown Modal Component -->
+@include('admin.dashboard.partials.drilldown-modal')
 @endsection
