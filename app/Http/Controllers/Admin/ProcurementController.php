@@ -26,7 +26,8 @@ class ProcurementController extends Controller
         $user = auth()->user();
         $canViewAll = $user->can('procurement.approve')
             || $user->can('procurement.view')
-            || $user->can('procurement.grv.view');
+            || $user->can('procurement.grv.view')
+            || $user->can('procurement.supplier-invoices.view');
 
         $requisitions = ProcurementRequisition::where('school_id', $school->id)
             ->when(! $canViewAll, fn ($query) => $query->where('requested_by', $user->id))
@@ -328,13 +329,33 @@ class ProcurementController extends Controller
         abort_unless(
             auth()->user()->can('procurement.grv.view')
                 || auth()->user()->can('procurement.grv.create')
-                || auth()->user()->can('procurement.view'),
+                || auth()->user()->can('procurement.view')
+                || auth()->user()->can('procurement.supplier-invoices.create')
+                || auth()->user()->can('procurement.supplier-invoices.view'),
             403
         );
         $this->assertSchoolRecord($voucher);
-        $voucher->load(['warehouse', 'receiver', 'purchaseOrder.vendor', 'items.item']);
+        $voucher->load([
+            'warehouse',
+            'receiver',
+            'purchaseOrder.vendor',
+            'items.item',
+            'items.supplierInvoiceItems.supplierInvoice',
+        ]);
+        $hasPendingInvoice = $voucher->supplierInvoices()->where('status', 'pending_review')->exists();
+        $unbilledQuantity = $voucher->items->sum(function ($line) {
+            $invoiced = $line->supplierInvoiceItems
+                ->filter(fn ($invoiceLine) => $invoiceLine->supplierInvoice?->status === 'posted')
+                ->sum('quantity_invoiced');
 
-        return view('admin.procurement.goods-received-voucher-show', compact('voucher'));
+            return max(0, (float) $line->quantity_received - (float) $invoiced);
+        });
+
+        return view('admin.procurement.goods-received-voucher-show', compact(
+            'voucher',
+            'hasPendingInvoice',
+            'unbilledQuantity'
+        ));
     }
 
     private function validateRequisition(Request $request, School $school): array
@@ -380,6 +401,8 @@ class ProcurementController extends Controller
         abort_unless(
             $user->can('procurement.view')
                 || $user->can('procurement.approve')
+                || $user->can('procurement.supplier-invoices.view')
+                || $user->can('procurement.grv.view')
                 || (int) $purchaseOrder->requisition()->value('requested_by') === (int) $user->id,
             403
         );

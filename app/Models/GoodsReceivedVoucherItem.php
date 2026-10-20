@@ -36,4 +36,9 @@ class GoodsReceivedVoucherItem extends Model
     {
         return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
     }
+
+    public function supplierInvoiceItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProcurementSupplierInvoiceItem::class);
+    }
 }

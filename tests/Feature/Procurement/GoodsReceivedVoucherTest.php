@@ -2,17 +2,20 @@
 
 namespace Tests\Feature\Procurement;
 
+use App\Models\Account;
 use App\Models\GoodsReceivedVoucher;
 use App\Models\InventoryBalance;
 use App\Models\InventoryCategory;
 use App\Models\InventoryItem;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryWarehouse;
+use App\Models\JournalBatch;
 use App\Models\ProcurementRequisition;
 use App\Models\PurchaseOrder;
 use App\Models\School;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\ProcurementAccountingService;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +42,11 @@ class GoodsReceivedVoucherTest extends TestCase
         $order = $this->issuedOrder($school, $item, $vendor, $requester, $procurementOfficer, 10, 2.75);
 
         $this->actingAs($storesPerson)
+            ->get(route('admin.procurement.purchase-orders.show', $order))
+            ->assertOk()
+            ->assertSee($order->purchase_order_number);
+
+        $this->actingAs($storesPerson)
             ->get(route('admin.procurement.goods-received-vouchers.create', $order))
             ->assertOk()
             ->assertSee('Receive goods');
@@ -57,6 +65,27 @@ class GoodsReceivedVoucherTest extends TestCase
         $this->assertEquals(4, (float) $balance->quantity_on_hand);
         $this->assertEquals(2.75, (float) $balance->average_unit_cost);
         $this->assertDatabaseCount('inventory_transactions', 1);
+        $firstVoucher = GoodsReceivedVoucher::firstOrFail();
+        $grvJournal = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'goods_received_voucher')
+            ->where('source_id', $firstVoucher->id)
+            ->firstOrFail();
+        $inventoryAccountId = Account::where('school_id', $school->id)
+            ->where('code', '1505')
+            ->value('id');
+        $this->assertEquals(11, (float) $grvJournal->entries()
+            ->where('account_id', $inventoryAccountId)
+            ->where('entry_type', 'debit')
+            ->sum('amount'));
+        $receivedNotInvoicedAccountId = Account::where('school_id', $school->id)
+            ->where('code', '3103')
+            ->value('id');
+        $this->assertEquals(11, (float) $grvJournal->entries()
+            ->where('account_id', $receivedNotInvoicedAccountId)
+            ->where('entry_type', 'credit')
+            ->sum('amount'));
+        app(ProcurementAccountingService::class)->postGoodsReceivedVoucher($firstVoucher);
+        $this->assertSame(1, JournalBatch::where('source_type', 'goods_received_voucher')->count());
 
         $this->actingAs($storesPerson)
             ->from(route('admin.procurement.purchase-orders.show', $order))

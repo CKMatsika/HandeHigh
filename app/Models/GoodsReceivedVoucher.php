@@ -48,4 +48,9 @@ class GoodsReceivedVoucher extends Model
     {
         return $this->hasMany(GoodsReceivedVoucherItem::class);
     }
+
+    public function supplierInvoices(): HasMany
+    {
+        return $this->hasMany(ProcurementSupplierInvoice::class);
+    }
 }

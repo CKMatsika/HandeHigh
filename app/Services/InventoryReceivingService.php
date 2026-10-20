@@ -148,6 +148,7 @@ class InventoryReceivingService
             $order->update(['status' => $fullyReceived ? 'received' : 'partially_received']);
             ProcurementRequisition::whereKey($order->procurement_requisition_id)
                 ->update(['status' => $fullyReceived ? 'received' : 'partially_received']);
+            app(ProcurementAccountingService::class)->postGoodsReceivedVoucher($voucher);
 
             return $voucher;
         });

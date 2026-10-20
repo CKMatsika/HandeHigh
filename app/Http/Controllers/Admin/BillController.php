@@ -137,7 +137,8 @@ class BillController extends Controller
     public function edit(Bill $bill)
     {
         $this->authorizeSchoolAccess($bill);
-        
+        abort_if($bill->procurementSupplierInvoice()->exists(), 409, 'Procurement supplier invoices must be corrected through their review workflow.');
+
         $user = auth()->user();
         $school = $user?->school;
 
@@ -157,6 +158,7 @@ class BillController extends Controller
     public function update(Request $request, Bill $bill)
     {
         $this->authorizeSchoolAccess($bill);
+        abort_if($bill->procurementSupplierInvoice()->exists(), 409, 'Procurement supplier invoices must be corrected through their review workflow.');
 
         $validated = $request->validate([
             'vendor_id' => ['required', TenantExists::make('vendors')],
@@ -188,7 +190,6 @@ class BillController extends Controller
             ->route('admin.bills.index')
             ->with('status', 'Bill updated successfully');
     }
-
 
     private function authorizeSchoolAccess($model)
     {

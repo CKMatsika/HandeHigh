@@ -7,6 +7,15 @@
         <h1 class="mt-2 text-2xl font-bold text-slate-50">Goods received {{ $voucher->voucher_number }}</h1>
         <p class="mt-1 text-sm text-slate-400">Posted to stock · Purchase order {{ $voucher->purchaseOrder->purchase_order_number }}</p>
     </div>
+    @can('procurement.supplier-invoices.create')
+        @if($hasPendingInvoice)
+            <span class="inline-flex rounded-lg border border-amber-700/50 px-4 py-2 text-sm text-amber-200">Supplier invoice under review</span>
+        @elseif($unbilledQuantity <= 0)
+            <span class="inline-flex rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-400">Received quantity fully invoiced</span>
+        @else
+            <a href="{{ route('admin.procurement.supplier-invoices.create', $voucher) }}" class="inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Record supplier invoice</a>
+        @endif
+    @endcan
 
     @if(session('success'))
         <div class="rounded-lg border border-emerald-700 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-200">{{ session('success') }}</div>
@@ -22,6 +31,20 @@
             <div class="md:col-span-3"><p class="text-xs uppercase text-slate-500">Notes</p><p class="mt-1 whitespace-pre-wrap text-sm text-slate-200">{{ $voucher->notes }}</p></div>
         @endif
     </section>
+
+    @if($voucher->supplierInvoices()->exists())
+        <section class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80">
+            <div class="border-b border-slate-800 px-5 py-4"><h2 class="font-semibold text-slate-100">Supplier invoices</h2></div>
+            <div class="divide-y divide-slate-800">
+                @foreach($voucher->supplierInvoices()->latest('invoice_date')->get() as $invoice)
+                    <a href="{{ route('admin.procurement.supplier-invoices.show', $invoice) }}" class="flex items-center justify-between px-5 py-3 text-sm hover:bg-slate-800/50">
+                        <span class="font-mono text-indigo-300">{{ $invoice->invoice_number }}</span>
+                        <span class="text-slate-400">{{ ucfirst(str_replace('_', ' ', $invoice->status)) }} · {{ number_format((float) $invoice->total_amount, 2) }}</span>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     <section class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80">
         <div class="overflow-x-auto">

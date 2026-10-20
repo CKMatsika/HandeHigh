@@ -877,7 +877,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('procurement', [\App\Http\Controllers\Admin\ProcurementController::class, 'dashboard'])
-            ->name('procurement.index')->middleware('permission:procurement.view|procurement.approve|procurement.requisitions.create|procurement.grv.view');
+            ->name('procurement.index')->middleware('permission:procurement.view|procurement.approve|procurement.requisitions.create|procurement.grv.view|procurement.supplier-invoices.view');
         Route::get('procurement/requisitions/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createRequisition'])
             ->name('procurement.requisitions.create')->middleware('permission:procurement.requisitions.create');
         Route::post('procurement/requisitions', [\App\Http\Controllers\Admin\ProcurementController::class, 'storeRequisition'])
@@ -893,7 +893,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('procurement/requisitions/{requisition}/purchase-order', [\App\Http\Controllers\Admin\ProcurementController::class, 'storePurchaseOrder'])
             ->name('procurement.purchase-orders.store')->middleware('permission:procurement.purchase-orders.create');
         Route::get('procurement/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showPurchaseOrder'])
-            ->name('procurement.purchase-orders.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve|procurement.grv.view');
+            ->name('procurement.purchase-orders.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve|procurement.grv.view|procurement.supplier-invoices.view');
         Route::post('procurement/purchase-orders/{purchaseOrder}/issue', [\App\Http\Controllers\Admin\ProcurementController::class, 'issuePurchaseOrder'])
             ->name('procurement.purchase-orders.issue')->middleware('permission:procurement.purchase-orders.issue');
         Route::get('procurement/purchase-orders/{purchaseOrder}/goods-received-vouchers/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createGoodsReceivedVoucher'])
@@ -901,7 +901,19 @@ Route::middleware(['auth'])->group(function () {
         Route::post('procurement/purchase-orders/{purchaseOrder}/goods-received-vouchers', [\App\Http\Controllers\Admin\ProcurementController::class, 'storeGoodsReceivedVoucher'])
             ->name('procurement.goods-received-vouchers.store')->middleware('permission:procurement.grv.create');
         Route::get('procurement/goods-received-vouchers/{voucher}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showGoodsReceivedVoucher'])
-            ->name('procurement.goods-received-vouchers.show')->middleware('permission:procurement.grv.view|procurement.grv.create|procurement.view');
+            ->name('procurement.goods-received-vouchers.show')->middleware('permission:procurement.grv.view|procurement.grv.create|procurement.view|procurement.supplier-invoices.view|procurement.supplier-invoices.create');
+        Route::get('procurement/goods-received-vouchers/{voucher}/supplier-invoice/create', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'create'])
+            ->name('procurement.supplier-invoices.create')->middleware('permission:procurement.supplier-invoices.create');
+        Route::post('procurement/goods-received-vouchers/{voucher}/supplier-invoice', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'store'])
+            ->name('procurement.supplier-invoices.store')->middleware('permission:procurement.supplier-invoices.create');
+        Route::get('procurement/supplier-invoices/{supplierInvoice}', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'show'])
+            ->name('procurement.supplier-invoices.show')->middleware('permission:procurement.supplier-invoices.view|procurement.supplier-invoices.create|procurement.supplier-invoices.approve');
+        Route::get('procurement/supplier-invoices/{supplierInvoice}/edit', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'edit'])
+            ->name('procurement.supplier-invoices.edit')->middleware('permission:procurement.supplier-invoices.create');
+        Route::put('procurement/supplier-invoices/{supplierInvoice}', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'update'])
+            ->name('procurement.supplier-invoices.update')->middleware('permission:procurement.supplier-invoices.create');
+        Route::post('procurement/supplier-invoices/{supplierInvoice}/review', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'review'])
+            ->name('procurement.supplier-invoices.review')->middleware('permission:procurement.supplier-invoices.approve');
     });
 
             // ICT Coordination & Staff Helpdesk Routes

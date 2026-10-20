@@ -71,6 +71,11 @@ class Bill extends Model
         return $this->hasMany(BillPayment::class);
     }
 
+    public function procurementSupplierInvoice()
+    {
+        return $this->hasOne(ProcurementSupplierInvoice::class);
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -84,9 +89,9 @@ class Bill extends Model
     public function scopeOverdue($query)
     {
         return $query->where('status', 'overdue')
-            ->orWhere(function($q) {
+            ->orWhere(function ($q) {
                 $q->whereIn('status', ['pending', 'partial'])
-                  ->where('due_date', '<', now());
+                    ->where('due_date', '<', now());
             });
     }
 }
