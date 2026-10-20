@@ -82,6 +82,18 @@
                             <span>Stock Requests</span>
                         </a>
                     @endcan
+                    @can('inventory.stock-takes.view')
+                        <a href="{{ route('admin.inventory.stock-takes.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-takes.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
+                            <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                            <span>Stock Takes</span>
+                        </a>
+                    @endcan
+                    @can('inventory.stock-levels.manage')
+                        <a href="{{ route('admin.inventory.stock-levels') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-levels*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
+                            <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                            <span>Stock Levels</span>
+                        </a>
+                    @endcan
                     @can('procurement.requisitions.create')
                         <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.*') ? 'bg-indigo-500/20 text-indigo-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-indigo-400"></span>

@@ -186,6 +186,7 @@ class ChartOfAccountsSeeder extends Seeder
             ['code' => '6520', 'name' => 'Examination and Practical Expenses', 'type' => 'expense', 'category' => 'supply_expense', 'parent_code' => '6500', 'sort_order' => 55],
             ['code' => '6550', 'name' => 'Office and Administration', 'type' => 'expense', 'category' => 'supply_expense', 'parent_code' => '6500', 'sort_order' => 56],
             ['code' => '6590', 'name' => 'Inventory Price Variance', 'type' => 'expense', 'category' => 'supply_expense', 'parent_code' => '6500', 'sort_order' => 59],
+            ['code' => '6595', 'name' => 'Inventory Adjustment Gain/Loss', 'type' => 'expense', 'category' => 'supply_expense', 'parent_code' => '6500', 'sort_order' => 58],
 
             // Other Expenses
             ['code' => '6600', 'name' => 'Rent', 'type' => 'expense', 'category' => 'other_expense', 'parent_code' => '6000', 'sort_order' => 60],

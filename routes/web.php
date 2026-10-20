@@ -1,44 +1,42 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Admin\SchoolController;
-use App\Http\Controllers\Admin\SchoolProfileController;
+use App\Http\Controllers\Admin\AcademicReportController;
+use App\Http\Controllers\Admin\AccountController;
+use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\BankReconciliationController;
+use App\Http\Controllers\Admin\BillController;
+use App\Http\Controllers\Admin\BudgetController;
+use App\Http\Controllers\Admin\CommunicationController;
+use App\Http\Controllers\Admin\CreditNoteController;
+use App\Http\Controllers\Admin\CurrencyController;
+use App\Http\Controllers\Admin\CurriculumController;
+use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\DebtorCreditorReportController;
 use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\FeeStructureController;
-use App\Http\Controllers\Admin\InvoiceController;
-use App\Http\Controllers\Admin\PaymentController;
-use App\Http\Controllers\Admin\CurriculumController;
-use App\Http\Controllers\Admin\ExamController;
-use App\Http\Controllers\Admin\AttendanceController;
-use App\Http\Controllers\Admin\CommunicationController;
-use App\Http\Controllers\Admin\AccountController;
-use App\Http\Controllers\Admin\JournalBatchController;
 use App\Http\Controllers\Admin\FinancialReportController;
-use App\Http\Controllers\Admin\AcademicReportController;
-use App\Http\Controllers\Admin\BankReconciliationController;
 use App\Http\Controllers\Admin\InterbankTransferController;
-use App\Http\Controllers\Admin\BudgetController;
+use App\Http\Controllers\Admin\InvoiceController;
+use App\Http\Controllers\Admin\JournalBatchController;
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentMethodController;
-use App\Http\Controllers\Admin\CustomerController;
-use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\PerformanceReportController;
 use App\Http\Controllers\Admin\ProjectController;
-use App\Http\Controllers\Admin\BillController;
 use App\Http\Controllers\Admin\ReceiptController;
-use App\Http\Controllers\Admin\DebtorCreditorReportController;
-use App\Http\Controllers\Admin\CreditNoteController;
 use App\Http\Controllers\Admin\SchoolClassController;
+use App\Http\Controllers\Admin\SchoolController;
+use App\Http\Controllers\Admin\SchoolProfileController;
 use App\Http\Controllers\Admin\StatementController;
+use App\Http\Controllers\Admin\StudentController as AdminStudentController;
 use App\Http\Controllers\Admin\SubjectController;
+use App\Http\Controllers\Admin\VendorController;
+use App\Http\Controllers\Admin\YearEndProcessController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Portal\LibrarianController;
 use App\Http\Controllers\Portal\ParentController;
 use App\Http\Controllers\Portal\StudentController;
-use App\Http\Controllers\Admin\TeacherController as AdminTeacherController;
-use App\Http\Controllers\Admin\CurrencyController;
-use App\Http\Controllers\Admin\StudentController as AdminStudentController;
-use App\Http\Controllers\Admin\YearEndProcessController;
-use App\Http\Controllers\Admin\PerformanceReportController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -58,34 +56,34 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['auth', 'tenant'])->prefix('sda')->name('sda.')->group(function () {
         // Main SDA dashboard - redirects based on role
         Route::get('/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'dashboard'])->name('dashboard');
-        
+
         // Role-specific dashboards
         Route::get('/chairman/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'chairmanDashboard'])->name('chairman.dashboard');
         Route::get('/secretary/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'secretaryDashboard'])->name('secretary.dashboard');
         Route::get('/finance/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'financeDashboard'])->name('finance.dashboard');
         Route::get('/procurement/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'procurementDashboard'])->name('procurement.dashboard');
         Route::get('/member/dashboard', [App\Http\Controllers\Sda\SdaController::class, 'memberDashboard'])->name('member.dashboard');
-        
+
         // SDA Meetings
         Route::resource('meetings', App\Http\Controllers\Sda\SdaMeetingController::class)->only(['index', 'show', 'create', 'store']);
         Route::post('meetings/{meeting}/attendance', [App\Http\Controllers\Sda\SdaMeetingController::class, 'recordAttendance'])->name('meetings.attendance');
-        
+
         // SDA Minutes
         Route::resource('minutes', App\Http\Controllers\Sda\SdaMinuteController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
         Route::post('minutes/{minute}/submit', [App\Http\Controllers\Sda\SdaMinuteController::class, 'submit'])->name('minutes.submit');
         Route::post('minutes/{minute}/approve', [App\Http\Controllers\Sda\SdaMinuteController::class, 'approve'])->name('minutes.approve');
         Route::post('minutes/{minute}/publish', [App\Http\Controllers\Sda\SdaMinuteController::class, 'publish'])->name('minutes.publish');
-        
+
         // SDA Resolutions
         Route::resource('resolutions', App\Http\Controllers\Sda\SdaResolutionController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
         Route::post('resolutions/{resolution}/second', [App\Http\Controllers\Sda\SdaResolutionController::class, 'second'])->name('resolutions.second');
         Route::post('resolutions/{resolution}/implement', [App\Http\Controllers\Sda\SdaResolutionController::class, 'implement'])->name('resolutions.implement');
-        
+
         // SDA Reports
         Route::resource('reports', App\Http\Controllers\Sda\SdaReportController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
         Route::post('reports/{report}/submit', [App\Http\Controllers\Sda\SdaReportController::class, 'submit'])->name('reports.submit');
         Route::get('reports/{report}/download', [App\Http\Controllers\Sda\SdaReportController::class, 'download'])->name('reports.download');
-        
+
         // SDA Tasks
         Route::resource('tasks', App\Http\Controllers\Sda\SdaTaskController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update']);
         Route::post('tasks/{task}/start', [App\Http\Controllers\Sda\SdaTaskController::class, 'start'])->name('tasks.start');
@@ -349,35 +347,35 @@ Route::middleware(['auth'])->group(function () {
             Route::post('bank-reconciliations/unmatch', [BankReconciliationController::class, 'unmatchTransaction'])->name('bank-reconciliations.unmatch');
             Route::post('bank-reconciliations/add-cashbook-transaction', [BankReconciliationController::class, 'addCashbookTransaction'])->name('bank-reconciliations.add-cashbook-transaction');
             Route::post('bank-reconciliations/add-bank-transaction', [BankReconciliationController::class, 'addBankTransaction'])->name('bank-reconciliations.add-bank-transaction');
-            Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index','create','store','show'])
+            Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index', 'create', 'store', 'show'])
                 ->middlewareFor('show', 'can:view,bankReconciliation');
-            Route::resource('interbank-transfers', InterbankTransferController::class)->only(['index','create','store']);
+            Route::resource('interbank-transfers', InterbankTransferController::class)->only(['index', 'create', 'store']);
 
             // Budgets
-            Route::resource('budgets', BudgetController::class)->only(['index','create','store','show','edit','update'])
+            Route::resource('budgets', BudgetController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update'])
                 ->middlewareFor('show', 'can:view,budget')
                 ->middlewareFor(['edit', 'update'], 'can:update,budget');
-            
+
             // Budget Workflow
             Route::post('budgets/{budget}/submit', [BudgetController::class, 'submit'])->name('budgets.submit');
             Route::post('budgets/{budget}/bursar-review', [BudgetController::class, 'bursarReview'])->name('budgets.bursar-review');
             Route::post('budgets/{budget}/committee-review', [BudgetController::class, 'committeeReview'])->name('budgets.committee-review');
             Route::post('budgets/{budget}/activate', [BudgetController::class, 'activate'])->name('budgets.activate');
             Route::post('budgets/{budget}/close', [BudgetController::class, 'close'])->name('budgets.close');
-            
+
             // Budget Lines
             Route::get('budgets/{budget}/lines/create', [BudgetController::class, 'createLine'])->name('budgets.lines.create');
             Route::post('budgets/{budget}/lines', [BudgetController::class, 'storeLine'])->name('budgets.lines.store');
             Route::get('budgets/{budget}/lines/{line}/edit', [BudgetController::class, 'editLine'])->name('budgets.lines.edit');
             Route::put('budgets/{budget}/lines/{line}', [BudgetController::class, 'updateLine'])->name('budgets.lines.update');
             Route::delete('budgets/{budget}/lines/{line}', [BudgetController::class, 'destroyLine'])->name('budgets.lines.destroy');
-            
+
             // Bills & Vendors
-            Route::resource('bills', BillController::class)->only(['index','create','store','show','edit','update']);
-            Route::resource('vendors', VendorController::class)->only(['index','create','store','edit','update']);
-            
+            Route::resource('bills', BillController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+            Route::resource('vendors', VendorController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+
             // Projects & Implementation Tasks
-            Route::resource('projects', ProjectController::class)->only(['index','create','store','show','edit','update']);
+            Route::resource('projects', ProjectController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
             Route::post('projects/{project}/income', [ProjectController::class, 'recordIncome'])->name('projects.income');
             Route::post('projects/{project}/tasks', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'store'])->name('projects.tasks.store');
             Route::put('projects/{project}/tasks/{task}', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'update'])->name('projects.tasks.update');
@@ -392,7 +390,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('kiosk/pos', [\App\Http\Controllers\Admin\KioskController::class, 'pos'])->name('kiosk.pos');
             Route::post('kiosk/sales', [\App\Http\Controllers\Admin\KioskController::class, 'storeSale'])->name('kiosk.sales.store');
             Route::get('kiosk/sales/{sale}', [\App\Http\Controllers\Admin\KioskController::class, 'showSale'])->name('kiosk.sales.show');
-            
+
             // Customers
             Route::resource('customers', CustomerController::class)->except(['show', 'destroy']);
 
@@ -408,11 +406,11 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/debtor-creditor', [DebtorCreditorReportController::class, 'index'])->name('reports.debtor-creditor');
 
             // Credit Notes
-            Route::resource('credit-notes', CreditNoteController::class)->parameters(['credit-notes' => 'creditNote'])->only(['index','create','store','show','edit','update']);
+            Route::resource('credit-notes', CreditNoteController::class)->parameters(['credit-notes' => 'creditNote'])->only(['index', 'create', 'store', 'show', 'edit', 'update']);
             Route::post('credit-notes/{creditNote}/issue', [CreditNoteController::class, 'issue'])->name('credit-notes.issue');
             Route::post('credit-notes/{creditNote}/cancel', [CreditNoteController::class, 'cancel'])->name('credit-notes.cancel');
             Route::post('credit-notes/{creditNote}/apply', [CreditNoteController::class, 'applyToInvoice'])->name('credit-notes.apply');
-            
+
             // Analytics & Reports
             Route::get('/analytics', [App\Http\Controllers\Admin\AnalyticsController::class, 'dashboard'])->name('analytics.dashboard');
             Route::get('/analytics/academic', [App\Http\Controllers\Admin\AnalyticsController::class, 'academicPerformance'])->name('analytics.academic');
@@ -424,41 +422,41 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/ai-finance/anomalies', [App\Http\Controllers\Admin\AIFinanceController::class, 'anomalies'])->name('ai-finance.anomalies');
             Route::get('/ai-finance/forecast', [App\Http\Controllers\Admin\AIFinanceController::class, 'forecast'])->name('ai-finance.forecast');
             Route::get('/ai-finance/insights', [App\Http\Controllers\Admin\AIFinanceController::class, 'insights'])->name('ai-finance.insights');
-            
+
             // Currency Management
             Route::get('/currency', [CurrencyController::class, 'index'])->name('currency.index');
             Route::post('/currency', [CurrencyController::class, 'update'])->name('currency.update');
             Route::post('/currency/convert', [CurrencyController::class, 'convert'])->name('currency.convert');
-            
+
             // Payment Methods
             Route::resource('payment-methods', PaymentMethodController::class);
             Route::post('payment-methods/{paymentMethod}/toggle', [PaymentMethodController::class, 'toggle'])->name('payment-methods.toggle');
             Route::get('api/payment-methods', [PaymentMethodController::class, 'getActivePaymentMethods'])->name('api.payment-methods');
             Route::post('api/payment-methods/calculate-fee', [PaymentMethodController::class, 'calculateFee'])->name('api.payment-methods.calculate-fee');
-            
+
             // School Development Association (SDA) Routes
             Route::prefix('sda')->name('sda.')->group(function () {
                 // SDA Dashboard
                 Route::get('/', [\App\Http\Controllers\Admin\SdaController::class, 'dashboard'])->name('dashboard');
-                
+
                 // Committees
                 Route::resource('committees', \App\Http\Controllers\Admin\SdaCommitteeController::class);
-                
+
                 // Committee Members
                 Route::post('committees/{committee}/members', [\App\Http\Controllers\Admin\SdaCommitteeMemberController::class, 'store'])->name('committees.members.store');
                 Route::put('committees/{committee}/members/{member}', [\App\Http\Controllers\Admin\SdaCommitteeMemberController::class, 'update'])->name('committees.members.update');
                 Route::delete('committees/{committee}/members/{member}', [\App\Http\Controllers\Admin\SdaCommitteeMemberController::class, 'destroy'])->name('committees.members.destroy');
-                
+
                 // Roles
                 Route::resource('roles', \App\Http\Controllers\Admin\SdaRoleController::class);
-                
+
                 // Meetings
                 Route::resource('meetings', \App\Http\Controllers\Admin\SdaMeetingController::class);
                 Route::post('meetings/{meeting}/start', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'start'])->name('meetings.start');
                 Route::post('meetings/{meeting}/complete', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'complete'])->name('meetings.complete');
                 Route::post('meetings/{meeting}/cancel', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'cancel'])->name('meetings.cancel');
                 Route::post('meetings/{meeting}/attendance', [\App\Http\Controllers\Admin\SdaMeetingController::class, 'recordAttendance'])->name('meetings.attendance');
-                
+
                 // Meeting Minutes
                 Route::get('meetings/{meeting}/minutes/create', [\App\Http\Controllers\Admin\SdaMinuteController::class, 'create'])->name('minutes.create');
                 Route::post('meetings/{meeting}/minutes', [\App\Http\Controllers\Admin\SdaMinuteController::class, 'store'])->name('minutes.store');
@@ -468,7 +466,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('minutes/{minute}/approve', [\App\Http\Controllers\Admin\SdaMinuteController::class, 'approve'])->name('minutes.approve');
                 Route::post('minutes/{minute}/publish', [\App\Http\Controllers\Admin\SdaMinuteController::class, 'publish'])->name('minutes.publish');
                 Route::get('minutes/{minute}/download', [\App\Http\Controllers\Admin\SdaMinuteController::class, 'download'])->name('minutes.download');
-                
+
                 // Resolutions
                 Route::resource('resolutions', \App\Http\Controllers\Admin\SdaResolutionController::class);
                 Route::post('resolutions/{resolution}/second', [\App\Http\Controllers\Admin\SdaResolutionController::class, 'second'])->name('resolutions.second');
@@ -477,7 +475,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('resolutions/{resolution}/implement', [\App\Http\Controllers\Admin\SdaResolutionController::class, 'implement'])->name('resolutions.implement');
                 Route::post('resolutions/{resolution}/cancel', [\App\Http\Controllers\Admin\SdaResolutionController::class, 'cancel'])->name('resolutions.cancel');
                 Route::post('resolutions/{resolution}/create-tasks', [\App\Http\Controllers\Admin\SdaResolutionController::class, 'createTasks'])->name('resolutions.create-tasks');
-                
+
                 // Reports
                 Route::resource('reports', \App\Http\Controllers\Admin\SdaReportController::class);
                 Route::post('reports/{report}/submit', [\App\Http\Controllers\Admin\SdaReportController::class, 'submit'])->name('reports.submit');
@@ -485,7 +483,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('reports/{report}/approve', [\App\Http\Controllers\Admin\SdaReportController::class, 'approve'])->name('reports.approve');
                 Route::post('reports/{report}/publish', [\App\Http\Controllers\Admin\SdaReportController::class, 'publish'])->name('reports.publish');
                 Route::get('reports/{report}/download', [\App\Http\Controllers\Admin\SdaReportController::class, 'download'])->name('reports.download');
-                
+
                 // Tasks
                 Route::resource('tasks', \App\Http\Controllers\Admin\SdaTaskController::class);
                 Route::post('tasks/{task}/start', [\App\Http\Controllers\Admin\SdaTaskController::class, 'start'])->name('tasks.start');
@@ -496,14 +494,14 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('tasks/high-priority', [\App\Http\Controllers\Admin\SdaTaskController::class, 'highPriority'])->name('tasks.high-priority');
                 Route::get('committees/{committee}/tasks', [\App\Http\Controllers\Admin\SdaTaskController::class, 'committeeTasks'])->name('tasks.committee');
                 Route::get('users/{user}/tasks', [\App\Http\Controllers\Admin\SdaTaskController::class, 'userTasks'])->name('tasks.user');
-                
+
                 // API Endpoints
                 Route::prefix('api')->name('api.')->group(function () {
                     Route::get('search-users', [\App\Http\Controllers\Admin\CommunicationController::class, 'searchUsers'])->name('search-users');
                     Route::get('committees/{committee}/members', [\App\Http\Controllers\Admin\SdaController::class, 'committeeMembers'])->name('committees.members');
                 });
             });
-            
+
             // Bank Accounts & Cashbook
             Route::get('/bank-accounts', [App\Http\Controllers\Admin\BankAccountController::class, 'index'])->name('bank-accounts.index');
             Route::get('/bank-accounts/create', [App\Http\Controllers\Admin\BankAccountController::class, 'create'])->name('bank-accounts.create');
@@ -512,12 +510,12 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/bank-accounts/{bankAccount}/edit', [App\Http\Controllers\Admin\BankAccountController::class, 'edit'])->name('bank-accounts.edit');
             Route::put('/bank-accounts/{bankAccount}', [App\Http\Controllers\Admin\BankAccountController::class, 'update'])->name('bank-accounts.update');
             Route::delete('/bank-accounts/{bankAccount}', [App\Http\Controllers\Admin\BankAccountController::class, 'destroy'])->name('bank-accounts.destroy');
-            
+
             // Cash Transfers
             Route::get('/cash-transfers', [App\Http\Controllers\Admin\CashTransferController::class, 'index'])->name('cash-transfers.index');
             Route::get('/cash-transfers/create', [App\Http\Controllers\Admin\CashTransferController::class, 'create'])->name('cash-transfers.create');
             Route::post('/cash-transfers', [App\Http\Controllers\Admin\CashTransferController::class, 'store'])->name('cash-transfers.store');
-            
+
             // Cashbook
             Route::get('/cashbook', [App\Http\Controllers\Admin\CashbookController::class, 'index'])->name('cashbook.index');
             Route::get('/cashbook/create', [App\Http\Controllers\Admin\CashbookController::class, 'create'])->name('cashbook.create');
@@ -526,13 +524,13 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/cashbook/{cashbook}/edit', [App\Http\Controllers\Admin\CashbookController::class, 'edit'])->name('cashbook.edit');
             Route::put('/cashbook/{cashbook}', [App\Http\Controllers\Admin\CashbookController::class, 'update'])->name('cashbook.update');
             Route::delete('/cashbook/{cashbook}', [App\Http\Controllers\Admin\CashbookController::class, 'destroy'])->name('cashbook.destroy');
-            
+
             // Smart Rules
             Route::get('/smart-rules', [App\Http\Controllers\Admin\SmartRuleController::class, 'index'])->name('smart-rules.index');
             Route::put('/smart-rules/fees', [App\Http\Controllers\Admin\SmartRuleController::class, 'updateFeeRules'])->name('smart-rules.fees.update');
             Route::put('/smart-rules/attendance', [App\Http\Controllers\Admin\SmartRuleController::class, 'updateAttendanceRules'])->name('smart-rules.attendance.update');
             Route::put('/smart-rules/academic', [App\Http\Controllers\Admin\SmartRuleController::class, 'updateAcademicRules'])->name('smart-rules.academic.update');
-            
+
             // School Setup
             Route::get('/school-setup', [App\Http\Controllers\Admin\SchoolSetupController::class, 'index'])->name('school-setup.index');
             Route::get('/school-setup/edit', [App\Http\Controllers\Admin\SchoolSetupController::class, 'edit'])->name('school-setup.edit');
@@ -540,7 +538,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/school-setup/settings', [App\Http\Controllers\Admin\SchoolSetupController::class, 'settings'])->name('school-setup.settings');
             Route::put('/school-setup/settings', [App\Http\Controllers\Admin\SchoolSetupController::class, 'updateSettings'])->name('school-setup.settings.update');
             Route::get('/school-setup/logs', [App\Http\Controllers\Admin\SchoolSetupController::class, 'logs'])->name('school-setup.logs');
-            
+
             // User Management
             Route::get('/user-management', [App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('user-management.index');
             Route::get('/user-management/create', [App\Http\Controllers\Admin\UserManagementController::class, 'create'])->name('user-management.create');
@@ -551,7 +549,7 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/user-management/{user}', [App\Http\Controllers\Admin\UserManagementController::class, 'destroy'])->name('user-management.destroy');
             Route::put('/user-management/{user}/reset-password', [App\Http\Controllers\Admin\UserManagementController::class, 'resetPassword'])->name('user-management.reset-password');
             Route::put('/user-management/{user}/toggle-status', [App\Http\Controllers\Admin\UserManagementController::class, 'toggleStatus'])->name('user-management.toggle-status');
-            
+
             // Employee Management (HR)
             Route::get('/employees', [App\Http\Controllers\Admin\EmployeeController::class, 'index'])->name('employees.index');
             Route::get('/employees/create', [App\Http\Controllers\Admin\EmployeeController::class, 'create'])->name('employees.create');
@@ -563,7 +561,7 @@ Route::middleware(['auth'])->group(function () {
             Route::put('/employees/{employee}/terminate', [App\Http\Controllers\Admin\EmployeeController::class, 'terminate'])->name('employees.terminate');
             Route::post('/employees/{employee}/qualifications', [App\Http\Controllers\Admin\EmployeeController::class, 'addQualification'])->name('employees.qualifications.store');
             Route::delete('/employees/{employee}/qualifications/{qualification}', [App\Http\Controllers\Admin\EmployeeController::class, 'deleteQualification'])->name('employees.qualifications.destroy');
-            
+
             // Department Management
             Route::get('/departments', [App\Http\Controllers\Admin\DepartmentController::class, 'index'])->name('departments.index');
             Route::get('/departments/create', [App\Http\Controllers\Admin\DepartmentController::class, 'create'])->name('departments.create');
@@ -572,7 +570,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/departments/{department}/edit', [App\Http\Controllers\Admin\DepartmentController::class, 'edit'])->name('departments.edit');
             Route::put('/departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'update'])->name('departments.update');
             Route::delete('/departments/{department}', [App\Http\Controllers\Admin\DepartmentController::class, 'destroy'])->name('departments.destroy');
-            
+
             // Leave Management
             Route::get('/leaves', [App\Http\Controllers\Admin\LeaveController::class, 'index'])->name('leaves.index');
             Route::get('/leaves/create', [App\Http\Controllers\Admin\LeaveController::class, 'create'])->name('leaves.create');
@@ -703,177 +701,200 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/schemes-of-work/{schemeOfWork}/reject', [App\Http\Controllers\Admin\SchemeOfWorkManagementController::class, 'reject'])->name('schemes-of-work.reject');
         });
 
-        // Academic -> Exams & Assignments -> End-of-Term Performance Reports (Accessible to Teachers and Leadership)
-        Route::middleware(['tenant', 'role:super-admin|school-admin|headmaster|deputy-headmaster|teacher'])
-            ->prefix('admin')
-            ->name('admin.')
-            ->group(function () {
-                Route::prefix('exams/performance-reports')->name('exams.performance-reports.')->group(function () {
-                    Route::get('/', [PerformanceReportController::class, 'index'])->name('index');
-                    Route::get('/my-subjects', [PerformanceReportController::class, 'mySubjects'])->name('my-subjects');
-                    Route::get('/entry/{class}/{subject}', [PerformanceReportController::class, 'teacherEntry'])->name('teacher-entry');
-                    Route::post('/subjects/{subjectItem}/save', [PerformanceReportController::class, 'saveSubjectEvaluation'])->name('save-subject');
-                    Route::post('/calculate-preview', [PerformanceReportController::class, 'calculateGradePreview'])->name('calculate-preview');
-                    Route::get('/{report}', [PerformanceReportController::class, 'show'])->name('show');
-                    Route::post('/{report}/comment', [PerformanceReportController::class, 'saveLeadershipComment'])->name('save-comment');
-                    Route::post('/{report}/sign', [PerformanceReportController::class, 'applySignature'])->name('sign');
-                    Route::post('/{report}/stamp', [PerformanceReportController::class, 'applyStamp'])->name('stamp');
-                    Route::post('/{report}/finalize', [PerformanceReportController::class, 'finalize'])->name('finalize');
-                    Route::post('/{report}/reopen', [PerformanceReportController::class, 'reopen'])->name('reopen');
-                    Route::get('/{report}/pdf', [PerformanceReportController::class, 'exportPdf'])->name('pdf');
-                    Route::get('/{report}/stream-pdf', [PerformanceReportController::class, 'streamPdf'])->name('stream-pdf');
-                    Route::post('/release-policy', [PerformanceReportController::class, 'updateReleasePolicy'])->name('update-release-policy');
-                    Route::post('/initialize', [PerformanceReportController::class, 'initializeReports'])->name('initialize');
-                });
+    // Academic -> Exams & Assignments -> End-of-Term Performance Reports (Accessible to Teachers and Leadership)
+    Route::middleware(['tenant', 'role:super-admin|school-admin|headmaster|deputy-headmaster|teacher'])
+        ->prefix('admin')
+        ->name('admin.')
+        ->group(function () {
+            Route::prefix('exams/performance-reports')->name('exams.performance-reports.')->group(function () {
+                Route::get('/', [PerformanceReportController::class, 'index'])->name('index');
+                Route::get('/my-subjects', [PerformanceReportController::class, 'mySubjects'])->name('my-subjects');
+                Route::get('/entry/{class}/{subject}', [PerformanceReportController::class, 'teacherEntry'])->name('teacher-entry');
+                Route::post('/subjects/{subjectItem}/save', [PerformanceReportController::class, 'saveSubjectEvaluation'])->name('save-subject');
+                Route::post('/calculate-preview', [PerformanceReportController::class, 'calculateGradePreview'])->name('calculate-preview');
+                Route::get('/{report}', [PerformanceReportController::class, 'show'])->name('show');
+                Route::post('/{report}/comment', [PerformanceReportController::class, 'saveLeadershipComment'])->name('save-comment');
+                Route::post('/{report}/sign', [PerformanceReportController::class, 'applySignature'])->name('sign');
+                Route::post('/{report}/stamp', [PerformanceReportController::class, 'applyStamp'])->name('stamp');
+                Route::post('/{report}/finalize', [PerformanceReportController::class, 'finalize'])->name('finalize');
+                Route::post('/{report}/reopen', [PerformanceReportController::class, 'reopen'])->name('reopen');
+                Route::get('/{report}/pdf', [PerformanceReportController::class, 'exportPdf'])->name('pdf');
+                Route::get('/{report}/stream-pdf', [PerformanceReportController::class, 'streamPdf'])->name('stream-pdf');
+                Route::post('/release-policy', [PerformanceReportController::class, 'updateReleasePolicy'])->name('update-release-policy');
+                Route::post('/initialize', [PerformanceReportController::class, 'initializeReports'])->name('initialize');
             });
+        });
 
-        Route::middleware(['auth', 'tenant', 'role:teacher|super-admin'])
-            ->prefix('teacher')
-            ->name('teacher.')
-            ->group(function () {
-                Route::get('/dashboard', [\App\Http\Controllers\Portal\TeacherController::class, 'dashboard'])->name('dashboard');
-                Route::get('/profile', [\App\Http\Controllers\Portal\TeacherController::class, 'profile'])->name('profile');
-                Route::get('/classes/{class}', [\App\Http\Controllers\Portal\TeacherController::class, 'showClass'])->name('classes.show');
-                Route::get('/timetable', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'index'])->name('timetable.index');
-                Route::get('/timetable/today', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'today'])->name('timetable.today');
+    Route::middleware(['auth', 'tenant', 'role:teacher|super-admin'])
+        ->prefix('teacher')
+        ->name('teacher.')
+        ->group(function () {
+            Route::get('/dashboard', [\App\Http\Controllers\Portal\TeacherController::class, 'dashboard'])->name('dashboard');
+            Route::get('/profile', [\App\Http\Controllers\Portal\TeacherController::class, 'profile'])->name('profile');
+            Route::get('/classes/{class}', [\App\Http\Controllers\Portal\TeacherController::class, 'showClass'])->name('classes.show');
+            Route::get('/timetable', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'index'])->name('timetable.index');
+            Route::get('/timetable/today', [\App\Http\Controllers\Portal\TeacherTimetableController::class, 'today'])->name('timetable.today');
 
-                Route::get('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'index'])->name('schemes-of-work.index');
-                Route::get('/schemes-of-work/create', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'create'])->name('schemes-of-work.create');
-                Route::post('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'store'])->name('schemes-of-work.store');
-                Route::get('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'show'])->name('schemes-of-work.show');
-                Route::get('/schemes-of-work/{schemeOfWork}/print', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'print'])->name('schemes-of-work.print');
-                Route::get('/schemes-of-work/{schemeOfWork}/edit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'edit'])->name('schemes-of-work.edit');
-                Route::put('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'update'])->name('schemes-of-work.update');
-                Route::get('/schemes-of-work/{schemeOfWork}/preview', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'preview'])->name('schemes-of-work.preview');
-                Route::post('/schemes-of-work/{schemeOfWork}/submit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'submit'])->name('schemes-of-work.submit');
-                Route::delete('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'destroy'])->name('schemes-of-work.destroy');
-                
-                // AI Resource Finder Routes
-                Route::post('/ai-resources/search', [\App\Http\Controllers\Portal\AIResourceController::class, 'search'])->name('ai-resources.search');
-                Route::get('/ai-resources/curriculum', [\App\Http\Controllers\Portal\AIResourceController::class, 'curriculum'])->name('ai-resources.curriculum');
-                Route::get('/ai-resources/metadata', [\App\Http\Controllers\Portal\AIResourceController::class, 'metadata'])->name('ai-resources.metadata');
+            Route::get('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'index'])->name('schemes-of-work.index');
+            Route::get('/schemes-of-work/create', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'create'])->name('schemes-of-work.create');
+            Route::post('/schemes-of-work', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'store'])->name('schemes-of-work.store');
+            Route::get('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'show'])->name('schemes-of-work.show');
+            Route::get('/schemes-of-work/{schemeOfWork}/print', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'print'])->name('schemes-of-work.print');
+            Route::get('/schemes-of-work/{schemeOfWork}/edit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'edit'])->name('schemes-of-work.edit');
+            Route::put('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'update'])->name('schemes-of-work.update');
+            Route::get('/schemes-of-work/{schemeOfWork}/preview', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'preview'])->name('schemes-of-work.preview');
+            Route::post('/schemes-of-work/{schemeOfWork}/submit', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'submit'])->name('schemes-of-work.submit');
+            Route::delete('/schemes-of-work/{schemeOfWork}', [\App\Http\Controllers\Portal\SchemeOfWorkController::class, 'destroy'])->name('schemes-of-work.destroy');
 
-                // Career Guidance
-                Route::get('/career-guidance', [\App\Http\Controllers\Portal\CareerGuidanceController::class, 'index'])->name('career-guidance.index');
-                Route::get('/career-guidance/assessments/{assessment}', [\App\Http\Controllers\Portal\CareerGuidanceController::class, 'show'])->name('career-guidance.show');
+            // AI Resource Finder Routes
+            Route::post('/ai-resources/search', [\App\Http\Controllers\Portal\AIResourceController::class, 'search'])->name('ai-resources.search');
+            Route::get('/ai-resources/curriculum', [\App\Http\Controllers\Portal\AIResourceController::class, 'curriculum'])->name('ai-resources.curriculum');
+            Route::get('/ai-resources/metadata', [\App\Http\Controllers\Portal\AIResourceController::class, 'metadata'])->name('ai-resources.metadata');
 
-                // Flash Cards
-                Route::get('/flash-cards', [\App\Http\Controllers\Portal\FlashCardController::class, 'index'])->name('flash-cards.index');
-                Route::get('/flash-cards/create', [\App\Http\Controllers\Portal\FlashCardController::class, 'create'])->name('flash-cards.create');
-                Route::post('/flash-cards', [\App\Http\Controllers\Portal\FlashCardController::class, 'store'])->name('flash-cards.store');
-                Route::get('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'show'])->name('flash-cards.show');
-                Route::get('/flash-cards/{flashCardSet}/edit', [\App\Http\Controllers\Portal\FlashCardController::class, 'edit'])->name('flash-cards.edit');
-                Route::put('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'update'])->name('flash-cards.update');
-                Route::post('/flash-cards/{flashCardSet}/publish', [\App\Http\Controllers\Portal\FlashCardController::class, 'publish'])->name('flash-cards.publish');
-                Route::delete('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'destroy'])->name('flash-cards.destroy');
-                Route::post('/flash-cards/generate', [\App\Http\Controllers\Portal\FlashCardController::class, 'generate'])->name('flash-cards.generate');
-            });
+            // Career Guidance
+            Route::get('/career-guidance', [\App\Http\Controllers\Portal\CareerGuidanceController::class, 'index'])->name('career-guidance.index');
+            Route::get('/career-guidance/assessments/{assessment}', [\App\Http\Controllers\Portal\CareerGuidanceController::class, 'show'])->name('career-guidance.show');
 
-        Route::middleware(['auth', 'tenant', 'role:student|super-admin'])
-            ->prefix('student')
-            ->name('student.')
-            ->group(function () {
-                Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('dashboard');
-                Route::get('/profile', [StudentController::class, 'profile'])->name('profile');
-                Route::get('/timetable', [\App\Http\Controllers\Portal\StudentTimetableController::class, 'index'])->name('timetable.index');
-                Route::get('/timetable/today', [\App\Http\Controllers\Portal\StudentTimetableController::class, 'today'])->name('timetable.today');
-                Route::get('/fees', [StudentController::class, 'fees'])->name('fees');
-                Route::get('/results', [StudentController::class, 'results'])->name('results');
-                Route::get('/career-counsellor', [StudentController::class, 'careerCounsellor'])->name('counsellor');
-                Route::get('/career-counsellor/welcome', [StudentController::class, 'counsellorWelcome'])->name('counsellor.welcome');
-                Route::post('/career-counsellor/chat', [StudentController::class, 'counsellorChat'])->name('counsellor.chat');
+            // Flash Cards
+            Route::get('/flash-cards', [\App\Http\Controllers\Portal\FlashCardController::class, 'index'])->name('flash-cards.index');
+            Route::get('/flash-cards/create', [\App\Http\Controllers\Portal\FlashCardController::class, 'create'])->name('flash-cards.create');
+            Route::post('/flash-cards', [\App\Http\Controllers\Portal\FlashCardController::class, 'store'])->name('flash-cards.store');
+            Route::get('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'show'])->name('flash-cards.show');
+            Route::get('/flash-cards/{flashCardSet}/edit', [\App\Http\Controllers\Portal\FlashCardController::class, 'edit'])->name('flash-cards.edit');
+            Route::put('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'update'])->name('flash-cards.update');
+            Route::post('/flash-cards/{flashCardSet}/publish', [\App\Http\Controllers\Portal\FlashCardController::class, 'publish'])->name('flash-cards.publish');
+            Route::delete('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\FlashCardController::class, 'destroy'])->name('flash-cards.destroy');
+            Route::post('/flash-cards/generate', [\App\Http\Controllers\Portal\FlashCardController::class, 'generate'])->name('flash-cards.generate');
+        });
 
-                // Flash Cards
-                Route::get('/flash-cards', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'index'])->name('flash-cards.index');
-                Route::get('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'study'])->name('flash-cards.study');
-                Route::post('/flash-cards/{flashCardSet}/start', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'startSession'])->name('flash-cards.start-session');
-                Route::post('/flash-cards/result', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'submitResult'])->name('flash-cards.submit-result');
-                Route::post('/flash-cards/session/{session}/complete', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'completeSession'])->name('flash-cards.complete-session');
-            });
+    Route::middleware(['auth', 'tenant', 'role:student|super-admin'])
+        ->prefix('student')
+        ->name('student.')
+        ->group(function () {
+            Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('dashboard');
+            Route::get('/profile', [StudentController::class, 'profile'])->name('profile');
+            Route::get('/timetable', [\App\Http\Controllers\Portal\StudentTimetableController::class, 'index'])->name('timetable.index');
+            Route::get('/timetable/today', [\App\Http\Controllers\Portal\StudentTimetableController::class, 'today'])->name('timetable.today');
+            Route::get('/fees', [StudentController::class, 'fees'])->name('fees');
+            Route::get('/results', [StudentController::class, 'results'])->name('results');
+            Route::get('/career-counsellor', [StudentController::class, 'careerCounsellor'])->name('counsellor');
+            Route::get('/career-counsellor/welcome', [StudentController::class, 'counsellorWelcome'])->name('counsellor.welcome');
+            Route::post('/career-counsellor/chat', [StudentController::class, 'counsellorChat'])->name('counsellor.chat');
 
-        // Notifications
-        Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
-        Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
-        Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
-        Route::get('/notifications/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+            // Flash Cards
+            Route::get('/flash-cards', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'index'])->name('flash-cards.index');
+            Route::get('/flash-cards/{flashCardSet}', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'study'])->name('flash-cards.study');
+            Route::post('/flash-cards/{flashCardSet}/start', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'startSession'])->name('flash-cards.start-session');
+            Route::post('/flash-cards/result', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'submitResult'])->name('flash-cards.submit-result');
+            Route::post('/flash-cards/session/{session}/complete', [\App\Http\Controllers\Portal\StudentFlashCardController::class, 'completeSession'])->name('flash-cards.complete-session');
+        });
 
-        Route::middleware(['auth', 'tenant', 'role:parent|super-admin'])
-            ->prefix('parent')
-            ->name('parent.')
-            ->group(function () {
-                Route::get('/dashboard', [ParentController::class, 'dashboard'])->name('dashboard');
-                Route::get('/profile', [ParentController::class, 'profile'])->name('profile');
-                Route::get('/students/{student}/fees', [ParentController::class, 'studentFees'])->name('students.fees');
-                Route::get('/students/{student}/results', [ParentController::class, 'studentResults'])->name('students.results');
-                Route::get('/students/{student}/statement', [ParentController::class, 'studentStatement'])->name('students.statement');
-            });
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::get('/notifications/unread-count', [\App\Http\Controllers\NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
 
-        Route::middleware(['auth', 'tenant', 'role:librarian|super-admin'])
-            ->prefix('librarian')
-            ->name('librarian.')
-            ->group(function () {
-                Route::get('/dashboard', [LibrarianController::class, 'dashboard'])->name('dashboard');
-                Route::get('/profile', [LibrarianController::class, 'profile'])->name('profile');
-                
-                // Book Management
-                Route::get('/books', [LibrarianController::class, 'booksIndex'])->name('books.index');
-                Route::get('/books/create', [LibrarianController::class, 'booksCreate'])->name('books.create');
-                Route::post('/books', [LibrarianController::class, 'booksStore'])->name('books.store');
-                Route::get('/books/{book}', [LibrarianController::class, 'booksShow'])->name('books.show');
-                Route::get('/books/{book}/edit', [LibrarianController::class, 'booksEdit'])->name('books.edit');
-                Route::put('/books/{book}', [LibrarianController::class, 'booksUpdate'])->name('books.update');
-                Route::delete('/books/{book}', [LibrarianController::class, 'booksDestroy'])->name('books.destroy');
-                
-                // Borrow Management
-                Route::get('/borrow', [LibrarianController::class, 'borrowIndex'])->name('borrow.index');
-                Route::post('/borrow', [LibrarianController::class, 'borrowStore'])->name('borrow.store');
-                Route::post('/return/{borrowRecord}', [LibrarianController::class, 'returnBook'])->name('borrow.return');
-                
-                // Reports
-                Route::get('/reports/popular', [LibrarianController::class, 'popularBooksReport'])->name('reports.popular');
-                Route::get('/reports/overdue', [LibrarianController::class, 'overdueBooksReport'])->name('reports.overdue');
-            });
+    Route::middleware(['auth', 'tenant', 'role:parent|super-admin'])
+        ->prefix('parent')
+        ->name('parent.')
+        ->group(function () {
+            Route::get('/dashboard', [ParentController::class, 'dashboard'])->name('dashboard');
+            Route::get('/profile', [ParentController::class, 'profile'])->name('profile');
+            Route::get('/students/{student}/fees', [ParentController::class, 'studentFees'])->name('students.fees');
+            Route::get('/students/{student}/results', [ParentController::class, 'studentResults'])->name('students.results');
+            Route::get('/students/{student}/statement', [ParentController::class, 'studentStatement'])->name('students.statement');
+        });
+
+    Route::middleware(['auth', 'tenant', 'role:librarian|super-admin'])
+        ->prefix('librarian')
+        ->name('librarian.')
+        ->group(function () {
+            Route::get('/dashboard', [LibrarianController::class, 'dashboard'])->name('dashboard');
+            Route::get('/profile', [LibrarianController::class, 'profile'])->name('profile');
+
+            // Book Management
+            Route::get('/books', [LibrarianController::class, 'booksIndex'])->name('books.index');
+            Route::get('/books/create', [LibrarianController::class, 'booksCreate'])->name('books.create');
+            Route::post('/books', [LibrarianController::class, 'booksStore'])->name('books.store');
+            Route::get('/books/{book}', [LibrarianController::class, 'booksShow'])->name('books.show');
+            Route::get('/books/{book}/edit', [LibrarianController::class, 'booksEdit'])->name('books.edit');
+            Route::put('/books/{book}', [LibrarianController::class, 'booksUpdate'])->name('books.update');
+            Route::delete('/books/{book}', [LibrarianController::class, 'booksDestroy'])->name('books.destroy');
+
+            // Borrow Management
+            Route::get('/borrow', [LibrarianController::class, 'borrowIndex'])->name('borrow.index');
+            Route::post('/borrow', [LibrarianController::class, 'borrowStore'])->name('borrow.store');
+            Route::post('/return/{borrowRecord}', [LibrarianController::class, 'returnBook'])->name('borrow.return');
+
+            // Reports
+            Route::get('/reports/popular', [LibrarianController::class, 'popularBooksReport'])->name('reports.popular');
+            Route::get('/reports/overdue', [LibrarianController::class, 'overdueBooksReport'])->name('reports.overdue');
+        });
 
     Route::middleware(['tenant', 'role:super-admin|school-admin|headmaster|bursar|accountant|procurement-officer|stores-person'])
-            ->prefix('admin')
-            ->name('admin.')
-            ->group(function () {
-                Route::get('inventory', [\App\Http\Controllers\Admin\InventoryController::class, 'dashboard'])
-                    ->name('inventory.index')->middleware('permission:inventory.view');
+        ->prefix('admin')
+        ->name('admin.')
+        ->group(function () {
+            Route::get('inventory', [\App\Http\Controllers\Admin\InventoryController::class, 'dashboard'])
+                ->name('inventory.index')->middleware('permission:inventory.view');
 
-                Route::get('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'categories'])
-                    ->name('inventory.categories.index')->middleware('permission:inventory.view');
-                Route::get('inventory/categories/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createCategory'])
-                    ->name('inventory.categories.create')->middleware('permission:inventory.catalog.manage');
-                Route::post('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'storeCategory'])
-                    ->name('inventory.categories.store')->middleware('permission:inventory.catalog.manage');
-                Route::get('inventory/categories/{category}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editCategory'])
-                    ->name('inventory.categories.edit')->middleware('permission:inventory.catalog.manage|accounts.edit');
-                Route::put('inventory/categories/{category}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateCategory'])
-                    ->name('inventory.categories.update')->middleware('permission:inventory.catalog.manage|accounts.edit');
+            Route::get('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'categories'])
+                ->name('inventory.categories.index')->middleware('permission:inventory.view');
+            Route::get('inventory/categories/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createCategory'])
+                ->name('inventory.categories.create')->middleware('permission:inventory.catalog.manage');
+            Route::post('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'storeCategory'])
+                ->name('inventory.categories.store')->middleware('permission:inventory.catalog.manage');
+            Route::get('inventory/categories/{category}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editCategory'])
+                ->name('inventory.categories.edit')->middleware('permission:inventory.catalog.manage|accounts.edit');
+            Route::put('inventory/categories/{category}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateCategory'])
+                ->name('inventory.categories.update')->middleware('permission:inventory.catalog.manage|accounts.edit');
 
-                Route::get('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'items'])
-                    ->name('inventory.items.index')->middleware('permission:inventory.view');
-                Route::get('inventory/items/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createItem'])
-                    ->name('inventory.items.create')->middleware('permission:inventory.catalog.manage');
-                Route::post('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'storeItem'])
-                    ->name('inventory.items.store')->middleware('permission:inventory.catalog.manage');
-                Route::get('inventory/items/{item}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editItem'])
-                    ->name('inventory.items.edit')->middleware('permission:inventory.catalog.manage');
-                Route::put('inventory/items/{item}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateItem'])
-                    ->name('inventory.items.update')->middleware('permission:inventory.catalog.manage');
+            Route::get('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'items'])
+                ->name('inventory.items.index')->middleware('permission:inventory.view');
+            Route::get('inventory/items/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createItem'])
+                ->name('inventory.items.create')->middleware('permission:inventory.catalog.manage');
+            Route::post('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'storeItem'])
+                ->name('inventory.items.store')->middleware('permission:inventory.catalog.manage');
+            Route::get('inventory/items/{item}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editItem'])
+                ->name('inventory.items.edit')->middleware('permission:inventory.catalog.manage');
+            Route::put('inventory/items/{item}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateItem'])
+                ->name('inventory.items.update')->middleware('permission:inventory.catalog.manage');
 
-                Route::get('inventory/warehouses', [\App\Http\Controllers\Admin\InventoryController::class, 'warehouses'])
-                    ->name('inventory.warehouses.index')->middleware('permission:inventory.view');
-                Route::get('inventory/warehouses/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createWarehouse'])
-                    ->name('inventory.warehouses.create')->middleware('permission:inventory.warehouses.manage');
-                Route::post('inventory/warehouses', [\App\Http\Controllers\Admin\InventoryController::class, 'storeWarehouse'])
-                    ->name('inventory.warehouses.store')->middleware('permission:inventory.warehouses.manage');
-                Route::get('inventory/warehouses/{warehouse}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editWarehouse'])
-                    ->name('inventory.warehouses.edit')->middleware('permission:inventory.warehouses.manage');
-                Route::put('inventory/warehouses/{warehouse}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateWarehouse'])
-                    ->name('inventory.warehouses.update')->middleware('permission:inventory.warehouses.manage');
-            });
+            Route::get('inventory/warehouses', [\App\Http\Controllers\Admin\InventoryController::class, 'warehouses'])
+                ->name('inventory.warehouses.index')->middleware('permission:inventory.view');
+            Route::get('inventory/warehouses/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createWarehouse'])
+                ->name('inventory.warehouses.create')->middleware('permission:inventory.warehouses.manage');
+            Route::post('inventory/warehouses', [\App\Http\Controllers\Admin\InventoryController::class, 'storeWarehouse'])
+                ->name('inventory.warehouses.store')->middleware('permission:inventory.warehouses.manage');
+            Route::get('inventory/warehouses/{warehouse}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editWarehouse'])
+                ->name('inventory.warehouses.edit')->middleware('permission:inventory.warehouses.manage');
+            Route::put('inventory/warehouses/{warehouse}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateWarehouse'])
+                ->name('inventory.warehouses.update')->middleware('permission:inventory.warehouses.manage');
+        });
+
+    Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('inventory/stock-levels', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'stockLevels'])
+            ->name('inventory.stock-levels')->middleware('permission:inventory.stock-levels.manage');
+        Route::put('inventory/stock-levels', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'updateStockLevels'])
+            ->name('inventory.stock-levels.update')->middleware('permission:inventory.stock-levels.manage');
+        Route::get('inventory/stock-takes', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'index'])
+            ->name('inventory.stock-takes.index')->middleware('permission:inventory.stock-takes.view|inventory.stock-takes.create|inventory.stock-takes.approve');
+        Route::get('inventory/stock-takes/create', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'create'])
+            ->name('inventory.stock-takes.create')->middleware('permission:inventory.stock-takes.create');
+        Route::post('inventory/stock-takes', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'store'])
+            ->name('inventory.stock-takes.store')->middleware('permission:inventory.stock-takes.create');
+        Route::get('inventory/stock-takes/{stockTake}/edit', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'edit'])
+            ->name('inventory.stock-takes.edit')->middleware('permission:inventory.stock-takes.create');
+        Route::put('inventory/stock-takes/{stockTake}', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'update'])
+            ->name('inventory.stock-takes.update')->middleware('permission:inventory.stock-takes.create');
+        Route::get('inventory/stock-takes/{stockTake}', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'show'])
+            ->name('inventory.stock-takes.show')->middleware('permission:inventory.stock-takes.view|inventory.stock-takes.create|inventory.stock-takes.approve');
+        Route::post('inventory/stock-takes/{stockTake}/approve', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'approve'])
+            ->name('inventory.stock-takes.approve')->middleware('permission:inventory.stock-takes.approve');
+        Route::post('inventory/stock-takes/{stockTake}/return', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'returnForCorrection'])
+            ->name('inventory.stock-takes.return')->middleware('permission:inventory.stock-takes.approve');
+    });
 
     Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('inventory/stock-requests', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'index'])
@@ -937,23 +958,23 @@ Route::middleware(['auth'])->group(function () {
             ->name('procurement.supplier-invoices.review')->middleware('permission:procurement.supplier-invoices.approve');
     });
 
-            // ICT Coordination & Staff Helpdesk Routes
-        Route::prefix('ict')->name('ict.')->group(function () {
-            // Staff / Teacher ICT Support Requests
-            Route::get('/tickets/create', [\App\Http\Controllers\Ict\IctTicketController::class, 'create'])->name('tickets.create');
-            Route::post('/tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'store'])->name('tickets.store');
-            Route::get('/tickets/my-tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'myTickets'])->name('tickets.my-tickets');
-            Route::get('/tickets/{ticket}', [\App\Http\Controllers\Ict\IctTicketController::class, 'show'])->name('tickets.show');
+    // ICT Coordination & Staff Helpdesk Routes
+    Route::prefix('ict')->name('ict.')->group(function () {
+        // Staff / Teacher ICT Support Requests
+        Route::get('/tickets/create', [\App\Http\Controllers\Ict\IctTicketController::class, 'create'])->name('tickets.create');
+        Route::post('/tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'store'])->name('tickets.store');
+        Route::get('/tickets/my-tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'myTickets'])->name('tickets.my-tickets');
+        Route::get('/tickets/{ticket}', [\App\Http\Controllers\Ict\IctTicketController::class, 'show'])->name('tickets.show');
 
-            // ICT Coordinator Desk (Coordinator, School Admin, Super Admin)
-            Route::middleware(['role:ict-coordinator|super-admin|school-admin'])->group(function () {
-                Route::get('/dashboard', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'dashboard'])->name('dashboard');
-                Route::get('/tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'index'])->name('tickets.index');
-                Route::put('/tickets/{ticket}/status', [\App\Http\Controllers\Ict\IctTicketController::class, 'updateStatus'])->name('tickets.update-status');
+        // ICT Coordinator Desk (Coordinator, School Admin, Super Admin)
+        Route::middleware(['role:ict-coordinator|super-admin|school-admin'])->group(function () {
+            Route::get('/dashboard', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'dashboard'])->name('dashboard');
+            Route::get('/tickets', [\App\Http\Controllers\Ict\IctTicketController::class, 'index'])->name('tickets.index');
+            Route::put('/tickets/{ticket}/status', [\App\Http\Controllers\Ict\IctTicketController::class, 'updateStatus'])->name('tickets.update-status');
 
-                Route::get('/devices', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'devices'])->name('devices.index');
-                Route::post('/devices', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'storeDevice'])->name('devices.store');
-                Route::put('/devices/{device}/condition', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'updateDeviceCondition'])->name('devices.update-condition');
-            });
+            Route::get('/devices', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'devices'])->name('devices.index');
+            Route::post('/devices', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'storeDevice'])->name('devices.store');
+            Route::put('/devices/{device}/condition', [\App\Http\Controllers\Ict\IctCoordinatorController::class, 'updateDeviceCondition'])->name('devices.update-condition');
         });
+    });
 });

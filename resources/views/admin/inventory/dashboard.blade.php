@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
         @can('inventory.catalog.manage')
             <a href="{{ route('admin.inventory.items.index') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
                 <h2 class="font-semibold text-slate-100">Item catalogue</h2>
@@ -64,6 +64,18 @@
                 <p class="mt-1 text-sm text-slate-400">Review staff requests and record controlled stock issues.</p>
             </a>
         @endcan
+        @can('inventory.stock-takes.view')
+            <a href="{{ route('admin.inventory.stock-takes.index') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
+                <h2 class="font-semibold text-slate-100">Stock takes</h2>
+                <p class="mt-1 text-sm text-slate-400">Record physical counts and review approved stock adjustments.</p>
+            </a>
+        @endcan
+        @can('inventory.stock-levels.manage')
+            <a href="{{ route('admin.inventory.stock-levels') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
+                <h2 class="font-semibold text-slate-100">Stock on hand & reorder</h2>
+                <p class="mt-1 text-sm text-slate-400">View warehouse balances and set reorder alerts and quantities.</p>
+            </a>
+        @endcan
     </div>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -75,7 +87,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <thead class="text-xs uppercase text-slate-500">
-                        <tr><th class="py-2 pr-3">Item</th><th class="py-2 pr-3">Warehouse</th><th class="py-2 pr-3">On hand</th><th class="py-2">Reorder at</th></tr>
+                        <tr><th class="py-2 pr-3">Item</th><th class="py-2 pr-3">Warehouse</th><th class="py-2 pr-3">On hand</th><th class="py-2 pr-3">Reorder at</th><th class="py-2">Suggested order</th></tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800">
                         @forelse($lowStockBalances as $balance)
@@ -83,10 +95,11 @@
                                 <td class="py-3 pr-3 text-slate-200">{{ $balance->item->name }} <span class="text-xs text-slate-500">({{ $balance->item->code }})</span></td>
                                 <td class="py-3 pr-3 text-slate-300">{{ $balance->warehouse->name }}</td>
                                 <td class="py-3 pr-3 text-amber-300">{{ number_format((float) $balance->quantity_on_hand, 4) }} {{ $balance->item->unit_of_measure }}</td>
-                                <td class="py-3 text-slate-300">{{ number_format((float) $balance->reorder_level, 4) }}</td>
+                                <td class="py-3 pr-3 text-slate-300">{{ number_format((float) $balance->reorder_level, 4) }}</td>
+                                <td class="py-3 text-slate-300">{{ number_format($balance->reorder_quantity !== null ? (float) $balance->reorder_quantity : max(0, (float) $balance->reorder_level - (float) $balance->quantity_on_hand), 4) }} {{ $balance->item->unit_of_measure }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="py-6 text-center text-slate-500">No low-stock balances yet. Reorder alerts appear once stock balances and levels are configured.</td></tr>
+                            <tr><td colspan="5" class="py-6 text-center text-slate-500">No low-stock balances yet. Reorder alerts appear once stock balances and levels are configured.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
