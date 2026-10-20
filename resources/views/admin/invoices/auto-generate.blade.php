@@ -56,18 +56,18 @@
             
             <div class="space-y-3">
                 <div class="flex items-center space-x-3">
-                    <input type="checkbox" id="include_boarding" name="include_boarding" value="1" 
+                    <input type="checkbox" id="include_boarding" name="include_boarding" value="1" checked
                            class="rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
                     <label for="include_boarding" class="text-xs text-slate-300">
-                        Include boarding fees for boarding students
+                        Include the boarding fee vote for boarding students
                     </label>
                 </div>
                 
                 <div class="flex items-center space-x-3">
-                    <input type="checkbox" id="include_transport" name="include_transport" value="1" 
+                    <input type="checkbox" id="include_transport" name="include_transport" value="1" checked
                            class="rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
                     <label for="include_transport" class="text-xs text-slate-300">
-                        Include transport fees for students with transport
+                        Include transport fees only for students registered for transport
                     </label>
                 </div>
                 

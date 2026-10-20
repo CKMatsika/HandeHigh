@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Rules\TenantExists;
 use App\Services\AccountingService;
 use App\Services\Finance\HandeFeeVotesService;
+use App\Services\Finance\InvoiceFeeSelectionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -26,9 +27,10 @@ use Illuminate\Validation\ValidationException;
 
 class InvoiceController extends Controller
 {
-    public function __construct(private AccountingService $accountingService)
-    {
-    }
+    public function __construct(
+        private AccountingService $accountingService,
+        private InvoiceFeeSelectionService $feeSelectionService,
+    ) {}
 
     private function resolveSchool(?User $user, ?Invoice $invoice = null): ?School
     {
@@ -725,35 +727,17 @@ class InvoiceController extends Controller
             $appliedItems = [];
             $studentTotal = 0.0;
 
-            foreach ($feeStructures as $fee) {
-                // Only apply fee structures that are selected/ticked
-                if (! in_array($fee->id, $selectedFeeStructureIds)) {
-                    continue;
-                }
+            $studentGrade = $enrollment->grade ?? $student->grade ?? $enrollment->class?->grade;
+            $applicableFees = $this->feeSelectionService->select(
+                $feeStructures,
+                $studentGrade,
+                $isBoarder,
+                $hasTransport,
+                $includeOptional,
+                $selectedFeeStructureIds,
+            );
 
-                $isBoardingFee = str_contains(strtolower($fee->category ?? ''), 'boarding') 
-                    || $fee->service_type === 'boarding' 
-                    || str_contains(strtolower($fee->label ?? ''), 'boarding');
-
-                $isTransportFee = str_contains(strtolower($fee->category ?? ''), 'transport') 
-                    || $fee->service_type === 'transport' 
-                    || str_contains(strtolower($fee->label ?? ''), 'transport');
-
-                // Boarding fee only applies to boarders
-                if ($isBoardingFee && ! $isBoarder) {
-                    continue;
-                }
-
-                // Transport fee only applies to students with transport
-                if ($isTransportFee && ! $hasTransport) {
-                    continue;
-                }
-
-                // Optional fees apply only if toggle is enabled
-                if ($fee->is_optional && ! $includeOptional) {
-                    continue;
-                }
-
+            foreach ($applicableFees as $fee) {
                 $amount = (float) $fee->amount;
                 $studentTotal += $amount;
                 $appliedItems[] = [
@@ -761,6 +745,7 @@ class InvoiceController extends Controller
                     'label' => $fee->label,
                     'category' => $fee->category ?? 'fees',
                     'amount' => $amount,
+                    'vote_code' => $fee->vote_code,
                 ];
             }
 
@@ -788,6 +773,7 @@ class InvoiceController extends Controller
             'grades' => $grades,
             'classes' => $classes,
             'feeStructures' => $feeStructures,
+            'standardVotes' => HandeFeeVotesService::getStandardVotes(),
             'selectedFeeStructureIds' => $selectedFeeStructureIds,
             'selectedYear' => $academicYear,
             'selectedTerm' => $term,
@@ -833,10 +819,12 @@ class InvoiceController extends Controller
             'custom_fee_items.*.description' => ['required_with:custom_fee_items', 'string', 'max:255'],
             'custom_fee_items.*.category' => ['nullable', 'string', 'max:50'],
             'custom_fee_items.*.amount' => ['required_with:custom_fee_items', 'numeric', 'min:0'],
+            'custom_fee_items.*.vote_code' => ['nullable', 'string', 'max:50', Rule::in(array_merge(array_keys(HandeFeeVotesService::getStandardVotes()), ['NONE']))],
             'fee_items' => ['nullable', 'array'],
             'fee_items.*.description' => ['required_with:fee_items', 'string', 'max:255'],
             'fee_items.*.category' => ['nullable', 'string', 'max:50'],
             'fee_items.*.amount' => ['required_with:fee_items', 'numeric', 'min:0'],
+            'fee_items.*.vote_code' => ['nullable', 'string', 'max:50', Rule::in(array_merge(array_keys(HandeFeeVotesService::getStandardVotes()), ['NONE']))],
         ]);
 
         $academicYear = $validated['academic_year'];
@@ -868,17 +856,10 @@ class InvoiceController extends Controller
         }
         $feeStructures = $feeStructureQuery->get();
 
-        // If specific fee structures were chosen manually via checkboxes, filter strictly to them
+        // Keep sibling vote rows available so selecting a package parent can expand to its sub-votes.
+        $selectedFeeIds = null;
         if ($request->has('fee_structure_ids')) {
             $selectedFeeIds = array_map('intval', (array) $request->input('fee_structure_ids', []));
-            if (!empty($selectedFeeIds)) {
-                $directFees = FeeStructure::where('school_id', $school->id)
-                    ->whereIn('id', $selectedFeeIds)
-                    ->get();
-                $feeStructures = $feeStructures->whereIn('id', $selectedFeeIds)->merge($directFees)->unique('id');
-            } else {
-                $feeStructures = collect();
-            }
         }
 
         $customItems = $validated['custom_fee_items'] ?? $validated['fee_items'] ?? [];
@@ -904,6 +885,7 @@ class InvoiceController extends Controller
             $feeStructures,
             $customItems,
             $includeOptional,
+            $selectedFeeIds,
             &$createdInvoices,
             &$skippedCount,
             &$errors,
@@ -937,43 +919,22 @@ class InvoiceController extends Controller
                     $studentTotal = 0.0;
 
                     // 1. From Fee Structures
-                    $studentGrade = $enrollment->grade ?? $student->grade;
-                    $studentGradeVars = $this->getGradeVariations($studentGrade);
-
-                    $applicableFees = $feeStructures->filter(function ($fee) use ($studentGradeVars) {
-                        if (empty($fee->grade)) {
-                            return true;
-                        }
-                        return empty($studentGradeVars) || in_array($fee->grade, $studentGradeVars);
-                    });
-
-                    if ($applicableFees->isEmpty() && $feeStructures->isNotEmpty()) {
-                        $applicableFees = $feeStructures;
-                    }
+                    $studentGrade = $enrollment->grade ?? $student->grade ?? $enrollment->class?->grade;
+                    $applicableFees = $this->feeSelectionService->select(
+                        $feeStructures,
+                        $studentGrade,
+                        $isBoarder,
+                        $hasTransport,
+                        $includeOptional,
+                        $selectedFeeIds,
+                    );
 
                     foreach ($applicableFees as $fee) {
-                        $isBoardingFee = str_contains(strtolower($fee->category ?? ''), 'boarding') 
-                            || $fee->service_type === 'boarding' 
-                            || str_contains(strtolower($fee->label ?? ''), 'boarding');
-
-                        $isTransportFee = str_contains(strtolower($fee->category ?? ''), 'transport') 
-                            || $fee->service_type === 'transport' 
-                            || str_contains(strtolower($fee->label ?? ''), 'transport');
-
-                        if ($isBoardingFee && ! $isBoarder) {
-                            continue;
-                        }
-                        if ($isTransportFee && ! $hasTransport) {
-                            continue;
-                        }
-                        if ($fee->is_optional && ! $includeOptional) {
-                            continue;
-                        }
-
                         $amount = (float) $fee->amount;
                         $studentTotal += $amount;
                         $itemsToCreate[] = [
                             'fee_structure_id' => $fee->id,
+                            'vote_code' => $fee->vote_code,
                             'description' => $fee->label,
                             'category' => $fee->category ?? 'fees',
                             'quantity' => 1,
@@ -986,10 +947,12 @@ class InvoiceController extends Controller
 
                     // 2. Custom fee items (if entered)
                     foreach ($customItems as $cItem) {
+                        $customVoteCode = ($cItem['vote_code'] ?? null) === 'NONE' ? null : ($cItem['vote_code'] ?? null);
                         $isBoardingItem = str_contains(strtolower($cItem['category'] ?? ''), 'boarding')
-                            || str_contains(strtolower($cItem['description'] ?? ''), 'boarding');
+                            || str_contains(strtolower($cItem['description'] ?? ''), 'boarding')
+                            || $customVoteCode === 'BOARDING_FEES';
 
-                        if ($isBoardingItem && ! $isBoarder) {
+                        if (($isBoardingItem && ! $isBoarder) || ($customVoteCode === 'FOOD' && $isBoarder)) {
                             continue;
                         }
 
@@ -997,6 +960,7 @@ class InvoiceController extends Controller
                         $studentTotal += $amount;
                         $itemsToCreate[] = [
                             'fee_structure_id' => null,
+                            'vote_code' => $customVoteCode,
                             'description' => $cItem['description'],
                             'category' => $cItem['category'] ?? 'fees',
                             'quantity' => 1,
@@ -1035,6 +999,7 @@ class InvoiceController extends Controller
                             'school_id' => $school->id,
                             'invoice_id' => $invoice->id,
                             'fee_structure_id' => $itemData['fee_structure_id'],
+                            'vote_code' => $itemData['vote_code'] ?? null,
                             'description' => $itemData['description'],
                             'category' => $itemData['category'],
                             'quantity' => $itemData['quantity'],
@@ -1106,7 +1071,7 @@ class InvoiceController extends Controller
         $targetTerm = $validated['target_term'];
 
         // Get current active enrollments
-        $currentEnrollments = Enrollment::with(['student', 'guardian', 'class'])
+        $currentEnrollments = Enrollment::with(['student', 'class'])
             ->where('school_id', $school->id)
             ->where('status', 'active')
             ->get();
@@ -1129,22 +1094,27 @@ class InvoiceController extends Controller
                         continue; // Skip if already exists
                     }
 
-                    // Get fee structures for this student's grade
+                    // Include grade-specific fees and school-wide fee rows.
                     $feeStructures = FeeStructure::where('school_id', $enrollment->school_id)
                         ->where('academic_year', $targetYear)
                         ->where('term', $targetTerm)
-                        ->where('grade', $enrollment->grade)
-                        ->where(function ($query) use ($validated, $enrollment) {
-                            $query->where('is_optional', false)
-                                  ->orWhere(function ($subQuery) use ($validated, $enrollment) {
-                                      if ($validated['include_optional_fees']) {
-                                          $subQuery->where('is_optional', true);
-                                      }
-                                  });
-                        })
                         ->get();
 
-                    if ($feeStructures->isEmpty()) {
+                    $student = $enrollment->student;
+                    $isBoarder = $enrollment->isBoarder() || (bool) $student?->is_boarding;
+                    $hasTransport = (bool) $enrollment->has_transport || (bool) $student?->has_transport;
+                    $applicableFees = $this->feeSelectionService->select(
+                        $feeStructures,
+                        $enrollment->grade ?? $student?->grade ?? $enrollment->class?->grade,
+                        $isBoarder,
+                        $hasTransport,
+                        (bool) ($validated['include_optional_fees'] ?? false),
+                        null,
+                        (bool) ($validated['include_boarding'] ?? false),
+                        (bool) ($validated['include_transport'] ?? false),
+                    );
+
+                    if ($applicableFees->isEmpty()) {
                         $errors[] = "No fee structure found for Grade {$enrollment->grade}, {$targetYear} {$targetTerm}";
                         continue;
                     }
@@ -1168,23 +1138,7 @@ class InvoiceController extends Controller
                     ]);
 
                     $totalAmount = 0;
-                    $isBoarder = $enrollment->isBoarder();
-                    $hasTransport = (bool) $enrollment->has_transport;
-
-                    foreach ($feeStructures as $feeStructure) {
-                        $isBoardingFee = str_contains(strtolower($feeStructure->category ?? ''), 'boarding') || $feeStructure->service_type === 'boarding';
-                        $isTransportFee = str_contains(strtolower($feeStructure->category ?? ''), 'transport') || $feeStructure->service_type === 'transport';
-
-                        // Boarding fee applies only if student is officially a boarder
-                        if ($isBoardingFee && ! $isBoarder) {
-                            continue;
-                        }
-
-                        // Transport fee applies only if student has transport
-                        if ($isTransportFee && ! $hasTransport && ! ($validated['include_transport'] ?? false)) {
-                            continue;
-                        }
-
+                    foreach ($applicableFees as $feeStructure) {
                         $lineTotal = (float) $feeStructure->amount;
                         $totalAmount += $lineTotal;
 
@@ -1192,6 +1146,7 @@ class InvoiceController extends Controller
                             'school_id' => $enrollment->school_id,
                             'invoice_id' => $invoice->id,
                             'fee_structure_id' => $feeStructure->id,
+                            'vote_code' => $feeStructure->vote_code,
                             'description' => $feeStructure->label,
                             'category' => $feeStructure->category,
                             'quantity' => 1,

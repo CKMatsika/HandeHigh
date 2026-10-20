@@ -154,7 +154,7 @@
                             Boarding Only
                         </button>
                         <button type="button" id="btn-fee-tuition-only" class="px-2.5 py-1 rounded-lg border border-indigo-800/80 bg-indigo-950/40 text-[11px] font-medium text-indigo-300 hover:bg-indigo-900/60 transition">
-                            Tuition Only
+                            Exclude Boarding Charge
                         </button>
                     </div>
                 @endif
@@ -168,8 +168,8 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         @foreach($feeStructures as $fee)
                             @php
-                                $isBoarding = str_contains(strtolower($fee->category ?? ''), 'boarding') || $fee->service_type === 'boarding' || str_contains(strtolower($fee->label ?? ''), 'boarding');
-                                $isTransport = str_contains(strtolower($fee->category ?? ''), 'transport') || $fee->service_type === 'transport';
+                                $isBoarding = str_contains(strtolower($fee->category ?? ''), 'boarding') || strtolower((string) $fee->service_type) === 'boarding' || str_contains(strtolower($fee->label ?? ''), 'boarding');
+                                $isTransport = str_contains(strtolower($fee->category ?? ''), 'transport') || strtolower((string) $fee->service_type) === 'transport' || str_contains(strtolower($fee->label ?? ''), 'transport');
                                 $isChecked = in_array($fee->id, $selectedFeeStructureIds);
                             @endphp
                             <label class="fee-card flex items-start gap-3 p-3.5 rounded-xl border {{ $isChecked ? 'border-indigo-500/60 bg-indigo-500/10' : 'border-slate-800 bg-slate-950/50' }} hover:border-slate-700 hover:bg-slate-900/60 transition cursor-pointer select-none">
@@ -184,6 +184,9 @@
                                        data-is-boarding="{{ $isBoarding ? '1' : '0' }}"
                                        data-is-transport="{{ $isTransport ? '1' : '0' }}"
                                        data-is-optional="{{ $fee->is_optional ? '1' : '0' }}"
+                                       data-parent-id="{{ $fee->parent_id ?? '' }}"
+                                       data-residency="{{ strtolower($fee->residency_type ?? 'all') }}"
+                                       data-vote-code="{{ $fee->vote_code ?? '' }}"
                                        {{ $isChecked ? 'checked' : '' }}>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center justify-between gap-2">
@@ -205,6 +208,9 @@
 
                                         @if($fee->is_optional)
                                             <span class="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">Optional</span>
+                                        @endif
+                                        @if($fee->vote_code)
+                                            <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-mono text-emerald-300">[{{ $fee->vote_code }}]</span>
                                         @endif
                                     </div>
                                 </div>
@@ -356,6 +362,7 @@
                                     data-student-row
                                     data-is-boarder="{{ $preview['is_boarder'] ? '1' : '0' }}"
                                     data-has-transport="{{ $preview['has_transport'] ? '1' : '0' }}"
+                                    data-grade="{{ strtolower($preview['grade'] === '—' ? '' : $preview['grade']) }}"
                                     data-already="{{ $isAlreadyInvoiced ? '1' : '0' }}">
                                     <td class="py-3 px-4">
                                         <input type="checkbox" name="enrollment_ids[]" value="{{ $enr->id }}"
@@ -404,6 +411,9 @@
                                                 @endphp
                                                 <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] {{ $isBoardingLine ? 'bg-purple-950/70 border border-purple-800/80 text-purple-200 font-medium' : 'bg-slate-800 text-slate-300' }}">
                                                     <span>{{ $item['label'] }}</span>
+                                                    @if($item['vote_code'])
+                                                        <span class="font-mono text-emerald-300">[{{ $item['vote_code'] }}]</span>
+                                                    @endif
                                                     <span class="text-slate-400 font-mono">${{ number_format($item['amount'], 2) }}</span>
                                                 </span>
                                             @empty
@@ -448,35 +458,40 @@
             @endif
         </div>
 
-        {{-- Fallback: Custom fee items (collapsible) if fee structure is not seeded yet --}}
-        @if($feeStructures->isEmpty())
+        {{-- Optional custom fee items can be assigned to an official vote --}}
+        <div>
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm font-semibold text-slate-100">Add Custom Fee Items for this Batch</h3>
-                    <span class="text-xs text-slate-400">Optional: will be applied to the students selected above</span>
-                </div>
-                <div id="custom-fee-items" class="space-y-3">
-                    <div class="fee-row grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                            <input type="text" name="custom_fee_items[0][description]" placeholder="e.g. Tuition Fee"
-                                   class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
-                        </div>
-                        <div>
-                            <select name="custom_fee_items[0][category]" class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
-                                <option value="tuition">Tuition</option>
-                                <option value="boarding">Boarding (Boarders Only)</option>
-                                <option value="levy">General Levy</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <input type="number" step="0.01" name="custom_fee_items[0][amount]" placeholder="0.00"
-                                   class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
-                        </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-100">Add Custom Fee Items for this Batch</h3>
+                        <p class="text-xs text-slate-400 mt-1">Optional: mapped votes are retained for FIFO allocation and MOPSE receipts.</p>
                     </div>
+                    <button type="button" id="add-custom-fee-item" class="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700">Add Item</button>
                 </div>
+                <div id="custom-fee-items" class="space-y-3"></div>
+                <template id="custom-fee-item-template">
+                    <div class="fee-row grid grid-cols-1 sm:grid-cols-5 gap-3">
+                        <input type="text" name="custom_fee_items[__INDEX__][description]" placeholder="Description"
+                               class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
+                        <select name="custom_fee_items[__INDEX__][category]" class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
+                            <option value="tuition">Tuition</option>
+                            <option value="boarding">Boarding</option>
+                            <option value="levy">General Levy</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <select name="custom_fee_items[__INDEX__][vote_code]" class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
+                            <option value="NONE">No vote assignment</option>
+                            @foreach($standardVotes as $voteCode => $vote)
+                                <option value="{{ $voteCode }}">{{ $vote['name'] ?? $voteCode }} [{{ $voteCode }}]</option>
+                            @endforeach
+                        </select>
+                        <input type="number" step="0.01" min="0" name="custom_fee_items[__INDEX__][amount]" placeholder="Amount"
+                               class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100">
+                        <button type="button" class="remove-custom-fee-item rounded-lg border border-rose-900/70 bg-rose-950/30 px-3 py-2 text-xs text-rose-300">Remove</button>
+                    </div>
+                </template>
             </div>
-        @endif
+        </div>
 
         {{-- Sticky Bottom Action Controls --}}
         <div class="sticky bottom-4 rounded-2xl border border-slate-700/80 bg-slate-900/95 backdrop-blur-xl p-4 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -519,6 +534,9 @@
             const kpiTotal = document.getElementById('kpi-total-amount');
             const kpiReady = document.getElementById('kpi-ready-count');
             const submitBtn = document.getElementById('submit-btn');
+            const customItemsContainer = document.getElementById('custom-fee-items');
+            const customItemTemplate = document.getElementById('custom-fee-item-template');
+            let customItemIndex = 0;
 
             function escapeHtml(str) {
                 if (!str) return '';
@@ -528,7 +546,12 @@
             function updateMetrics() {
                 let selectedCount = 0;
                 let selectedTotal = 0.0;
-                const anyFeeChecked = document.querySelectorAll('.fee-structure-checkbox:checked').length > 0;
+                const hasFeeStructure = document.querySelectorAll('.fee-structure-checkbox:checked').length > 0;
+                const hasCustomItems = Array.from(customItemsContainer?.querySelectorAll('.fee-row') || []).some(row => {
+                    const description = row.querySelector('[name$="[description]"]')?.value.trim();
+                    const amount = Number(row.querySelector('[name$="[amount]"]')?.value);
+                    return Boolean(description) && Number.isFinite(amount) && amount >= 0;
+                });
 
                 studentCheckboxes.forEach(cb => {
                     if (cb.checked) {
@@ -546,25 +569,30 @@
                 if (kpiReady) kpiReady.textContent = selectedCount;
 
                 if (submitBtn) {
-                    submitBtn.disabled = selectedCount === 0 || !anyFeeChecked;
+                    submitBtn.disabled = selectedCount === 0 || (!hasFeeStructure && !hasCustomItems);
                 }
             }
 
             function recalculateFeePreviews() {
-                const checkedFees = [];
+                const allFees = [];
 
                 feeCheckboxes.forEach(cb => {
                     const card = cb.closest('.fee-card');
+                    allFees.push({
+                        id: cb.dataset.id,
+                        label: cb.dataset.label,
+                        amount: parseFloat(cb.dataset.amount) || 0,
+                        category: cb.dataset.category || 'fees',
+                        isBoarding: cb.dataset.isBoarding === '1',
+                        isTransport: cb.dataset.isTransport === '1',
+                        isOptional: cb.dataset.isOptional === '1',
+                        parentId: cb.dataset.parentId || '',
+                        residency: cb.dataset.residency || 'all',
+                        voteCode: cb.dataset.voteCode || '',
+                        grade: cb.dataset.grade || '',
+                        selected: cb.checked,
+                    });
                     if (cb.checked) {
-                        checkedFees.push({
-                            id: cb.dataset.id,
-                            label: cb.dataset.label,
-                            amount: parseFloat(cb.dataset.amount) || 0,
-                            category: cb.dataset.category || 'fees',
-                            isBoarding: cb.dataset.isBoarding === '1',
-                            isTransport: cb.dataset.isTransport === '1',
-                            isOptional: cb.dataset.isOptional === '1',
-                        });
                         if (card) {
                             card.classList.add('border-indigo-500/60', 'bg-indigo-500/10');
                             card.classList.remove('border-slate-800', 'bg-slate-950/50');
@@ -581,6 +609,7 @@
                 studentRows.forEach(row => {
                     const isBoarder = row.dataset.isBoarder === '1';
                     const hasTransport = row.dataset.hasTransport === '1';
+                    const studentGrade = (row.dataset.grade || '').trim().toLowerCase();
                     const studentCheckbox = row.querySelector('.student-checkbox');
                     const appliedItemsDiv = row.querySelector('.student-applied-items');
                     const totalAmountDiv = row.querySelector('.student-total-amount');
@@ -590,15 +619,43 @@
                     let appliedItemsHtml = '';
                     let appliedCount = 0;
 
-                    checkedFees.forEach(fee => {
-                        // Boarding fee applies only to boarders
-                        if (fee.isBoarding && !isBoarder) {
+                    const applicableFees = new Map();
+                    const addFeeIfApplicable = fee => {
+                        const normalizedFeeGrade = fee.grade.replace(/^form\s*/, '').replace(/^grade\s*/, '');
+                        const normalizedStudentGrade = studentGrade.replace(/^form\s*/, '').replace(/^grade\s*/, '');
+                        const gradeMatches = !fee.grade || (studentGrade && normalizedFeeGrade === normalizedStudentGrade);
+                        const residencyMatches = fee.residency === 'all' || fee.residency === (isBoarder ? 'boarding' : 'day');
+                        const includeOptional = document.querySelector('[name="include_optional"]')?.value === '1';
+                        if (!gradeMatches || !residencyMatches || (fee.isOptional && !includeOptional)) return;
+                        if (fee.isBoarding && !isBoarder) return;
+                        if (fee.isTransport && !hasTransport) return;
+                        applicableFees.set(fee.id, fee);
+                    };
+
+                    allFees.filter(fee => fee.selected).forEach(fee => {
+                        const subVotes = allFees.filter(child => child.parentId === fee.id && child.voteCode);
+                        if (subVotes.length) {
+                            if (fee.residency === (isBoarder ? 'boarding' : 'day')) {
+                                subVotes.forEach(addFeeIfApplicable);
+                            }
                             return;
                         }
-                        // Transport fee applies only to students with transport
-                        if (fee.isTransport && !hasTransport) {
-                            return;
-                        }
+                        addFeeIfApplicable(fee);
+                    });
+
+                    const customItems = [];
+                    Array.from(customItemsContainer?.querySelectorAll('.fee-row') || []).forEach(customRow => {
+                        const description = customRow.querySelector('[name$="[description]"]')?.value.trim();
+                        const amount = Number(customRow.querySelector('[name$="[amount]"]')?.value);
+                        const category = customRow.querySelector('[name$="[category]"]')?.value || 'other';
+                        const voteCode = customRow.querySelector('[name$="[vote_code]"]')?.value || 'NONE';
+                        if (!description || !Number.isFinite(amount) || amount < 0) return;
+                        const isBoarding = voteCode === 'BOARDING_FEES' || category === 'boarding' || /boarding/i.test(description);
+                        if ((isBoarding && !isBoarder) || (voteCode === 'FOOD' && isBoarder)) return;
+                        customItems.push({ label: description, amount, isBoarding, voteCode: voteCode === 'NONE' ? '' : voteCode });
+                    });
+
+                    [...applicableFees.values(), ...customItems].forEach(fee => {
 
                         studentTotal += fee.amount;
                         appliedCount++;
@@ -609,6 +666,7 @@
 
                         appliedItemsHtml += `<span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] ${badgeClass}">
                             <span>${escapeHtml(fee.label)}</span>
+                            ${fee.voteCode ? `<span class="font-mono text-emerald-300">[${escapeHtml(fee.voteCode)}]</span>` : ''}
                             <span class="text-slate-400 font-mono">$${fee.amount.toFixed(2)}</span>
                         </span> `;
                     });
@@ -641,14 +699,16 @@
 
             document.getElementById('btn-fee-boarding-only')?.addEventListener('click', function() {
                 feeCheckboxes.forEach(cb => {
-                    cb.checked = (cb.dataset.isBoarding === '1');
+                    const isPackage = feeCheckboxes.some(child => child.dataset.parentId === cb.dataset.id && child.dataset.voteCode);
+                    cb.checked = cb.dataset.isBoarding === '1' && !isPackage;
                 });
                 recalculateFeePreviews();
             });
 
             document.getElementById('btn-fee-tuition-only')?.addEventListener('click', function() {
                 feeCheckboxes.forEach(cb => {
-                    cb.checked = (cb.dataset.isBoarding !== '1');
+                    const isPackage = feeCheckboxes.some(child => child.dataset.parentId === cb.dataset.id && child.dataset.voteCode);
+                    cb.checked = cb.dataset.isBoarding !== '1' && !isPackage;
                 });
                 recalculateFeePreviews();
             });
@@ -656,6 +716,25 @@
             // Fee structure checkboxes change
             feeCheckboxes.forEach(cb => {
                 cb.addEventListener('change', recalculateFeePreviews);
+            });
+
+            document.getElementById('add-custom-fee-item')?.addEventListener('click', function () {
+                const row = customItemTemplate?.content.cloneNode(true);
+                if (!row) return;
+                row.querySelectorAll('[name]').forEach(input => {
+                    input.name = input.name.replace('__INDEX__', String(customItemIndex));
+                });
+                customItemsContainer.appendChild(row);
+                customItemIndex++;
+                recalculateFeePreviews();
+            });
+            customItemsContainer?.addEventListener('input', recalculateFeePreviews);
+            customItemsContainer?.addEventListener('change', recalculateFeePreviews);
+            customItemsContainer?.addEventListener('click', event => {
+                if (event.target.closest('.remove-custom-fee-item')) {
+                    event.target.closest('.fee-row')?.remove();
+                    recalculateFeePreviews();
+                }
             });
 
             // Master select checkbox

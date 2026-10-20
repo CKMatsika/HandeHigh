@@ -477,6 +477,10 @@
                                     <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
                                     <span>Cashbook & Bank Summary</span>
                                 </a>
+                                <a href="{{ route('admin.reports.daily-banking-handover') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.daily-banking-handover*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Daily Cash Banking Handover</span>
+                                </a>
 
                                 <!-- Accounting Statements -->
                                 <div class="text-xs text-slate-500 font-medium px-3 py-1 mt-2">ACCOUNTING STATEMENTS</div>

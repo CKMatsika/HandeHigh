@@ -8,6 +8,7 @@ use App\Models\LedgerEntry;
 use App\Models\Enrollment;
 use App\Models\FeeStructure;
 use App\Models\School;
+use App\Services\Finance\InvoiceFeeSelectionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -35,7 +36,7 @@ class GenerateScheduledInvoices extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(InvoiceFeeSelectionService $feeSelectionService)
     {
         $schoolId = $this->option('school_id');
         $academicYear = $this->option('academic_year');
@@ -80,10 +81,12 @@ class GenerateScheduledInvoices extends Command
                     $school, 
                     $targetYear, 
                     $targetTerm, 
-                    $dryRun
+                    $dryRun,
+                    $feeSelectionService,
                 );
 
-                $this->info("  ✓ Success: {$result['created']} invoices created, {$result['skipped']} skipped, {$result['errors']} errors");
+                $createdLabel = $dryRun ? 'would be created' : 'created';
+                $this->info("  ✓ Success: {$result['created']} invoices {$createdLabel}, {$result['skipped']} skipped, {$result['errors']} errors");
             } catch (\Exception $e) {
                 $this->error("  ✗ Failed: {$e->getMessage()}");
                 Log::error("Invoice generation failed for school {$school->id}: {$e->getMessage()}");
@@ -97,7 +100,13 @@ class GenerateScheduledInvoices extends Command
     /**
      * Generate invoices for a specific school
      */
-    protected function generateInvoicesForSchool(School $school, string $academicYear, string $term, bool $dryRun = false): array
+    protected function generateInvoicesForSchool(
+        School $school,
+        string $academicYear,
+        string $term,
+        bool $dryRun,
+        InvoiceFeeSelectionService $feeSelectionService,
+    ): array
     {
         $created = 0;
         $skipped = 0;
@@ -110,10 +119,12 @@ class GenerateScheduledInvoices extends Command
         $dueDate = now()->addDays($dueDateDays)->toDateString();
 
         // Get active enrollments
-        $enrollments = Enrollment::with(['student', 'guardian', 'class'])
+        $enrollments = Enrollment::with(['student', 'class'])
             ->where('school_id', $school->id)
             ->where('status', 'active')
-            ->get();
+            ->get()
+            ->unique('student_id')
+            ->values();
 
         if ($enrollments->isEmpty()) {
             $this->warn("  No active enrollments found for {$school->name}");
@@ -122,17 +133,31 @@ class GenerateScheduledInvoices extends Command
 
         $this->info("  Found {$enrollments->count()} active enrollments");
 
-        if ($dryRun) {
-            return [
-                'created' => $enrollments->count(), 
-                'skipped' => 0, 
-                'errors' => 0
-            ];
-        }
+        $feeStructures = FeeStructure::where('school_id', $school->id)
+            ->where('academic_year', $academicYear)
+            ->where('term', $term)
+            ->get();
 
-        DB::transaction(function () use ($enrollments, $academicYear, $term, $generationDate, $dueDate, &$created, &$skipped, &$errors) {
+        DB::transaction(function () use (
+            $enrollments,
+            $academicYear,
+            $term,
+            $generationDate,
+            $dueDate,
+            $dryRun,
+            $feeSelectionService,
+            $feeStructures,
+            &$created,
+            &$skipped,
+            &$errors
+        ) {
             foreach ($enrollments as $enrollment) {
                 try {
+                    if (! $enrollment->student) {
+                        $skipped++;
+                        continue;
+                    }
+
                     // Check if invoice already exists
                     $existingInvoice = Invoice::where('school_id', $enrollment->school_id)
                         ->where('student_id', $enrollment->student_id)
@@ -146,17 +171,23 @@ class GenerateScheduledInvoices extends Command
                         continue;
                     }
 
-                    // Get fee structures
-                    $feeStructures = FeeStructure::where('school_id', $enrollment->school_id)
-                        ->where('academic_year', $academicYear)
-                        ->where('term', $term)
-                        ->where('grade', $enrollment->grade)
-                        ->where('is_optional', false)
-                        ->get();
+                    $student = $enrollment->student;
+                    $applicableFees = $feeSelectionService->select(
+                        $feeStructures,
+                        $enrollment->grade ?? $student->grade ?? $enrollment->class?->grade,
+                        $enrollment->isBoarder() || (bool) $student->is_boarding,
+                        (bool) $enrollment->has_transport || (bool) $student->has_transport,
+                        false,
+                    );
 
-                    if ($feeStructures->isEmpty()) {
+                    if ($applicableFees->isEmpty()) {
                         $errors++;
-                        Log::warning("No fee structure found for Grade {$enrollment->grade}, {$academicYear} {$term}");
+                        Log::warning("No applicable fee structure found for Grade {$enrollment->grade}, {$academicYear} {$term}");
+                        continue;
+                    }
+
+                    if ($dryRun) {
+                        $created++;
                         continue;
                     }
 
@@ -182,7 +213,7 @@ class GenerateScheduledInvoices extends Command
 
                     // Create invoice items
                     $totalAmount = 0;
-                    foreach ($feeStructures as $feeStructure) {
+                    foreach ($applicableFees as $feeStructure) {
                         $lineTotal = (float) $feeStructure->amount;
                         $totalAmount += $lineTotal;
 
@@ -190,6 +221,7 @@ class GenerateScheduledInvoices extends Command
                             'school_id' => $enrollment->school_id,
                             'invoice_id' => $invoice->id,
                             'fee_structure_id' => $feeStructure->id,
+                            'vote_code' => $feeStructure->vote_code,
                             'description' => $feeStructure->label,
                             'category' => $feeStructure->category,
                             'quantity' => 1,

@@ -41,6 +41,8 @@ The following issues have been resolved:
 - In invoice editing, review each line's vote and paid amount; paid lines cannot be deleted or reduced below the amount allocated to them.
 - Eligible unpaid legacy package lines can be converted into seven vote lines without changing the total.
 - Vote codes flow into payment allocations and MOPSE vouchers.
+- Bulk, web-auto, and scheduled generation share the same grade/residency fee selection. Selecting a package expands its seven vote lines, school-wide (grade-less) structures are considered, transport is charged only to eligible students, and generated items retain their vote codes.
+- Scheduled `--dry-run` reports only eligible students not already invoiced and does not create invoice records.
 
 Apply pending database migrations during deployment before using the new invoice workflow.
 

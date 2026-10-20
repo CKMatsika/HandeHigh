@@ -13,6 +13,8 @@ use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use App\Services\Finance\HandeFeeVotesService;
 use Tests\TestCase;
 
 class BulkInvoicingPreviewTest extends TestCase
@@ -786,5 +788,162 @@ class BulkInvoicingPreviewTest extends TestCase
         $response->assertSee('Select Fee Structures to Invoice (Tick to Include)');
         $response->assertSee('Boarding Fee');
         $response->assertSee('single-fee-checkbox');
+    }
+
+    public function test_bulk_generation_expands_selected_packages_to_residency_specific_vote_lines(): void
+    {
+        $packages = HandeFeeVotesService::syncSchoolVotes($this->school, '2026', 'Term 1');
+        $boarder = $this->createStudentEnrollment(true);
+        $dayScholar = $this->createStudentEnrollment(false);
+
+        $preview = $this->actingAs($this->adminUser)->get(route('admin.invoices.bulk.create', [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+        ]));
+        $preview->assertOk();
+        $previews = collect($preview->viewData('studentPreviews'))->keyBy(fn ($row) => $row['student']->id);
+        $this->assertSame(470.0, (float) $previews[$boarder['student']->id]['total_amount']);
+        $this->assertSame(135.0, (float) $previews[$dayScholar['student']->id]['total_amount']);
+        $this->assertCount(7, $previews[$boarder['student']->id]['applied_items']);
+        $this->assertCount(7, $previews[$dayScholar['student']->id]['applied_items']);
+
+        $response = $this->actingAs($this->adminUser)->post(route('admin.invoices.bulk.store'), [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'enrollment_ids' => [$boarder['enrollment']->id, $dayScholar['enrollment']->id],
+            'fee_structure_ids' => [$packages['boarding_parent']->id, $packages['day_parent']->id],
+            'issued_at' => now()->toDateString(),
+        ]);
+        $response->assertRedirect(route('admin.invoices.index'));
+
+        foreach ([[$boarder['student'], 470.0, 'BOARDING_FEES'], [$dayScholar['student'], 135.0, 'FOOD']] as [$student, $total, $lastVote]) {
+            $invoice = Invoice::where('student_id', $student->id)->firstOrFail();
+            $this->assertSame($total, (float) $invoice->total_amount);
+            $this->assertCount(7, $invoice->items);
+            $this->assertSame($lastVote, $invoice->items->firstWhere('vote_code', $lastVote)->vote_code);
+            $this->assertNotContains($packages['boarding_parent']->id, $invoice->items->pluck('fee_structure_id')->all());
+            $this->assertNotContains($packages['day_parent']->id, $invoice->items->pluck('fee_structure_id')->all());
+        }
+    }
+
+    public function test_web_and_scheduled_generation_use_grade_independent_vote_schedules_and_transport_eligibility(): void
+    {
+        HandeFeeVotesService::syncSchoolVotes($this->school, '2026', 'Term 1');
+        $boarder = $this->createStudentEnrollment(true);
+        $dayScholar = $this->createStudentEnrollment(false);
+        $dayScholar['student']->update(['has_transport' => true]);
+        $dayScholar['enrollment']->update(['has_transport' => true]);
+        FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'category' => 'transport',
+            'code' => 'TRANSPORT-2026',
+            'label' => 'Transport',
+            'amount' => 25.00,
+            'service_type' => 'transport',
+        ]);
+
+        $webResponse = $this->actingAs($this->adminUser)->post(route('admin.invoices.process-auto-generate'), [
+            'target_academic_year' => '2026',
+            'target_term' => 'Term 1',
+            'generation_date' => now()->toDateString(),
+            'include_boarding' => '1',
+            'include_transport' => '1',
+        ]);
+        $webResponse->assertRedirect(route('admin.invoices.index'));
+
+        $boarderInvoice = Invoice::where('student_id', $boarder['student']->id)->firstOrFail();
+        $dayInvoice = Invoice::where('student_id', $dayScholar['student']->id)->firstOrFail();
+        $this->assertSame(470.0, (float) $boarderInvoice->total_amount);
+        $this->assertSame(160.0, (float) $dayInvoice->total_amount);
+        $this->assertCount(7, $boarderInvoice->items);
+        $this->assertCount(8, $dayInvoice->items);
+
+        $otherSchool = School::create([
+            'name' => 'Scheduled Invoice School',
+            'code' => 'HHS002',
+            'is_active' => true,
+        ]);
+        HandeFeeVotesService::syncSchoolVotes($otherSchool, '2026', 'Term 1');
+        $scheduledBoarder = $this->createStudentEnrollment(true, $otherSchool);
+        $scheduledDay = $this->createStudentEnrollment(false, $otherSchool);
+
+        Artisan::call('invoices:generate-scheduled', [
+            '--school_id' => $otherSchool->id,
+            '--academic_year' => '2026',
+            '--term' => 'Term 1',
+            '--dry-run' => true,
+        ]);
+
+        $this->assertStringContainsString('2 invoices would be created', Artisan::output());
+        $this->assertDatabaseMissing('invoices', ['student_id' => $scheduledBoarder['student']->id]);
+        $this->assertDatabaseMissing('invoices', ['student_id' => $scheduledDay['student']->id]);
+
+        Artisan::call('invoices:generate-scheduled', [
+            '--school_id' => $otherSchool->id,
+            '--academic_year' => '2026',
+            '--term' => 'Term 1',
+        ]);
+        $this->assertStringContainsString('2 invoices created', Artisan::output());
+        $scheduledBoarderInvoice = Invoice::where('student_id', $scheduledBoarder['student']->id)->firstOrFail();
+        $scheduledDayInvoice = Invoice::where('student_id', $scheduledDay['student']->id)->firstOrFail();
+        $this->assertSame(470.0, (float) $scheduledBoarderInvoice->total_amount);
+        $this->assertSame(135.0, (float) $scheduledDayInvoice->total_amount);
+        $this->assertCount(7, $scheduledBoarderInvoice->items);
+        $this->assertCount(7, $scheduledDayInvoice->items);
+    }
+
+    public function test_bulk_custom_items_preserve_vote_codes_and_apply_residency_restrictions(): void
+    {
+        $boarder = $this->createStudentEnrollment(true);
+        $dayScholar = $this->createStudentEnrollment(false);
+
+        $response = $this->actingAs($this->adminUser)->post(route('admin.invoices.bulk.store'), [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'enrollment_ids' => [$boarder['enrollment']->id, $dayScholar['enrollment']->id],
+            'issued_at' => now()->toDateString(),
+            'custom_fee_items' => [
+                ['description' => 'Extra science subject', 'category' => 'other', 'amount' => 5, 'vote_code' => 'SCIENCE_LEVY'],
+                ['description' => 'Boarding top-up', 'category' => 'other', 'amount' => 10, 'vote_code' => 'BOARDING_FEES'],
+                ['description' => 'Lunch top-up', 'category' => 'other', 'amount' => 5, 'vote_code' => 'FOOD'],
+            ],
+        ]);
+        $response->assertRedirect(route('admin.invoices.index'));
+
+        $boarderInvoice = Invoice::where('student_id', $boarder['student']->id)->firstOrFail();
+        $dayInvoice = Invoice::where('student_id', $dayScholar['student']->id)->firstOrFail();
+        $this->assertSame(15.0, (float) $boarderInvoice->total_amount);
+        $this->assertSame(10.0, (float) $dayInvoice->total_amount);
+        $this->assertEqualsCanonicalizing(['SCIENCE_LEVY', 'BOARDING_FEES'], $boarderInvoice->items->pluck('vote_code')->all());
+        $this->assertEqualsCanonicalizing(['SCIENCE_LEVY', 'FOOD'], $dayInvoice->items->pluck('vote_code')->all());
+    }
+
+    private function createStudentEnrollment(bool $isBoarding, ?School $school = null): array
+    {
+        $school ??= $this->school;
+        $student = Student::create([
+            'school_id' => $school->id,
+            'first_name' => $isBoarding ? 'Boarding' : 'Day',
+            'last_name' => 'Vote Test',
+            'grade' => 'Form 2',
+            'is_boarding' => $isBoarding,
+            'status' => 'active',
+        ]);
+        $enrollment = Enrollment::create([
+            'school_id' => $school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'is_boarding' => $isBoarding,
+            'enrollment_date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+
+        return compact('student', 'enrollment');
     }
 }

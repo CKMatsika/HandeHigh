@@ -20,8 +20,10 @@ Manually create multiple invoices at once for selected students.
 **How it works:**
 - Select multiple students from active enrollments
 - Specify academic year and term
-- Add custom fee items with descriptions, categories, and amounts
-- System creates invoices for all selected students with the same fee structure
+- Select fee structures; selecting an official package parent expands it into the appropriate seven boarding or day vote lines for each student, without billing the parent and children together
+- Add custom fee items with descriptions, categories, amounts, and optional MOPSE vote assignments
+- Grade-specific and school-wide fee structures are filtered per student; boarding, day, transport, and optional-fee eligibility is applied consistently
+- Invoice items retain their vote codes for FIFO allocation and MOPSE receipt vouchers
 - Invoices are properly categorized by term for accounting reports
 - Duplicate invoices for the same student/term are automatically skipped
 
@@ -37,9 +39,11 @@ Automatically generate invoices for all active students based on pre-configured 
 
 **How it works:**
 - Select target academic year and term
-- System fetches fee structures configured for each grade level
+- System fetches grade-specific and school-wide fee structures and selects the applicable vote schedule for each student's grade and residency
+- Official package parents expand into their seven vote lines instead of adding an extra lump-sum charge
 - Automatically creates invoices for all active enrollments
-- Optional: Include/exclude boarding, transport, and optional fees
+- Boarding and transport options include only eligible vote/fee lines; optional fees remain opt-in
+- Each generated invoice item saves its fee-structure vote code
 - Invoices are tagged with the correct term for accounting purposes
 - Duplicate checking prevents re-creating existing invoices
 
@@ -73,9 +77,11 @@ php artisan invoices:generate-scheduled --dry-run
 **How it works:**
 - Checks school settings for auto-generation configuration
 - Determines current academic year/term automatically
-- Generates invoices for all active enrollments
+- Applies the same grade, residency, package-expansion, transport, and duplicate checks as web generation
+- Generates invoice items with their vote codes
 - Skips students who already have invoices for that term
 - Creates proper ledger entries for accounting
+- In dry-run mode, counts only students with applicable fees and no existing invoice; it creates no invoices
 - Logs all operations for audit purposes
 
 ### 4. Term-Based Accounting
