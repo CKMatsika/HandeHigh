@@ -98,6 +98,29 @@
         </div>
     </a>
 
+    <!-- Daily Cash Banking Handover -->
+    <div class="rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 p-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m-3-3h9m0 0l-3-3m3 3l-3 3"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-emerald-300">Daily Cash Banking Handover</h3>
+                    <p class="text-xs text-slate-400 mt-1">Prepare, reconcile, print, and export today's cash handover for banking.</p>
+                </div>
+            </div>
+            <a href="{{ route('admin.reports.daily-banking-handover') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 transition">
+                Open Today's Handover
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+
     <!-- Fee Collection Status -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">

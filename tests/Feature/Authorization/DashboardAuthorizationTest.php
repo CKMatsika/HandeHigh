@@ -64,6 +64,17 @@ class DashboardAuthorizationTest extends TestCase
         }
     }
 
+    public function test_accounts_clerk_dashboard_links_to_daily_cash_banking_handover(): void
+    {
+        $user = $this->userWithRole('accounts-clerk');
+
+        $this->actingAs($user)
+            ->get(route('admin.dashboard.accounts-clerk'))
+            ->assertOk()
+            ->assertSee('Daily Cash Banking Handover')
+            ->assertSee(route('admin.reports.daily-banking-handover'));
+    }
+
     public function test_school_admin_does_not_receive_role_specific_dashboard_permissions(): void
     {
         $user = $this->userWithRole('school-admin');
