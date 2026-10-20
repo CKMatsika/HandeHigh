@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Authorization;
 
+use App\Models\SdaRole;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -10,7 +11,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
-use App\Models\SdaRole;
 use Tests\TestCase;
 
 class RolePermissionSeederTest extends TestCase
@@ -37,7 +37,7 @@ class RolePermissionSeederTest extends TestCase
         $expected = RolePermissionSeeder::permissions();
         sort($expected);
         $this->assertSame($expected, Permission::query()->orderBy('name')->pluck('name')->all());
-        $this->assertSame(103, Permission::count());
+        $this->assertSame(count(RolePermissionSeeder::permissions()), Permission::count());
         $this->assertSame(['web'], Permission::query()->distinct()->pluck('guard_name')->all());
     }
 
@@ -72,9 +72,9 @@ class RolePermissionSeederTest extends TestCase
 
         $expectedRoleCount = count(RoleSeeder::roles());
         $this->assertSame($expectedRoleCount, Role::count());
-        $this->assertSame(103, Permission::count());
+        $this->assertSame(count(RolePermissionSeeder::permissions()), Permission::count());
         $this->assertSame($expectedRoleCount, Role::query()->select(['name', 'guard_name'])->distinct()->count());
-        $this->assertSame(103, Permission::query()->select(['name', 'guard_name'])->distinct()->count());
+        $this->assertSame(count(RolePermissionSeeder::permissions()), Permission::query()->select(['name', 'guard_name'])->distinct()->count());
     }
 
     public function test_database_seeder_runs_structural_authorization_without_demo_users(): void
@@ -84,7 +84,7 @@ class RolePermissionSeederTest extends TestCase
 
         $expectedRoleCount = count(RoleSeeder::roles());
         $this->assertSame($expectedRoleCount, Role::count());
-        $this->assertSame(103, Permission::count());
+        $this->assertSame(count(RolePermissionSeeder::permissions()), Permission::count());
         $this->assertDatabaseCount('users', 0);
     }
 

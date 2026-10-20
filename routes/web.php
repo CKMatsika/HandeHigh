@@ -834,7 +834,48 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/reports/overdue', [LibrarianController::class, 'overdueBooksReport'])->name('reports.overdue');
             });
 
-        // ICT Coordination & Staff Helpdesk Routes
+    Route::middleware(['tenant', 'role:super-admin|school-admin|headmaster|bursar|accountant|procurement-officer|stores-person'])
+            ->prefix('admin')
+            ->name('admin.')
+            ->group(function () {
+                Route::get('inventory', [\App\Http\Controllers\Admin\InventoryController::class, 'dashboard'])
+                    ->name('inventory.index')->middleware('permission:inventory.view');
+
+                Route::get('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'categories'])
+                    ->name('inventory.categories.index')->middleware('permission:inventory.view');
+                Route::get('inventory/categories/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createCategory'])
+                    ->name('inventory.categories.create')->middleware('permission:inventory.catalog.manage');
+                Route::post('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'storeCategory'])
+                    ->name('inventory.categories.store')->middleware('permission:inventory.catalog.manage');
+                Route::get('inventory/categories/{category}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editCategory'])
+                    ->name('inventory.categories.edit')->middleware('permission:inventory.catalog.manage');
+                Route::put('inventory/categories/{category}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateCategory'])
+                    ->name('inventory.categories.update')->middleware('permission:inventory.catalog.manage');
+
+                Route::get('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'items'])
+                    ->name('inventory.items.index')->middleware('permission:inventory.view');
+                Route::get('inventory/items/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createItem'])
+                    ->name('inventory.items.create')->middleware('permission:inventory.catalog.manage');
+                Route::post('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'storeItem'])
+                    ->name('inventory.items.store')->middleware('permission:inventory.catalog.manage');
+                Route::get('inventory/items/{item}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editItem'])
+                    ->name('inventory.items.edit')->middleware('permission:inventory.catalog.manage');
+                Route::put('inventory/items/{item}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateItem'])
+                    ->name('inventory.items.update')->middleware('permission:inventory.catalog.manage');
+
+                Route::get('inventory/warehouses', [\App\Http\Controllers\Admin\InventoryController::class, 'warehouses'])
+                    ->name('inventory.warehouses.index')->middleware('permission:inventory.view');
+                Route::get('inventory/warehouses/create', [\App\Http\Controllers\Admin\InventoryController::class, 'createWarehouse'])
+                    ->name('inventory.warehouses.create')->middleware('permission:inventory.warehouses.manage');
+                Route::post('inventory/warehouses', [\App\Http\Controllers\Admin\InventoryController::class, 'storeWarehouse'])
+                    ->name('inventory.warehouses.store')->middleware('permission:inventory.warehouses.manage');
+                Route::get('inventory/warehouses/{warehouse}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editWarehouse'])
+                    ->name('inventory.warehouses.edit')->middleware('permission:inventory.warehouses.manage');
+                Route::put('inventory/warehouses/{warehouse}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateWarehouse'])
+                    ->name('inventory.warehouses.update')->middleware('permission:inventory.warehouses.manage');
+            });
+
+            // ICT Coordination & Staff Helpdesk Routes
         Route::prefix('ict')->name('ict.')->group(function () {
             // Staff / Teacher ICT Support Requests
             Route::get('/tickets/create', [\App\Http\Controllers\Ict\IctTicketController::class, 'create'])->name('tickets.create');
@@ -854,4 +895,3 @@ Route::middleware(['auth'])->group(function () {
             });
         });
 });
-

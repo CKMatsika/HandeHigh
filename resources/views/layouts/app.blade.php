@@ -70,6 +70,12 @@
                             </a>
                         @endcan
                     @endif
+                    @can('inventory.view')
+                        <a href="{{ route('admin.inventory.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
+                            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                            <span>Stores & Inventory</span>
+                        </a>
+                    @endcan
                     @if($user && $user->hasRole(['super-admin','school-admin']))
                         <!-- Academic Management -->
                         <div class="space-y-1">

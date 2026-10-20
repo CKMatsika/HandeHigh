@@ -122,6 +122,7 @@ class DashboardAuthorizationTest extends TestCase
             'accounts-clerk' => 'admin.dashboard.accounts-clerk',
             'bursar' => 'admin.dashboard.bursar',
             'procurement-officer' => 'admin.dashboard.procurement-officer',
+            'stores-person' => 'admin.inventory.index',
             'teacher' => 'teacher.dashboard',
             'student' => 'student.dashboard',
             'parent' => 'parent.dashboard',
