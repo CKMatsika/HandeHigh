@@ -35,6 +35,15 @@ The following issues have been resolved:
 - Supports dry-run mode for testing
 - Full logging and error tracking
 
+### ✅ 4. Vote-coded invoice items
+- In manual invoice creation, load the official Boarding ($470) or Day-Scholar ($135) schedule for the selected student's residency and term.
+- Add individual fee-structure lines or custom lines assigned to MOPSE votes.
+- In invoice editing, review each line's vote and paid amount; paid lines cannot be deleted or reduced below the amount allocated to them.
+- Eligible unpaid legacy package lines can be converted into seven vote lines without changing the total.
+- Vote codes flow into payment allocations and MOPSE vouchers.
+
+Apply pending database migrations during deployment before using the new invoice workflow.
+
 ## Quick Test
 
 ### Test the Command Manually

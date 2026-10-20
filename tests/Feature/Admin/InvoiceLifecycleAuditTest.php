@@ -17,6 +17,7 @@ use App\Models\Student;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
+use App\Services\Finance\HandeFeeVotesService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -363,5 +364,241 @@ class InvoiceLifecycleAuditTest extends TestCase
         // Assert that the img tag with the school logo is rendered, NOT the fallback crest box
         $response->assertSee('test_school_crest.png');
         $response->assertSee('class="school-logo-img"', false);
+    }
+
+    public function test_invoice_creation_persists_manual_and_fee_structure_vote_codes(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.create'))
+            ->assertOk()
+            ->assertSee('Load Boarding Schedule');
+
+        $fee = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'category' => 'tuition',
+            'code' => 'TEST-TUITION',
+            'label' => 'Tuition',
+            'amount' => 20.00,
+            'vote_code' => 'TUITION',
+            'allocation_priority' => 1,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->post(route('admin.invoices.store'), [
+                'student_id' => $this->student->id,
+                'academic_year' => '2026',
+                'term' => 'Term 1',
+                'issued_at' => '2026-01-01',
+                'items' => [
+                    [
+                        'fee_structure_id' => $fee->id,
+                        'description' => 'Tuition',
+                        'category' => 'tuition',
+                        'quantity' => 1,
+                        'unit_amount' => 20.00,
+                    ],
+                    [
+                        'description' => 'Extra Science Subject',
+                        'category' => 'subject',
+                        'quantity' => 1,
+                        'unit_amount' => 20.00,
+                        'vote_code' => 'SCIENCE_LEVY',
+                    ],
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $invoice = Invoice::where('student_id', $this->student->id)
+            ->where('term', 'Term 1')
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('invoice_items', [
+            'invoice_id' => $invoice->id,
+            'fee_structure_id' => $fee->id,
+            'vote_code' => 'TUITION',
+        ]);
+        $this->assertDatabaseHas('invoice_items', [
+            'invoice_id' => $invoice->id,
+            'fee_structure_id' => null,
+            'vote_code' => 'SCIENCE_LEVY',
+            'description' => 'Extra Science Subject',
+        ]);
+    }
+
+    public function test_invoice_edit_updates_vote_linkage_and_rejects_removing_paid_items(): void
+    {
+        $fee = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'category' => 'levy',
+            'code' => 'TEST-BUILDING',
+            'label' => 'Building Fund',
+            'amount' => 15.00,
+            'vote_code' => 'BUILDING_FUND',
+            'allocation_priority' => 2,
+        ]);
+        $invoice = Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'enrollment_id' => $this->enrollment->id,
+            'number' => 'INV-2026-000089',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'total_amount' => 100.00,
+            'balance' => 100.00,
+            'status' => 'unpaid',
+            'issued_at' => '2026-01-01',
+        ]);
+        $item = $invoice->items()->create([
+            'description' => 'Original fee',
+            'category' => 'fees',
+            'quantity' => 1,
+            'unit_amount' => 100.00,
+            'line_total' => 100.00,
+        ]);
+
+        $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.edit', $invoice))
+            ->assertOk()
+            ->assertSee('MOPSE Vote');
+
+        $response = $this->actingAs($this->adminUser)
+            ->put(route('admin.invoices.update', $invoice), [
+                'issued_at' => '2026-01-01',
+                'edit_reason' => 'Link building subvote',
+                'items' => [[
+                    'id' => $item->id,
+                    'fee_structure_id' => $fee->id,
+                    'vote_code' => 'BUILDING_FUND',
+                    'description' => 'Building Fund',
+                    'category' => 'levy',
+                    'quantity' => 1,
+                    'unit_amount' => 100.00,
+                ]],
+            ]);
+        $response->assertRedirect(route('admin.invoices.show', $invoice));
+        $this->assertDatabaseHas('invoice_items', [
+            'id' => $item->id,
+            'fee_structure_id' => $fee->id,
+            'vote_code' => 'BUILDING_FUND',
+        ]);
+        $auditLog = AuditLog::where('model_id', $invoice->id)
+            ->where('action', 'update')
+            ->firstOrFail();
+        $this->assertSame('BUILDING_FUND', $auditLog->new_values['items'][0]['vote_code']);
+        $this->assertSame('Link building subvote', $auditLog->new_values['reason']);
+
+        $payment = Payment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'amount' => 20.00,
+            'method' => 'cash',
+            'paid_at' => '2026-01-05',
+            'status' => 'completed',
+        ]);
+        PaymentAllocation::create([
+            'payment_id' => $payment->id,
+            'invoice_id' => $invoice->id,
+            'invoice_item_id' => $item->id,
+            'vote_code' => 'BUILDING_FUND',
+            'amount' => 20.00,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->put(route('admin.invoices.update', $invoice), [
+                'issued_at' => '2026-01-01',
+                'items' => [[
+                    'description' => 'Replacement fee',
+                    'category' => 'fees',
+                    'quantity' => 1,
+                    'unit_amount' => 100.00,
+                ]],
+            ]);
+
+        $response->assertSessionHasErrors('items');
+        $this->assertDatabaseHas('invoice_items', ['id' => $item->id]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->put(route('admin.invoices.update', $invoice), [
+                'issued_at' => '2026-01-01',
+                'items' => [[
+                    'id' => $item->id,
+                    'fee_structure_id' => $fee->id,
+                    'vote_code' => 'BUILDING_FUND',
+                    'description' => 'Building Fund',
+                    'category' => 'levy',
+                    'quantity' => 1,
+                    'unit_amount' => 19.99,
+                ]],
+            ]);
+        $response->assertSessionHasErrors('items');
+        $this->assertDatabaseHas('invoice_items', ['id' => $item->id, 'line_total' => 100.00]);
+    }
+
+    public function test_legacy_unpaid_package_invoice_can_be_converted_to_seven_vote_lines(): void
+    {
+        HandeFeeVotesService::syncSchoolVotes($this->school, '2026', 'Term 1');
+        $invoice = Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'enrollment_id' => $this->enrollment->id,
+            'number' => 'INV-2026-000090',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'total_amount' => 470.00,
+            'balance' => 470.00,
+            'status' => 'unpaid',
+            'issued_at' => '2026-01-01',
+        ]);
+        $invoice->items()->create([
+            'description' => 'Boarding Student Fees - $470.00',
+            'category' => 'boarding',
+            'quantity' => 1,
+            'unit_amount' => 470.00,
+            'line_total' => 470.00,
+        ]);
+
+        $editResponse = $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.edit', $invoice));
+        $editResponse->assertOk()->assertSee('Convert to Official Vote Breakdown');
+
+        $schedule = FeeStructure::where('school_id', $this->school->id)
+            ->where('academic_year', '2026')
+            ->where('term', 'Term 1')
+            ->where('residency_type', 'boarding')
+            ->whereNotNull('vote_code')
+            ->orderBy('allocation_priority')
+            ->get();
+        $items = $schedule->map(fn (FeeStructure $fee) => [
+            'fee_structure_id' => $fee->id,
+            'vote_code' => $fee->vote_code,
+            'description' => $fee->label,
+            'category' => $fee->category,
+            'quantity' => 1,
+            'unit_amount' => (float) $fee->amount,
+        ])->all();
+
+        $response = $this->actingAs($this->adminUser)
+            ->put(route('admin.invoices.update', $invoice), [
+                'issued_at' => '2026-01-01',
+                'items' => $items,
+            ]);
+
+        $response->assertRedirect(route('admin.invoices.show', $invoice));
+        $this->assertDatabaseMissing('invoice_items', [
+            'invoice_id' => $invoice->id,
+            'description' => 'Boarding Student Fees - $470.00',
+        ]);
+        $this->assertDatabaseCount('invoice_items', 7);
+        $this->assertEquals(470.00, (float) Invoice::findOrFail($invoice->id)->total_amount);
+        $this->assertEquals(470.00, (float) InvoiceItem::where('invoice_id', $invoice->id)->sum('line_total'));
+        $this->assertDatabaseHas('invoice_items', [
+            'invoice_id' => $invoice->id,
+            'vote_code' => 'BOARDING_FEES',
+            'line_total' => 380.00,
+        ]);
     }
 }

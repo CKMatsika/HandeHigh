@@ -59,9 +59,19 @@
             <div class="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-4">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="text-sm font-semibold text-slate-100">Items</h2>
-                    <button type="button" onclick="addNewItem()" class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">
-                        Add Item
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        @if($convertSchedule)
+                            <button type="button" onclick="convertToVoteBreakdown()" class="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition-colors">
+                                Convert to Official Vote Breakdown
+                            </button>
+                        @endif
+                        <button type="button" onclick="addNewItem(); document.querySelector('#invoice-items tr:last-child .item-fee-select')?.focus()" class="px-3 py-1 bg-indigo-700 text-white text-xs rounded hover:bg-indigo-600 transition-colors">
+                            Add from Fee Structure
+                        </button>
+                        <button type="button" onclick="addNewItem()" class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">
+                            Add Manual Item
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="overflow-x-auto">
@@ -69,6 +79,8 @@
                         <thead>
                             <tr class="border-b border-slate-800 text-slate-400">
                                 <th class="text-left py-2 font-medium">Description</th>
+                                <th class="text-left py-2 font-medium">Fee Structure</th>
+                                <th class="text-left py-2 font-medium">MOPSE Vote</th>
                                 <th class="text-left py-2 font-medium">Category</th>
                                 <th class="text-right py-2 font-medium">Qty</th>
                                 <th class="text-right py-2 font-medium">Unit Price</th>
@@ -78,10 +90,32 @@
                         </thead>
                         <tbody id="invoice-items">
                             @foreach($invoice->items as $index => $item)
-                                <tr class="border-b border-slate-800/70 invoice-item" data-item-id="{{ $item->id }}">
+                                <tr class="border-b border-slate-800/70 invoice-item" data-item-id="{{ $item->id }}" data-paid="{{ (float) $item->paid_amount }}">
                                     <td class="py-2 align-middle">
                                         <input type="text" name="items[{{ $index }}][description]" value="{{ old('items.' . $index . '.description', $item->description) }}" required class="w-72 rounded border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs item-description">
                                         <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item->id }}" class="item-id">
+                                    </td>
+                                    <td class="py-2 align-middle">
+                                        <select name="items[{{ $index }}][fee_structure_id]" class="w-56 rounded border border-slate-700 bg-slate-950/60 px-2 py-2 text-xs item-fee-select">
+                                            <option value="">Manual / no preset</option>
+                                            @foreach($feeStructures->groupBy('residency_type') as $residency => $fees)
+                                                <optgroup label="{{ ucfirst($residency) }} Fee Structures">
+                                                    @foreach($fees as $fee)
+                                                        <option value="{{ $fee->id }}" data-label="{{ $fee->label }}" data-category="{{ $fee->category }}" data-amount="{{ $fee->amount }}" data-vote-code="{{ $fee->vote_code }}" {{ $item->fee_structure_id == $fee->id ? 'selected' : '' }}>
+                                                            {{ $fee->label }} — ${{ number_format($fee->amount, 2) }}
+                                                        </option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    <td class="py-2 align-middle">
+                                        <select name="items[{{ $index }}][vote_code]" class="w-52 rounded border border-slate-700 bg-slate-950/60 px-2 py-2 text-xs item-vote-select">
+                                            <option value="NONE" {{ $item->effective_vote_code ? '' : 'selected' }}>NONE (unassigned)</option>
+                                            @foreach($standardVotes as $code => $vote)
+                                                <option value="{{ $code }}" {{ $item->effective_vote_code === $code ? 'selected' : '' }}>[{{ $code }}] {{ $vote['name'] }}</option>
+                                            @endforeach
+                                        </select>
                                     </td>
                                     <td class="py-2 align-middle">
                                         <input type="text" name="items[{{ $index }}][category]" value="{{ old('items.' . $index . '.category', $item->category) }}" class="w-28 rounded border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs item-category">
@@ -94,9 +128,10 @@
                                     </td>
                                     <td class="py-2 align-middle text-right">
                                         <span class="item-total w-28 inline-block text-right">{{ number_format($item->line_total, 2) }}</span>
+                                        <span class="block text-[10px] text-emerald-300">Paid: ${{ number_format($item->paid_amount, 2) }}</span>
                                     </td>
                                     <td class="py-2 align-middle text-center">
-                                        <button type="button" onclick="removeItem(this)" class="text-red-400 hover:text-red-300 text-xs">Remove</button>
+                                        <button type="button" onclick="removeItem(this)" {{ $item->paid_amount > 0 ? 'disabled title=Paid-item-cannot-be-removed' : '' }} class="text-red-400 hover:text-red-300 text-xs disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
                                     </td>
                                 </tr>
                             @endforeach
@@ -116,6 +151,11 @@
                 </div>
             </div>
 
+            <div>
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="edit_reason">Reason for invoice edit</label>
+                <input id="edit_reason" type="text" name="edit_reason" value="{{ old('edit_reason') }}" maxlength="500" placeholder="Optional audit note" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+            </div>
+
             <div class="flex justify-end gap-2">
                 <button type="submit" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 transition">Save changes</button>
                 <a href="{{ route('admin.invoices.show', $invoice) }}" class="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-4 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition">Cancel</a>
@@ -125,6 +165,37 @@
 
 <script>
 let newItemIndex = {{ $invoice->items->count() }};
+const feeStructures = @json($feeStructures);
+const standardVotes = @json($standardVotes);
+const convertSchedule = @json($convertSchedule ?? []);
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    }[char]));
+}
+
+function feeOptions(selectedId = '') {
+    let html = '<option value="">Manual / no preset</option>';
+    const groups = {};
+    feeStructures.forEach(fee => (groups[fee.residency_type || 'all'] ||= []).push(fee));
+    Object.entries(groups).forEach(([residency, fees]) => {
+        html += `<optgroup label="${escapeHtml(residency)} Fee Structures">`;
+        fees.forEach(fee => {
+            html += `<option value="${fee.id}" data-label="${escapeHtml(fee.label)}" data-category="${escapeHtml(fee.category)}" data-amount="${Number(fee.amount || 0)}" data-vote-code="${escapeHtml(fee.vote_code || '')}" ${String(fee.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(fee.label)} — $${Number(fee.amount || 0).toFixed(2)}</option>`;
+        });
+        html += '</optgroup>';
+    });
+    return html;
+}
+
+function voteOptions(selectedCode = '') {
+    let html = `<option value="NONE" ${selectedCode ? '' : 'selected'}>NONE (unassigned)</option>`;
+    Object.entries(standardVotes).forEach(([code, vote]) => {
+        html += `<option value="${escapeHtml(code)}" ${selectedCode === code ? 'selected' : ''}>[${escapeHtml(code)}] ${escapeHtml(vote.name)}</option>`;
+    });
+    return html;
+}
 
 function addNewItem() {
     const tbody = document.getElementById('invoice-items');
@@ -136,6 +207,16 @@ function addNewItem() {
         <td class="py-2 align-middle">
             <input type="text" name="items[${newItemIndex}][description]" required class="w-72 rounded border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs item-description">
             <input type="hidden" name="items[${newItemIndex}][id]" value="" class="item-id">
+        </td>
+        <td class="py-2 align-middle">
+            <select name="items[${newItemIndex}][fee_structure_id]" class="w-56 rounded border border-slate-700 bg-slate-950/60 px-2 py-2 text-xs item-fee-select">
+                ${feeOptions()}
+            </select>
+        </td>
+        <td class="py-2 align-middle">
+            <select name="items[${newItemIndex}][vote_code]" class="w-52 rounded border border-slate-700 bg-slate-950/60 px-2 py-2 text-xs item-vote-select">
+                ${voteOptions()}
+            </select>
         </td>
         <td class="py-2 align-middle">
             <input type="text" name="items[${newItemIndex}][category]" value="fees" class="w-28 rounded border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs item-category">
@@ -157,19 +238,71 @@ function addNewItem() {
     tbody.appendChild(newRow);
     newItemIndex++;
     
-    // Add event listeners to new inputs
     newRow.querySelectorAll('input').forEach(input => {
         input.addEventListener('input', calculateTotal);
     });
+    newRow.querySelector('.item-fee-select').addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        if (!this.value) {
+            newRow.querySelector('.item-vote-select').value = 'NONE';
+            return;
+        }
+        newRow.querySelector('.item-description').value = option.dataset.label || '';
+        newRow.querySelector('.item-category').value = option.dataset.category || 'fees';
+        newRow.querySelector('.item-unit-price').value = Number(option.dataset.amount || 0).toFixed(2);
+        newRow.querySelector('.item-vote-select').value = option.dataset.voteCode || 'NONE';
+        calculateTotal();
+    });
+    calculateTotal();
+}
+
+function addScheduleItem(fee) {
+    addNewItem();
+    const row = document.querySelector('#invoice-items tr:last-child');
+    row.querySelector('.item-fee-select').value = String(fee.id);
+    row.querySelector('.item-vote-select').value = fee.vote_code || 'NONE';
+    row.querySelector('.item-description').value = fee.label || '';
+    row.querySelector('.item-category').value = fee.category || 'fees';
+    row.querySelector('.item-quantity').value = '1';
+    row.querySelector('.item-unit-price').value = Number(fee.amount || 0).toFixed(2);
+    calculateTotal();
+}
+
+function convertToVoteBreakdown() {
+    if (!convertSchedule.length || !confirm('Replace the unpaid lump-sum line with its seven official vote lines? The schedule total must remain unchanged.')) return;
+    document.getElementById('invoice-items').replaceChildren();
+    newItemIndex = 0;
+    convertSchedule.forEach(addScheduleItem);
+    calculateTotal();
 }
 
 function removeItem(button) {
+    if (Number(button.closest('tr')?.dataset.paid || 0) > 0) {
+        alert('This item has recorded payments and cannot be removed.');
+        return;
+    }
     if (confirm('Are you sure you want to remove this item?')) {
         const row = button.closest('tr');
         row.remove();
         calculateTotal();
     }
-}
+    }
+
+    document.querySelectorAll('.item-fee-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const row = this.closest('tr');
+            const option = this.options[this.selectedIndex];
+            if (!this.value) {
+                row.querySelector('.item-vote-select').value = 'NONE';
+                return;
+            }
+            row.querySelector('.item-description').value = option.dataset.label || '';
+            row.querySelector('.item-category').value = option.dataset.category || 'fees';
+            row.querySelector('.item-unit-price').value = Number(option.dataset.amount || 0).toFixed(2);
+            row.querySelector('.item-vote-select').value = option.dataset.voteCode || 'NONE';
+            calculateTotal();
+        });
+    });
 
 function calculateTotal() {
     let total = 0;

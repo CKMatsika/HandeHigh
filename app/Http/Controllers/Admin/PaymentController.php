@@ -87,8 +87,10 @@ class PaymentController extends Controller
             $paid = (float) $item->allocations()->sum('amount');
             $lineTotal = (float) $item->line_total;
             $balance = max(0.0, $lineTotal - $paid);
-            $priority = (int) ($item->feeStructure?->allocation_priority ?? 10);
-            $voteCode = $item->feeStructure?->vote_code ?? null;
+            $voteCode = $item->effective_vote_code;
+            $priority = (int) ($item->feeStructure?->allocation_priority
+                ?? HandeFeeVotesService::getStandardVotes()[$voteCode]['priority']
+                ?? 10);
 
             return [
                 'id' => $item->id,
@@ -199,7 +201,7 @@ class PaymentController extends Controller
                         'payment_id' => $payment->id,
                         'invoice_id' => $invoice->id,
                         'invoice_item_id' => $itemId,
-                        'vote_code' => $item?->feeStructure?->vote_code,
+                        'vote_code' => $item?->effective_vote_code,
                         'amount' => $allocVal,
                     ]);
                 }
@@ -397,7 +399,7 @@ class PaymentController extends Controller
                         'payment_id' => $payment->id,
                         'invoice_id' => $invoice->id,
                         'invoice_item_id' => $itemId,
-                        'vote_code' => $item?->feeStructure?->vote_code,
+                        'vote_code' => $item?->effective_vote_code,
                         'amount' => $allocVal,
                     ]);
                 }

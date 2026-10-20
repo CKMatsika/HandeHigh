@@ -12,11 +12,14 @@ class InvoiceItem extends Model
     protected $fillable = [
         'invoice_id',
         'fee_structure_id',
+        'vote_code',
         'description',
         'category',
         'quantity',
         'unit_amount',
         'line_total',
+        'project_id',
+        'cost_center_id',
         'project_id',
         'cost_center_id',
     ];
@@ -35,6 +38,11 @@ class InvoiceItem extends Model
     public function feeStructure()
     {
         return $this->belongsTo(FeeStructure::class);
+    }
+
+    public function getEffectiveVoteCodeAttribute(): ?string
+    {
+        return $this->vote_code ?: $this->feeStructure?->vote_code;
     }
 
     public function project()

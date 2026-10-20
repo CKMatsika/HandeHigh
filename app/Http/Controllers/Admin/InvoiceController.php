@@ -16,10 +16,13 @@ use App\Models\Student;
 use App\Models\User;
 use App\Rules\TenantExists;
 use App\Services\AccountingService;
+use App\Services\Finance\HandeFeeVotesService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class InvoiceController extends Controller
 {
@@ -61,6 +64,8 @@ class InvoiceController extends Controller
 
         $feeStructures = FeeStructure::where('school_id', $school->id)
             ->orderBy('grade')
+            ->orderBy('residency_type')
+            ->orderBy('allocation_priority')
             ->orderBy('category')
             ->orderBy('label')
             ->get();
@@ -81,6 +86,7 @@ class InvoiceController extends Controller
             'school' => $school,
             'students' => $students,
             'feeStructures' => $feeStructures,
+            'standardVotes' => HandeFeeVotesService::getStandardVotes(),
             'academicYears' => $academicYears,
             'terms' => $terms,
         ]);
@@ -102,7 +108,8 @@ class InvoiceController extends Controller
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.fee_structure_id' => ['nullable', 'integer'],
+            'items.*.fee_structure_id' => ['nullable', 'integer', TenantExists::make('fee_structures')],
+            'items.*.vote_code' => ['nullable', 'string', 'max:50', Rule::in(array_merge(array_keys(HandeFeeVotesService::getStandardVotes()), ['NONE']))],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.category' => ['nullable', 'string', 'max:50'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -158,21 +165,27 @@ class InvoiceController extends Controller
                 $lineTotal = (float) $item['quantity'] * (float) $item['unit_amount'];
                 $totalAmount += $lineTotal;
 
-                $feeStructure = !empty($item['fee_structure_id']) ? FeeStructure::find($item['fee_structure_id']) : null;
-                $projectId = $item['project_id'] ?? $feeStructure?->project_id;
-                $costCenterId = $item['cost_center_id'] ?? $feeStructure?->cost_center_id;
+                $feeStructure = !empty($item['fee_structure_id'])
+                    ? FeeStructure::where('school_id', $school->id)->findOrFail($item['fee_structure_id'])
+                    : null;
+                $voteCode = $item['vote_code'] ?? null;
+                if ($voteCode === 'NONE') {
+                    $voteCode = null;
+                } elseif (! $voteCode) {
+                    $voteCode = $feeStructure?->vote_code;
+                }
 
                 InvoiceItem::create([
-                    'school_id' => $invoice->school_id,
                     'invoice_id' => $invoice->id,
                     'fee_structure_id' => !empty($item['fee_structure_id']) ? (int)$item['fee_structure_id'] : null,
+                    'vote_code' => $voteCode,
                     'description' => $item['description'],
                     'category' => $item['category'] ?? 'fees',
                     'quantity' => (int) $item['quantity'],
                     'unit_amount' => (float) $item['unit_amount'],
                     'line_total' => $lineTotal,
-                    'project_id' => $projectId,
-                    'cost_center_id' => $costCenterId,
+                    'project_id' => $feeStructure?->project_id,
+                    'cost_center_id' => $feeStructure?->cost_center_id,
                 ]);
             }
 
@@ -1241,14 +1254,57 @@ class InvoiceController extends Controller
                 ->with('status', 'Cancelled invoices cannot be edited.');
         }
 
-        $invoice->load(['student', 'guardian', 'items', 'allocations']);
+        $invoice->load(['student', 'guardian', 'items.feeStructure', 'items.allocations', 'allocations']);
 
         $totalPaid = (float) $invoice->allocations->sum('amount');
+        $feeStructures = FeeStructure::where('school_id', $school->id)
+            ->where('academic_year', $invoice->academic_year)
+            ->where('term', $invoice->term)
+            ->orderBy('residency_type')
+            ->orderBy('allocation_priority')
+            ->orderBy('label')
+            ->get();
+
+        $convertSchedule = null;
+        if ($totalPaid <= 0.00001 && $invoice->items->count() === 1) {
+            $item = $invoice->items->first();
+            if (! $item->effective_vote_code && (float) $item->paid_amount <= 0.00001) {
+                $residency = $invoice->student?->is_boarding ? 'boarding' : 'day';
+                $packageCode = ($residency === 'boarding' ? 'BOARD-PKG-' : 'DAY-PKG-') . $invoice->academic_year;
+                $package = $feeStructures->first(fn (FeeStructure $fee) =>
+                    $fee->parent_id === null
+                    && $fee->residency_type === $residency
+                    && $fee->code === $packageCode
+                );
+                $schedule = $package
+                    ? $feeStructures->where('parent_id', $package->id)->whereNotNull('vote_code')->sortBy('allocation_priority')->values()
+                    : collect();
+                $scheduleTotal = (float) $schedule->sum(fn (FeeStructure $fee) => (float) $fee->amount);
+
+                if ($schedule->count() === 7 && abs($scheduleTotal - (float) $item->line_total) < 0.01) {
+                    $convertSchedule = $schedule;
+                }
+            }
+        }
 
         return view('admin.invoices.edit', [
             'school' => $school,
             'invoice' => $invoice,
             'totalPaid' => $totalPaid,
+            'feeStructures' => $feeStructures,
+            'standardVotes' => HandeFeeVotesService::getStandardVotes(),
+            'convertSchedule' => $convertSchedule,
+            'invoiceItems' => $invoice->items->map(fn (InvoiceItem $item) => [
+                'id' => $item->id,
+                'fee_structure_id' => $item->fee_structure_id,
+                'vote_code' => $item->effective_vote_code,
+                'description' => $item->description,
+                'category' => $item->category,
+                'quantity' => $item->quantity,
+                'unit_amount' => (float) $item->unit_amount,
+                'line_total' => (float) $item->line_total,
+                'paid_amount' => (float) $item->paid_amount,
+            ])->values(),
         ]);
     }
 
@@ -1267,86 +1323,129 @@ class InvoiceController extends Controller
                 ->with('status', 'Cancelled invoices cannot be edited.');
         }
 
-        $invoice->load(['items', 'allocations']);
-
         $validated = $request->validate([
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.fee_structure_id' => ['nullable', 'integer', TenantExists::make('fee_structures')],
+            'items.*.vote_code' => ['nullable', 'string', 'max:50', Rule::in(array_merge(array_keys(HandeFeeVotesService::getStandardVotes()), ['NONE']))],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.category' => ['nullable', 'string', 'max:50'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_amount' => ['required', 'numeric', 'min:0'],
-            'items.*.id' => ['nullable', 'integer'], // For existing items
-            'removed_items' => ['nullable', 'array'], // IDs of items to remove
-            'removed_items.*' => ['integer'],
+            'items.*.id' => ['nullable', 'integer', Rule::exists('invoice_items', 'id')->where('invoice_id', $invoice->id)],
+            'edit_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $totalPaid = (float) $invoice->allocations->sum('amount');
         $newTotal = 0.0;
-
-        // Calculate new total from submitted items
         foreach ($validated['items'] as $item) {
-            $newTotal += ((int) $item['quantity']) * ((float) $item['unit_amount']);
+            $newTotal += round((int) $item['quantity'] * (float) $item['unit_amount'], 2);
         }
+        $newTotal = round($newTotal, 2);
 
-        if ($newTotal + 0.00001 < $totalPaid) {
-            return back()
-                ->withErrors(['items' => 'Invoice total cannot be lower than the amount already paid (' . number_format($totalPaid, 2) . ').'])
-                ->withInput();
-        }
+        DB::transaction(function () use ($invoice, $validated, $newTotal, $school, $user) {
+            $lockedInvoice = Invoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            $lockedInvoice->load(['items.allocations']);
+            $existingItems = $lockedInvoice->items->keyBy('id');
+            $submittedItemIds = collect($validated['items'])
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $totalPaid = (float) $lockedInvoice->allocations()->sum('amount');
 
-        $oldTotal = (float) $invoice->total_amount;
-        $delta = $newTotal - $oldTotal;
+            if ($newTotal + 0.00001 < $totalPaid) {
+                throw ValidationException::withMessages([
+                    'items' => 'Invoice total cannot be lower than the amount already paid (' . number_format($totalPaid, 2) . ').',
+                ]);
+            }
 
-        DB::transaction(function () use ($invoice, $validated, $newTotal, $totalPaid, $delta) {
-            $existingItemIds = $invoice->items->pluck('id')->toArray();
-            $submittedItemIds = [];
-
-            // Update existing items and create new ones
-            foreach ($validated['items'] as $itemData) {
-                $lineTotal = ((int) $itemData['quantity']) * ((float) $itemData['unit_amount']);
-
-                if (isset($itemData['id']) && in_array($itemData['id'], $existingItemIds)) {
-                    // Update existing item
-                    $item = $invoice->items()->find($itemData['id']);
-                    if ($item) {
-                        $item->update([
-                            'description' => $itemData['description'],
-                            'category' => $itemData['category'] ?? $item->category,
-                            'quantity' => (int) $itemData['quantity'],
-                            'unit_amount' => (float) $itemData['unit_amount'],
-                            'line_total' => $lineTotal,
-                        ]);
-                        $submittedItemIds[] = $itemData['id'];
-                    }
-                } else {
-                    // Create new item
-                    $newItem = $invoice->items()->create([
-                        'school_id' => $invoice->school_id,
-                        'invoice_id' => $invoice->id,
-                        'fee_structure_id' => null,
-                        'description' => $itemData['description'],
-                        'category' => $itemData['category'] ?? 'fees',
-                        'quantity' => (int) $itemData['quantity'],
-                        'unit_amount' => (float) $itemData['unit_amount'],
-                        'line_total' => $lineTotal,
+            foreach ($existingItems as $existingItem) {
+                $itemPaid = (float) $existingItem->allocations->sum('amount');
+                $isSubmitted = in_array((int) $existingItem->id, $submittedItemIds, true);
+                if (! $isSubmitted && $itemPaid > 0.00001) {
+                    throw ValidationException::withMessages([
+                        'items' => "The paid item '{$existingItem->description}' cannot be removed.",
                     ]);
-                    $submittedItemIds[] = $newItem->id;
                 }
             }
 
-            // Remove items that were deleted
-            $itemsToRemove = array_diff($existingItemIds, $submittedItemIds);
-            if (!empty($itemsToRemove)) {
-                $invoice->items()->whereIn('id', $itemsToRemove)->delete();
+            $feeIds = collect($validated['items'])
+                ->pluck('fee_structure_id')
+                ->filter()
+                ->unique()
+                ->all();
+            $feeStructures = FeeStructure::where('school_id', $school->id)
+                ->whereIn('id', $feeIds)
+                ->get()
+                ->keyBy('id');
+            if ($feeStructures->count() !== count($feeIds)) {
+                throw ValidationException::withMessages([
+                    'items' => 'One or more selected fee structures do not belong to this school.',
+                ]);
             }
 
-            // Update invoice totals and status
+            $oldItems = $lockedInvoice->items->map(fn (InvoiceItem $item) => [
+                'id' => $item->id,
+                'fee_structure_id' => $item->fee_structure_id,
+                'vote_code' => $item->effective_vote_code,
+                'description' => $item->description,
+                'category' => $item->category,
+                'quantity' => $item->quantity,
+                'unit_amount' => (float) $item->unit_amount,
+                'line_total' => (float) $item->line_total,
+                'paid_amount' => (float) $item->allocations->sum('amount'),
+            ])->values()->all();
+            $oldTotal = (float) $lockedInvoice->total_amount;
+            $delta = $newTotal - $oldTotal;
+
+            foreach ($validated['items'] as $itemData) {
+                $lineTotal = round((int) $itemData['quantity'] * (float) $itemData['unit_amount'], 2);
+                $feeStructure = ! empty($itemData['fee_structure_id'])
+                    ? $feeStructures->get((int) $itemData['fee_structure_id'])
+                    : null;
+                $voteCode = $itemData['vote_code'] ?? null;
+                if ($voteCode === 'NONE') {
+                    $voteCode = null;
+                } elseif (! $voteCode) {
+                    $voteCode = $feeStructure?->vote_code;
+                }
+
+                $itemAttributes = [
+                    'fee_structure_id' => $feeStructure?->id,
+                    'vote_code' => $voteCode,
+                    'description' => $itemData['description'],
+                    'category' => $itemData['category'] ?? 'fees',
+                    'quantity' => (int) $itemData['quantity'],
+                    'unit_amount' => (float) $itemData['unit_amount'],
+                    'line_total' => $lineTotal,
+                    'project_id' => $feeStructure?->project_id,
+                    'cost_center_id' => $feeStructure?->cost_center_id,
+                ];
+
+                if (! empty($itemData['id'])) {
+                    $item = $existingItems->get((int) $itemData['id']);
+                    $itemPaid = (float) $item->allocations->sum('amount');
+                    if ($lineTotal + 0.00001 < $itemPaid) {
+                        throw ValidationException::withMessages([
+                            'items' => "The total for '{$item->description}' cannot be lower than its paid amount (" . number_format($itemPaid, 2) . ').',
+                        ]);
+                    }
+                    $item->update($itemAttributes);
+                } else {
+                    $lockedInvoice->items()->create($itemAttributes);
+                }
+            }
+
+            $itemsToRemove = $existingItems->keys()->diff($submittedItemIds)->all();
+            if (!empty($itemsToRemove)) {
+                $lockedInvoice->items()->whereIn('id', $itemsToRemove)->delete();
+            }
+
             $newBalance = max(0, $newTotal - $totalPaid);
             $newStatus = $newBalance <= 0 ? 'paid' : ($totalPaid > 0 ? 'partial' : 'unpaid');
 
-            $invoice->update([
+            $lockedInvoice->update([
                 'issued_at' => $validated['issued_at'],
                 'due_date' => $validated['due_date'] ?? null,
                 'total_amount' => $newTotal,
@@ -1354,17 +1453,15 @@ class InvoiceController extends Controller
                 'status' => $newStatus,
             ]);
 
-            // Create ledger entries for total changes
             if (abs($delta) >= 0.00001) {
                 $entryDate = now()->toDateString();
                 $amount = abs($delta);
 
                 if ($delta > 0) {
-                    // Invoice increased - debit receivables, credit revenue
                     LedgerEntry::create([
-                        'school_id' => $invoice->school_id,
-                        'student_id' => $invoice->student_id,
-                        'invoice_id' => $invoice->id,
+                        'school_id' => $lockedInvoice->school_id,
+                        'student_id' => $lockedInvoice->student_id,
+                        'invoice_id' => $lockedInvoice->id,
                         'entry_date' => $entryDate,
                         'account_code' => 'FEES_RECEIVABLE',
                         'type' => 'debit',
@@ -1373,9 +1470,9 @@ class InvoiceController extends Controller
                     ]);
 
                     LedgerEntry::create([
-                        'school_id' => $invoice->school_id,
-                        'student_id' => $invoice->student_id,
-                        'invoice_id' => $invoice->id,
+                        'school_id' => $lockedInvoice->school_id,
+                        'student_id' => $lockedInvoice->student_id,
+                        'invoice_id' => $lockedInvoice->id,
                         'entry_date' => $entryDate,
                         'account_code' => 'FEES_REVENUE',
                         'type' => 'credit',
@@ -1383,11 +1480,10 @@ class InvoiceController extends Controller
                         'description' => 'Invoice adjustment (increase) for ' . $invoice->number,
                     ]);
                 } else {
-                    // Invoice decreased - credit receivables, debit revenue
                     LedgerEntry::create([
-                        'school_id' => $invoice->school_id,
-                        'student_id' => $invoice->student_id,
-                        'invoice_id' => $invoice->id,
+                        'school_id' => $lockedInvoice->school_id,
+                        'student_id' => $lockedInvoice->student_id,
+                        'invoice_id' => $lockedInvoice->id,
                         'entry_date' => $entryDate,
                         'account_code' => 'FEES_RECEIVABLE',
                         'type' => 'credit',
@@ -1396,9 +1492,9 @@ class InvoiceController extends Controller
                     ]);
 
                     LedgerEntry::create([
-                        'school_id' => $invoice->school_id,
-                        'student_id' => $invoice->student_id,
-                        'invoice_id' => $invoice->id,
+                        'school_id' => $lockedInvoice->school_id,
+                        'student_id' => $lockedInvoice->student_id,
+                        'invoice_id' => $lockedInvoice->id,
                         'entry_date' => $entryDate,
                         'account_code' => 'FEES_REVENUE',
                         'type' => 'debit',
@@ -1407,6 +1503,39 @@ class InvoiceController extends Controller
                     ]);
                 }
             }
+
+            $newItems = $lockedInvoice->items()->with('allocations')->get()->map(fn (InvoiceItem $item) => [
+                'id' => $item->id,
+                'fee_structure_id' => $item->fee_structure_id,
+                'vote_code' => $item->effective_vote_code,
+                'description' => $item->description,
+                'category' => $item->category,
+                'quantity' => $item->quantity,
+                'unit_amount' => (float) $item->unit_amount,
+                'line_total' => (float) $item->line_total,
+                'paid_amount' => (float) $item->allocations->sum('amount'),
+            ])->values()->all();
+
+            AuditLog::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'action' => 'update',
+                'module' => 'accounting',
+                'model_type' => Invoice::class,
+                'model_id' => $lockedInvoice->id,
+                'description' => "Updated invoice {$lockedInvoice->number}. Reason: " . ($validated['edit_reason'] ?? 'Invoice details updated.'),
+                'old_values' => [
+                    'total_amount' => $oldTotal,
+                    'items' => $oldItems,
+                ],
+                'new_values' => [
+                    'total_amount' => $newTotal,
+                    'items' => $newItems,
+                    'reason' => $validated['edit_reason'] ?? 'Invoice details updated.',
+                ],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
         });
 
         return redirect()

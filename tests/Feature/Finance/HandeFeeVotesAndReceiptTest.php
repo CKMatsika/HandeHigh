@@ -236,6 +236,76 @@ class HandeFeeVotesAndReceiptTest extends TestCase
         $receiptResponse->assertSee('Two hundred dollars only');
     }
 
+    public function test_manual_invoice_item_vote_code_flows_into_payment_allocation_and_mopse_voucher(): void
+    {
+        $student = $this->createStudent(true);
+        $invoice = Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 3',
+            'number' => 'INV-2026-000099',
+            'issued_at' => now()->toDateString(),
+            'total_amount' => 40.00,
+            'balance' => 40.00,
+            'status' => 'unpaid',
+        ]);
+        $item = InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'vote_code' => 'SCIENCE_LEVY',
+            'description' => 'Extra Science Subject',
+            'category' => 'subject',
+            'quantity' => 1,
+            'unit_amount' => 20.00,
+            'line_total' => 20.00,
+        ]);
+        InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'vote_code' => 'TUITION',
+            'description' => 'Tuition',
+            'category' => 'tuition',
+            'quantity' => 1,
+            'unit_amount' => 20.00,
+            'line_total' => 20.00,
+        ]);
+
+        $paymentForm = $this->actingAs($this->clerkUser)
+            ->get(route('admin.payments.create', $invoice));
+        $paymentForm->assertOk();
+        $tuitionPosition = strpos($paymentForm->getContent(), '[TUITION]');
+        $sciencePosition = strpos($paymentForm->getContent(), '[SCIENCE_LEVY]');
+        $this->assertNotFalse($tuitionPosition);
+        $this->assertNotFalse($sciencePosition);
+        $this->assertLessThan($sciencePosition, $tuitionPosition);
+
+        $response = $this->actingAs($this->clerkUser)
+            ->post(route('admin.payments.store', $invoice), [
+                'amount' => 20.00,
+                'paid_at' => now()->toDateString(),
+                'method' => 'cash',
+                'account_id' => $this->cashAccount->id,
+                'mopse_receipt_number' => '134299',
+                'allocations' => [$item->id => 20.00],
+            ]);
+        $response->assertRedirect();
+
+        $payment = Payment::where('mopse_receipt_number', '134299')->firstOrFail();
+        $this->assertDatabaseHas('payment_allocations', [
+            'payment_id' => $payment->id,
+            'invoice_item_id' => $item->id,
+            'vote_code' => 'SCIENCE_LEVY',
+            'amount' => 20.00,
+        ]);
+
+        $receiptResponse = $this->actingAs($this->clerkUser)
+            ->get(route('admin.payments.receipt-mopse', $payment));
+        $receiptResponse->assertOk();
+        $this->assertMatchesRegularExpression(
+            '/<td class="col-desc">SCIENCE LEVY<\/td>\s*<td class="col-dollars">20<\/td>/',
+            $receiptResponse->getContent()
+        );
+    }
+
     /**
      * 4. Test advance fee receipting and subsequent application to future invoice
      */

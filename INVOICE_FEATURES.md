@@ -5,6 +5,13 @@ This document describes the bulk invoice creation and automatic invoice generati
 
 ## Features
 
+### Vote-coded invoice creation and editing
+Invoice line items can be linked to a fee structure and an official MOPSE vote code. Boarding and day-scholars can load the seven-line fee schedule for their residency, or staff can add a custom charge and assign a vote. Fee-structure project and cost-center mappings are inherited by the invoice line.
+
+When editing an invoice, staff can link existing or new lines to fee structures and votes, see the amount already paid against each line, and convert an eligible unpaid $470 boarding or $135 day package into its seven official sub-votes. The conversion is offered only when the matching schedule exists and totals exactly to the legacy line.
+
+Payment allocation and MOPSE vouchers use the line's saved vote code, with the fee structure's vote as a compatibility fallback for older lines. Invoice totals cannot be reduced below the total already paid, paid lines cannot be reduced below their allocations or deleted, and edits are recorded in the accounting audit log. The vote-code database migration must be applied before deploying this workflow.
+
 ### 1. Bulk Invoice Creation
 Manually create multiple invoices at once for selected students.
 

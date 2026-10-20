@@ -148,7 +148,10 @@
                                        data-amount="{{ (float) $fee->amount }}"
                                        data-grade="{{ strtolower($fee->grade ?? '') }}"
                                        data-is-boarding="{{ $isBoarding ? '1' : '0' }}"
-                                       data-is-transport="{{ $isTransport ? '1' : '0' }}">
+                                       data-is-transport="{{ $isTransport ? '1' : '0' }}"
+                                       data-is-optional="{{ $fee->is_optional ? '1' : '0' }}"
+                                       data-vote-code="{{ $fee->vote_code ?? '' }}"
+                                       data-residency="{{ $fee->residency_type ?? 'all' }}">
                                     <input type="checkbox"
                                            class="single-fee-checkbox mt-0.5 rounded border-slate-600 bg-slate-900 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                                            value="{{ $fee->id }}"
@@ -185,15 +188,25 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-100">Invoice Items</h3>
-                        <p class="text-xs text-slate-400">Ticked fee items appear below. You can also adjust quantities or add custom items.</p>
+                        <p class="text-xs text-slate-400">Add official vote schedules or individual fee and custom items.</p>
                     </div>
                     <div class="flex items-center gap-2">
+                        <button type="button" onclick="addInvoiceItem(); document.querySelector('#invoice-items .invoice-item:last-child .fee-select')?.focus()"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition">
+                            Add from Fee Structure
+                        </button>
+                        <button type="button" onclick="loadVoteSchedule('boarding')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 text-xs font-medium rounded-lg border border-purple-500/30 transition">
+                            Load Boarding Schedule ($470.00)
+                        </button>
+                        <button type="button" onclick="loadVoteSchedule('day')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600/30 text-sky-200 text-xs font-medium rounded-lg border border-sky-500/30 transition">
+                            Load Day Schedule ($135.00)
+                        </button>
                         <button type="button" onclick="addInvoiceItem()" 
                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                             </svg>
-                            Add Custom Item
+                            Add Manual Item
                         </button>
                     </div>
                 </div>
@@ -239,29 +252,53 @@
 <!-- Embedded Fee Structures JSON -->
 <script>
 const feeStructures = @json($feeStructures);
+const standardVotes = @json($standardVotes);
 let itemCount = 0;
 
 function getFeeTypeOptions(selectedFeeId = null) {
     let options = '<option value="">-- Choose Preset Fee (or enter custom) --</option>';
-    
-    // Group fees by category or list them
+    const groups = {
+        'Boarding Votes': [],
+        'Day-Scholar Votes': [],
+        'Other Levies & Fees': [],
+    };
+
     feeStructures.forEach(fee => {
-        const selected = (selectedFeeId && String(selectedFeeId) === String(fee.id)) ? 'selected' : '';
-        const gradeTag = fee.grade ? ` [${fee.grade}]` : ' [All Grades]';
-        const optTag = fee.is_optional ? ' (Optional)' : '';
-        options += `<option value="${fee.id}" 
-            data-label="${escapeHtml(fee.label)}" 
-            data-category="${escapeHtml(fee.category || 'fees')}" 
-            data-amount="${parseFloat(fee.amount || 0).toFixed(2)}"
-            data-grade="${escapeHtml(fee.grade || '')}"
-            data-year="${escapeHtml(fee.academic_year || '')}"
-            data-term="${escapeHtml(fee.term || '')}"
-            data-service="${escapeHtml(fee.service_type || '')}"
-            ${selected}>
-            ${escapeHtml(fee.label)}${gradeTag} — $${parseFloat(fee.amount || 0).toFixed(2)} (${capitalize(fee.category || 'Fee')}${optTag})
-        </option>`;
+        const group = fee.residency_type === 'boarding' && fee.vote_code
+            ? 'Boarding Votes'
+            : fee.residency_type === 'day' && fee.vote_code
+                ? 'Day-Scholar Votes'
+                : 'Other Levies & Fees';
+        groups[group].push(fee);
     });
 
+    Object.entries(groups).forEach(([groupName, fees]) => {
+        if (!fees.length) return;
+        options += `<optgroup label="${groupName}">`;
+        fees.forEach(fee => {
+            const selected = (selectedFeeId && String(selectedFeeId) === String(fee.id)) ? 'selected' : '';
+            const gradeTag = fee.grade ? ` [${fee.grade}]` : ' [All Grades]';
+            const optTag = fee.is_optional ? ' (Optional)' : '';
+            options += `<option value="${fee.id}"
+                data-label="${escapeHtml(fee.label)}"
+                data-category="${escapeHtml(fee.category || 'fees')}"
+                data-amount="${parseFloat(fee.amount || 0).toFixed(2)}"
+                data-vote-code="${escapeHtml(fee.vote_code || '')}"
+                ${selected}>
+                ${escapeHtml(fee.label)}${gradeTag} — $${parseFloat(fee.amount || 0).toFixed(2)} (${capitalize(fee.category || 'Fee')}${optTag})
+            </option>`;
+        });
+        options += '</optgroup>';
+    });
+
+    return options;
+}
+
+function getVoteCodeOptions(selectedVoteCode = '') {
+    let options = `<option value="NONE" ${!selectedVoteCode ? 'selected' : ''}>NONE (unassigned)</option>`;
+    Object.entries(standardVotes).forEach(([code, vote]) => {
+        options += `<option value="${escapeHtml(code)}" ${selectedVoteCode === code ? 'selected' : ''}>[${escapeHtml(code)}] ${escapeHtml(vote.name)}</option>`;
+    });
     return options;
 }
 
@@ -284,6 +321,7 @@ function addInvoiceItem(preset = null) {
     const category = preset ? (preset.category || 'fees') : '';
     const quantity = preset ? (preset.quantity || 1) : 1;
     const unitAmount = preset ? parseFloat(preset.amount || preset.unit_amount || 0).toFixed(2) : '0.00';
+    const voteCode = preset ? (preset.vote_code || '') : '';
 
     const row = document.createElement('div');
     row.className = 'invoice-item bg-slate-800/60 hover:bg-slate-800/90 rounded-xl p-3.5 border border-slate-700/60 transition space-y-3';
@@ -316,6 +354,13 @@ function addInvoiceItem(preset = null) {
                 <input type="text" name="items[${index}][category]" value="${escapeHtml(category)}"
                        placeholder="tuition / boarding" 
                        class="item-category w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+
+            <div class="md:col-span-4">
+                <label class="block text-[11px] font-medium text-slate-400 mb-1">MOPSE Vote / Sub-account</label>
+                <select name="items[${index}][vote_code]" class="vote-select w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-xs focus:ring-2 focus:ring-blue-500">
+                    ${getVoteCodeOptions(voteCode)}
+                </select>
             </div>
 
             <!-- Qty -->
@@ -370,6 +415,7 @@ function addInvoiceItem(preset = null) {
             descInput.value = selectedOpt.dataset.label || '';
             catInput.value = selectedOpt.dataset.category || 'fees';
             priceInput.value = selectedOpt.dataset.amount || '0.00';
+            row.querySelector('.vote-select').value = selectedOpt.dataset.voteCode || 'NONE';
             row.setAttribute('data-linked-fee-id', this.value);
 
             const newCb = document.querySelector(`.single-fee-checkbox[value="${this.value}"]`);
@@ -383,6 +429,7 @@ function addInvoiceItem(preset = null) {
             }
         } else {
             row.removeAttribute('data-linked-fee-id');
+            row.querySelector('.vote-select').value = 'NONE';
         }
         calculateTotal();
     });
@@ -431,6 +478,7 @@ function onFeeCheckboxToggle(checkbox) {
                 label: card.dataset.label,
                 category: card.dataset.category,
                 amount: card.dataset.amount,
+                vote_code: card.dataset.voteCode,
                 quantity: 1,
             });
         }
@@ -514,6 +562,63 @@ function clearAllFeeSelections() {
         if (cb.checked) {
             cb.checked = false;
             onFeeCheckboxToggle(cb);
+        }
+
+        function loadVoteSchedule(residency) {
+            const studentSelect = document.getElementById('studentSelect');
+            const studentOption = studentSelect?.options[studentSelect.selectedIndex];
+            if (!studentSelect?.value || !studentOption) {
+                showNotification('Select a student before loading a residency schedule.', 'warning');
+                return;
+            }
+            const studentResidency = studentOption.dataset.boarding === '1' ? 'boarding' : 'day';
+            if (studentResidency !== residency) {
+                showNotification(`This student is a ${studentResidency === 'boarding' ? 'Boarder' : 'Day Scholar'}. Load the matching schedule instead.`, 'warning');
+                return;
+            }
+
+            const year = document.getElementById('academicYearSelect')?.value;
+            const term = document.getElementById('termSelect')?.value;
+            const prefix = residency === 'boarding' ? 'BOARD-PKG-' : 'DAY-PKG-';
+            const packageFee = feeStructures.find(fee =>
+                fee.code === `${prefix}${year}` &&
+                fee.academic_year === year &&
+                fee.term === term &&
+                fee.residency_type === residency
+            );
+            const schedule = packageFee
+                ? feeStructures.filter(fee => Number(fee.parent_id) === Number(packageFee.id) && fee.vote_code)
+                    .sort((a, b) => Number(a.allocation_priority || 10) - Number(b.allocation_priority || 10))
+                : [];
+            const expectedTotal = residency === 'boarding' ? 470 : 135;
+            const scheduleTotal = schedule.reduce((total, fee) => total + Number(fee.amount || 0), 0);
+
+            if (schedule.length !== 7 || Math.abs(scheduleTotal - expectedTotal) >= 0.01) {
+                showNotification(`The official ${residency} schedule for ${year} ${term} is missing or does not total $${expectedTotal.toFixed(2)}. No invoice lines were changed.`, 'warning');
+                return;
+            }
+
+            clearAllFeeSelections();
+            schedule.forEach(fee => {
+                const checkbox = document.querySelector(`.single-fee-checkbox[value="${fee.id}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    const card = checkbox.closest('.single-fee-card');
+                    if (card) {
+                        card.classList.add('border-indigo-500/60', 'bg-indigo-500/10');
+                        card.classList.remove('border-slate-800', 'bg-slate-950/50');
+                    }
+                }
+                addInvoiceItem({
+                    fee_structure_id: fee.id,
+                    label: fee.label,
+                    category: fee.category,
+                    amount: fee.amount,
+                    vote_code: fee.vote_code,
+                    quantity: 1,
+                });
+            });
+            showNotification(`Loaded the ${residency} vote schedule totaling $${scheduleTotal.toFixed(2)}.`, 'success');
         }
     });
 }
