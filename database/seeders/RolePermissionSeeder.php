@@ -32,6 +32,7 @@ class RolePermissionSeeder extends Seeder
             'procurement.approve', 'procurement.committee', 'procurement.vendors.view',
             'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             'procurement.reports.view',
+            'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue',
             'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view',
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
             'reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance',
@@ -73,36 +74,37 @@ class RolePermissionSeeder extends Seeder
 
         return [
             'super-admin' => self::permissions(),
-            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view'], $academic, $finance, $accounting, [
+            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue'], $academic, $finance, $accounting, [
                 'procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.approve',
                 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign'], $timetables),
-            'headmaster' => array_merge(['dashboard.headmaster', 'inventory.view', 'inventory.ledger.view'], $academic, $finance, [
+            'headmaster' => array_merge(['dashboard.headmaster', 'inventory.view', 'inventory.ledger.view', 'procurement.requisitions.create'], $academic, $finance, [
                 'procurement.view', 'procurement.approve', 'procurement.vendors.view',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
-            'deputy-headmaster' => array_merge(['dashboard.deputy-headmaster'], $academic, $finance, [
+            'deputy-headmaster' => array_merge(['dashboard.deputy-headmaster', 'procurement.requisitions.create'], $academic, $finance, [
                 'procurement.view', 'procurement.approve',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
             'accounts-clerk' => array_merge(['dashboard.accounts-clerk'],
+                ['procurement.requisitions.create'],
                 ['students.view', 'enrollments.view'],
                 ['fees.view', 'fees.create', 'fees.edit', 'invoices.view', 'invoices.create', 'invoices.edit', 'payments.view', 'payments.create', 'payments.edit', 'receipts.view', 'receipts.create', 'receipts.edit'],
                 ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
                 ['communication.view', 'communication.create', 'communication.sms', 'communication.email'],
                 ['reports.view', 'reports.financial', 'reports.attendance']),
             'bursar' => array_merge(['dashboard.bursar'],
-                ['students.view'], $finance, ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
-                ['inventory.view', 'inventory.ledger.view'],
+                ['students.view', 'procurement.requisitions.create', 'inventory.view', 'inventory.ledger.view'], $finance, ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
                 ['procurement.view', 'procurement.approve', 'procurement.vendors.view'],
                 ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial', 'reports.procurement']),
             'procurement-officer' => array_merge(['dashboard.procurement-officer'],
-                ['procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.committee', 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete', 'procurement.reports.view'],
+                ['procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.committee', 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete', 'procurement.reports.view', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue'],
                 ['inventory.view', 'inventory.catalog.manage'],
                 $communication, ['reports.view', 'reports.procurement']),
             'stores-person' => [
                 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view',
+                'procurement.requisitions.create',
             ],
-            'teacher' => array_merge(['dashboard.view'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3), ['timetables.view', 'timetables.export']),
-            'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
+            'teacher' => array_merge(['dashboard.view', 'procurement.requisitions.create'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3), ['timetables.view', 'timetables.export']),
+            'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view', 'procurement.requisitions.create'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
         ];
     }
 

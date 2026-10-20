@@ -875,6 +875,29 @@ Route::middleware(['auth'])->group(function () {
                     ->name('inventory.warehouses.update')->middleware('permission:inventory.warehouses.manage');
             });
 
+    Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('procurement', [\App\Http\Controllers\Admin\ProcurementController::class, 'dashboard'])
+            ->name('procurement.index')->middleware('permission:procurement.view|procurement.approve|procurement.requisitions.create');
+        Route::get('procurement/requisitions/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createRequisition'])
+            ->name('procurement.requisitions.create')->middleware('permission:procurement.requisitions.create');
+        Route::post('procurement/requisitions', [\App\Http\Controllers\Admin\ProcurementController::class, 'storeRequisition'])
+            ->name('procurement.requisitions.store')->middleware('permission:procurement.requisitions.create');
+        Route::get('procurement/requisitions/{requisition}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showRequisition'])
+            ->name('procurement.requisitions.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve');
+        Route::post('procurement/requisitions/{requisition}/submit', [\App\Http\Controllers\Admin\ProcurementController::class, 'submitRequisition'])
+            ->name('procurement.requisitions.submit')->middleware('permission:procurement.requisitions.create');
+        Route::post('procurement/requisitions/{requisition}/review', [\App\Http\Controllers\Admin\ProcurementController::class, 'reviewRequisition'])
+            ->name('procurement.requisitions.review')->middleware('permission:procurement.approve');
+        Route::get('procurement/requisitions/{requisition}/purchase-order/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createPurchaseOrder'])
+            ->name('procurement.purchase-orders.create')->middleware('permission:procurement.purchase-orders.create');
+        Route::post('procurement/requisitions/{requisition}/purchase-order', [\App\Http\Controllers\Admin\ProcurementController::class, 'storePurchaseOrder'])
+            ->name('procurement.purchase-orders.store')->middleware('permission:procurement.purchase-orders.create');
+        Route::get('procurement/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showPurchaseOrder'])
+            ->name('procurement.purchase-orders.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve');
+        Route::post('procurement/purchase-orders/{purchaseOrder}/issue', [\App\Http\Controllers\Admin\ProcurementController::class, 'issuePurchaseOrder'])
+            ->name('procurement.purchase-orders.issue')->middleware('permission:procurement.purchase-orders.issue');
+    });
+
             // ICT Coordination & Staff Helpdesk Routes
         Route::prefix('ict')->name('ict.')->group(function () {
             // Staff / Teacher ICT Support Requests
