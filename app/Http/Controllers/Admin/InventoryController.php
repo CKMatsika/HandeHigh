@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\InventoryBalance;
 use App\Models\InventoryCategory;
 use App\Models\InventoryItem;
@@ -13,6 +14,7 @@ use App\Models\School;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
 {
@@ -82,6 +84,9 @@ class InventoryController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['required', 'boolean'],
         ]);
+        if (auth()->user()->can('accounts.edit')) {
+            $validated['issue_expense_account_id'] = $this->validateIssueExpenseAccount($request, $school);
+        }
 
         InventoryCategory::create([...$validated, 'school_id' => $school->id]);
 
@@ -105,6 +110,9 @@ class InventoryController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['required', 'boolean'],
         ]);
+        if (auth()->user()->can('accounts.edit')) {
+            $validated['issue_expense_account_id'] = $this->validateIssueExpenseAccount($request, $school);
+        }
 
         $category->update($validated);
 
@@ -211,8 +219,34 @@ class InventoryController extends Controller
         $users = $kind === 'warehouses'
             ? $school->users()->orderBy('name')->get()
             : collect();
+        $expenseAccounts = $kind === 'categories' && auth()->user()->can('accounts.edit')
+            ? Account::where('school_id', $school->id)->where('type', 'expense')->where('is_active', true)->where('is_postable', true)->orderBy('code')->get()
+            : collect();
 
-        return view('admin.inventory.catalog-form', compact('kind', 'record', 'categories', 'users'));
+        return view('admin.inventory.catalog-form', compact('kind', 'record', 'categories', 'users', 'expenseAccounts'));
+    }
+
+    private function validateIssueExpenseAccount(Request $request, School $school): ?int
+    {
+        $validated = $request->validate([
+            'issue_expense_account_id' => [
+                'nullable',
+                Rule::exists('accounts', 'id')->where('school_id', $school->id),
+            ],
+        ]);
+        $accountId = $validated['issue_expense_account_id'] ?? null;
+        if ($accountId === null) {
+            return null;
+        }
+
+        $account = Account::where('school_id', $school->id)->findOrFail($accountId);
+        if ($account->type !== 'expense' || ! $account->is_active || ! $account->is_postable) {
+            throw ValidationException::withMessages([
+                'issue_expense_account_id' => 'Choose an active, postable expense account.',
+            ]);
+        }
+
+        return (int) $account->id;
     }
 
     private function validateItem(Request $request, School $school, ?InventoryItem $item = null): array

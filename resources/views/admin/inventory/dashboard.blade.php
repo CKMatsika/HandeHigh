@@ -34,7 +34,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
         @can('inventory.catalog.manage')
             <a href="{{ route('admin.inventory.items.index') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
                 <h2 class="font-semibold text-slate-100">Item catalogue</h2>
@@ -58,6 +58,12 @@
             <h2 class="font-semibold text-slate-100">Warehouses</h2>
             <p class="mt-1 text-sm text-slate-400">View the school’s separate stock locations.</p>
         </a>
+        @can('inventory.stock-requests.view')
+            <a href="{{ route('admin.inventory.stock-requests.index') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
+                <h2 class="font-semibold text-slate-100">Stock requests</h2>
+                <p class="mt-1 text-sm text-slate-400">Review staff requests and record controlled stock issues.</p>
+            </a>
+        @endcan
     </div>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">

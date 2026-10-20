@@ -848,9 +848,9 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('inventory/categories', [\App\Http\Controllers\Admin\InventoryController::class, 'storeCategory'])
                     ->name('inventory.categories.store')->middleware('permission:inventory.catalog.manage');
                 Route::get('inventory/categories/{category}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editCategory'])
-                    ->name('inventory.categories.edit')->middleware('permission:inventory.catalog.manage');
+                    ->name('inventory.categories.edit')->middleware('permission:inventory.catalog.manage|accounts.edit');
                 Route::put('inventory/categories/{category}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateCategory'])
-                    ->name('inventory.categories.update')->middleware('permission:inventory.catalog.manage');
+                    ->name('inventory.categories.update')->middleware('permission:inventory.catalog.manage|accounts.edit');
 
                 Route::get('inventory/items', [\App\Http\Controllers\Admin\InventoryController::class, 'items'])
                     ->name('inventory.items.index')->middleware('permission:inventory.view');
@@ -874,6 +874,27 @@ Route::middleware(['auth'])->group(function () {
                 Route::put('inventory/warehouses/{warehouse}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateWarehouse'])
                     ->name('inventory.warehouses.update')->middleware('permission:inventory.warehouses.manage');
             });
+
+    Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('inventory/stock-requests', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'index'])
+            ->name('inventory.stock-requests.index')->middleware('permission:inventory.stock-requests.view');
+        Route::get('inventory/stock-requests/create', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'create'])
+            ->name('inventory.stock-requests.create')->middleware('permission:inventory.stock-requests.create');
+        Route::post('inventory/stock-requests', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'store'])
+            ->name('inventory.stock-requests.store')->middleware('permission:inventory.stock-requests.create');
+        Route::get('inventory/stock-requests/{stockRequest}/edit', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'edit'])
+            ->name('inventory.stock-requests.edit')->middleware('permission:inventory.stock-requests.create');
+        Route::put('inventory/stock-requests/{stockRequest}', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'update'])
+            ->name('inventory.stock-requests.update')->middleware('permission:inventory.stock-requests.create');
+        Route::get('inventory/stock-requests/{stockRequest}', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'show'])
+            ->name('inventory.stock-requests.show')->middleware('permission:inventory.stock-requests.view|inventory.stock-requests.approve|inventory.stock-issues.create');
+        Route::post('inventory/stock-requests/{stockRequest}/approve', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'approve'])
+            ->name('inventory.stock-requests.approve')->middleware('permission:inventory.stock-requests.approve');
+        Route::post('inventory/stock-requests/{stockRequest}/return', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'returnForCorrection'])
+            ->name('inventory.stock-requests.return')->middleware('permission:inventory.stock-requests.approve');
+        Route::post('inventory/stock-requests/{stockRequest}/issue', [\App\Http\Controllers\Admin\InventoryStockRequestController::class, 'issue'])
+            ->name('inventory.stock-requests.issue')->middleware('permission:inventory.stock-issues.create');
+    });
 
     Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('procurement', [\App\Http\Controllers\Admin\ProcurementController::class, 'dashboard'])

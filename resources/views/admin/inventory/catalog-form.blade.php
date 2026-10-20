@@ -74,6 +74,20 @@
                 </div>
             @endif
 
+            @if($kind === 'categories' && auth()->user()->can('accounts.edit'))
+                <div class="sm:col-span-2">
+                    <label for="issue_expense_account_id" class="mb-1 block text-xs font-medium text-slate-300">Default stock-issue expense account</label>
+                    <select id="issue_expense_account_id" name="issue_expense_account_id" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                        <option value="">Default: Supplies (6500)</option>
+                        @foreach($expenseAccounts as $account)
+                            <option value="{{ $account->id }}" @selected(old('issue_expense_account_id', $record?->issue_expense_account_id) == $account->id)>{{ $account->code }} · {{ $account->name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500">Finance can assign category issues to the appropriate expense ledger.</p>
+                    @error('issue_expense_account_id')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+                </div>
+            @endif
+
             @if($kind !== 'warehouses')
                 <div class="{{ $kind === 'categories' ? 'sm:col-span-2' : '' }}">
                     <label for="description" class="mb-1 block text-xs font-medium text-slate-300">Description</label>
