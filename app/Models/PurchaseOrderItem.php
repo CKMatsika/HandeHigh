@@ -36,4 +36,9 @@ class PurchaseOrderItem extends Model
     {
         return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
     }
+
+    public function goodsReceivedItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(GoodsReceivedVoucherItem::class);
+    }
 }

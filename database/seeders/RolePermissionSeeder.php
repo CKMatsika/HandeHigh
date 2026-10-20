@@ -33,6 +33,7 @@ class RolePermissionSeeder extends Seeder
             'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             'procurement.reports.view',
             'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue',
+            'procurement.grv.view', 'procurement.grv.create',
             'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view',
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
             'reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance',
@@ -74,7 +75,7 @@ class RolePermissionSeeder extends Seeder
 
         return [
             'super-admin' => self::permissions(),
-            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue'], $academic, $finance, $accounting, [
+            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create'], $academic, $finance, $accounting, [
                 'procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.approve',
                 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign'], $timetables),
@@ -97,11 +98,12 @@ class RolePermissionSeeder extends Seeder
                 ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial', 'reports.procurement']),
             'procurement-officer' => array_merge(['dashboard.procurement-officer'],
                 ['procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.committee', 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete', 'procurement.reports.view', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue'],
+                ['procurement.grv.view'],
                 ['inventory.view', 'inventory.catalog.manage'],
                 $communication, ['reports.view', 'reports.procurement']),
             'stores-person' => [
                 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view',
-                'procurement.requisitions.create',
+                'procurement.requisitions.create', 'procurement.grv.view', 'procurement.grv.create',
             ],
             'teacher' => array_merge(['dashboard.view', 'procurement.requisitions.create'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3), ['timetables.view', 'timetables.export']),
             'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view', 'procurement.requisitions.create'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),

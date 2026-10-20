@@ -17,6 +17,11 @@
                 </form>
             @endif
         @endcan
+        @can('procurement.grv.create')
+            @if(in_array($purchaseOrder->status, ['issued', 'partially_received'], true))
+                <a href="{{ route('admin.procurement.goods-received-vouchers.create', $purchaseOrder) }}" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500">Receive goods</a>
+            @endif
+        @endcan
     </div>
 
     @if(session('success'))
@@ -54,5 +59,19 @@
             </table>
         </div>
     </section>
+
+    @if($purchaseOrder->goodsReceivedVouchers()->exists())
+        <section class="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80">
+            <div class="border-b border-slate-800 px-5 py-4"><h2 class="font-semibold text-slate-100">Goods received vouchers</h2></div>
+            <div class="divide-y divide-slate-800">
+                @foreach($purchaseOrder->goodsReceivedVouchers()->latest('received_date')->get() as $voucher)
+                    <a href="{{ route('admin.procurement.goods-received-vouchers.show', $voucher) }}" class="flex items-center justify-between px-5 py-3 text-sm hover:bg-slate-800/50">
+                        <span class="font-mono text-indigo-300">{{ $voucher->voucher_number }}</span>
+                        <span class="text-slate-400">{{ $voucher->received_date?->format('d M Y') }}</span>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+    @endif
 </div>
 @endsection

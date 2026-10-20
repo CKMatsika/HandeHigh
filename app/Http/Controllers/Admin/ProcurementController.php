@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\GoodsReceivedVoucher;
 use App\Models\InventoryItem;
 use App\Models\InventoryWarehouse;
 use App\Models\ProcurementRequisition;
@@ -11,6 +12,7 @@ use App\Models\ProcurementRequisitionReview;
 use App\Models\PurchaseOrder;
 use App\Models\School;
 use App\Models\Vendor;
+use App\Services\InventoryReceivingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,25 +24,27 @@ class ProcurementController extends Controller
     {
         $school = $this->school();
         $user = auth()->user();
-        $canReview = $user->can('procurement.approve') || $user->can('procurement.view');
+        $canViewAll = $user->can('procurement.approve')
+            || $user->can('procurement.view')
+            || $user->can('procurement.grv.view');
 
         $requisitions = ProcurementRequisition::where('school_id', $school->id)
-            ->when(! $canReview, fn ($query) => $query->where('requested_by', $user->id))
+            ->when(! $canViewAll, fn ($query) => $query->where('requested_by', $user->id))
             ->with(['requester', 'department', 'items.item', 'purchaseOrder'])
             ->latest()
             ->paginate(15, ['*'], 'requisitions_page');
 
         $purchaseOrders = PurchaseOrder::where('school_id', $school->id)
-            ->when(! $canReview, fn ($query) => $query->whereHas('requisition', fn ($q) => $q->where('requested_by', $user->id)))
+            ->when(! $canViewAll, fn ($query) => $query->whereHas('requisition', fn ($q) => $q->where('requested_by', $user->id)))
             ->with(['vendor', 'requisition'])
             ->latest()
             ->limit(10)
             ->get();
 
         $requisitionStats = ProcurementRequisition::where('school_id', $school->id)
-            ->when(! $canReview, fn ($query) => $query->where('requested_by', $user->id));
+            ->when(! $canViewAll, fn ($query) => $query->where('requested_by', $user->id));
         $purchaseOrderStats = PurchaseOrder::where('school_id', $school->id)
-            ->when(! $canReview, fn ($query) => $query->whereHas('requisition', fn ($q) => $q->where('requested_by', $user->id)));
+            ->when(! $canViewAll, fn ($query) => $query->whereHas('requisition', fn ($q) => $q->where('requested_by', $user->id)));
         $stats = [
             'awaiting_review' => (clone $requisitionStats)->where('status', 'submitted')->count(),
             'approved' => (clone $requisitionStats)->where('status', 'approved')->count(),
@@ -261,6 +265,76 @@ class ProcurementController extends Controller
         $purchaseOrder->load(['vendor', 'creator', 'issuer', 'requisition.requester', 'items.item']);
 
         return view('admin.procurement.purchase-order-show', compact('purchaseOrder'));
+    }
+
+    public function createGoodsReceivedVoucher(PurchaseOrder $purchaseOrder)
+    {
+        abort_unless(auth()->user()->can('procurement.grv.create'), 403);
+        $this->assertSchoolRecord($purchaseOrder);
+        abort_unless(in_array($purchaseOrder->status, ['issued', 'partially_received'], true), 409);
+
+        $purchaseOrder->load(['items.item', 'items.goodsReceivedItems', 'requisition.deliveryWarehouse']);
+        $school = $this->school();
+        $warehouses = InventoryWarehouse::where('school_id', $school->id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+        $defaultWarehouseId = $purchaseOrder->requisition->delivery_warehouse_id
+            ?? $warehouses->first()?->id;
+
+        return view('admin.procurement.goods-received-voucher-form', compact(
+            'purchaseOrder',
+            'warehouses',
+            'defaultWarehouseId'
+        ));
+    }
+
+    public function storeGoodsReceivedVoucher(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        abort_unless($request->user()->can('procurement.grv.create'), 403);
+        $this->assertSchoolRecord($purchaseOrder);
+        $school = $this->school();
+
+        $validated = $request->validate([
+            'inventory_warehouse_id' => [
+                'required',
+                Rule::exists('inventory_warehouses', 'id')
+                    ->where('school_id', $school->id)
+                    ->where('is_active', true),
+            ],
+            'received_date' => ['required', 'date'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'received_quantities' => ['required', 'array', 'min:1'],
+            'received_quantities.*' => ['required', 'numeric', 'min:0'],
+        ]);
+        $warehouse = InventoryWarehouse::where('school_id', $school->id)
+            ->findOrFail($validated['inventory_warehouse_id']);
+        $voucher = app(InventoryReceivingService::class)->receive(
+            $purchaseOrder,
+            $warehouse,
+            $school,
+            $request->user(),
+            $validated['received_quantities'],
+            $validated['received_date'],
+            $validated['notes'] ?? null
+        );
+
+        return redirect()->route('admin.procurement.goods-received-vouchers.show', $voucher)
+            ->with('success', 'Goods received voucher posted to inventory.');
+    }
+
+    public function showGoodsReceivedVoucher(GoodsReceivedVoucher $voucher)
+    {
+        abort_unless(
+            auth()->user()->can('procurement.grv.view')
+                || auth()->user()->can('procurement.grv.create')
+                || auth()->user()->can('procurement.view'),
+            403
+        );
+        $this->assertSchoolRecord($voucher);
+        $voucher->load(['warehouse', 'receiver', 'purchaseOrder.vendor', 'items.item']);
+
+        return view('admin.procurement.goods-received-voucher-show', compact('voucher'));
     }
 
     private function validateRequisition(Request $request, School $school): array

@@ -877,7 +877,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('procurement', [\App\Http\Controllers\Admin\ProcurementController::class, 'dashboard'])
-            ->name('procurement.index')->middleware('permission:procurement.view|procurement.approve|procurement.requisitions.create');
+            ->name('procurement.index')->middleware('permission:procurement.view|procurement.approve|procurement.requisitions.create|procurement.grv.view');
         Route::get('procurement/requisitions/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createRequisition'])
             ->name('procurement.requisitions.create')->middleware('permission:procurement.requisitions.create');
         Route::post('procurement/requisitions', [\App\Http\Controllers\Admin\ProcurementController::class, 'storeRequisition'])
@@ -893,9 +893,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('procurement/requisitions/{requisition}/purchase-order', [\App\Http\Controllers\Admin\ProcurementController::class, 'storePurchaseOrder'])
             ->name('procurement.purchase-orders.store')->middleware('permission:procurement.purchase-orders.create');
         Route::get('procurement/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showPurchaseOrder'])
-            ->name('procurement.purchase-orders.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve');
+            ->name('procurement.purchase-orders.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve|procurement.grv.view');
         Route::post('procurement/purchase-orders/{purchaseOrder}/issue', [\App\Http\Controllers\Admin\ProcurementController::class, 'issuePurchaseOrder'])
             ->name('procurement.purchase-orders.issue')->middleware('permission:procurement.purchase-orders.issue');
+        Route::get('procurement/purchase-orders/{purchaseOrder}/goods-received-vouchers/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createGoodsReceivedVoucher'])
+            ->name('procurement.goods-received-vouchers.create')->middleware('permission:procurement.grv.create');
+        Route::post('procurement/purchase-orders/{purchaseOrder}/goods-received-vouchers', [\App\Http\Controllers\Admin\ProcurementController::class, 'storeGoodsReceivedVoucher'])
+            ->name('procurement.goods-received-vouchers.store')->middleware('permission:procurement.grv.create');
+        Route::get('procurement/goods-received-vouchers/{voucher}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showGoodsReceivedVoucher'])
+            ->name('procurement.goods-received-vouchers.show')->middleware('permission:procurement.grv.view|procurement.grv.create|procurement.view');
     });
 
             // ICT Coordination & Staff Helpdesk Routes
