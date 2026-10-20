@@ -152,6 +152,8 @@ class ProcurementSupplierInvoiceController extends Controller
                 }
             }
 
+            $assetService = app(\App\Services\SchoolFixedAssetService::class);
+            $assetService->applySupplierInvoice($invoice);
             $accounting = app(ProcurementAccountingService::class);
             $accounts = $accounting->procurementAccounts($invoice->school);
             $bill = Bill::create([
@@ -174,9 +176,10 @@ class ProcurementSupplierInvoiceController extends Controller
             foreach ($invoice->items as $line) {
                 $receivedItem = $line->goodsReceivedItem;
                 $lineTotal = (float) $line->line_total;
+                $expenseAccount = $assetService->assetAccountFor($receivedItem) ?? $accounts['inventory'];
                 BillItem::create([
                     'bill_id' => $bill->id,
-                    'expense_account_id' => $accounts['inventory']->id,
+                    'expense_account_id' => $expenseAccount->id,
                     'description' => $receivedItem->item->name
                         .' - '.number_format((float) $line->quantity_invoiced, 4)
                         .' '.$receivedItem->item->unit_of_measure,

@@ -874,6 +874,19 @@ Route::middleware(['auth'])->group(function () {
         });
 
     Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('inventory/settings', [\App\Http\Controllers\Admin\InventorySettingsController::class, 'edit'])
+            ->name('inventory.settings.edit')->middleware('permission:accounts.edit');
+        Route::put('inventory/settings', [\App\Http\Controllers\Admin\InventorySettingsController::class, 'update'])
+            ->name('inventory.settings.update')->middleware('permission:accounts.edit');
+        Route::get('inventory/fixed-assets', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'index'])
+            ->name('inventory.fixed-assets.index')->middleware('permission:inventory.assets.view|inventory.assets.manage');
+        Route::get('inventory/fixed-assets/{fixedAsset}', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'show'])
+            ->name('inventory.fixed-assets.show')->middleware('permission:inventory.assets.view|inventory.assets.manage');
+        Route::put('inventory/fixed-assets/{fixedAsset}/custody', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'updateCustody'])
+            ->name('inventory.fixed-assets.custody')->middleware('permission:inventory.assets.manage');
+    });
+
+    Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('inventory/stock-levels', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'stockLevels'])
             ->name('inventory.stock-levels')->middleware('permission:inventory.stock-levels.manage');
         Route::put('inventory/stock-levels', [\App\Http\Controllers\Admin\InventoryStockTakeController::class, 'updateStockLevels'])

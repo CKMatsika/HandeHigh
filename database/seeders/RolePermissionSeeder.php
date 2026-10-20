@@ -39,7 +39,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.stock-requests.view', 'inventory.stock-requests.create',
             'inventory.stock-requests.approve', 'inventory.stock-issues.create',
             'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve',
-            'inventory.stock-levels.manage',
+            'inventory.stock-levels.manage', 'inventory.assets.view', 'inventory.assets.manage',
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
             'reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance',
             'schools.view', 'schools.edit', 'users.view', 'users.create', 'users.edit', 'users.delete',
@@ -80,14 +80,14 @@ class RolePermissionSeeder extends Seeder
 
         return [
             'super-admin' => self::permissions(),
-            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], $academic, $finance, $accounting, [
+            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.assets.view', 'inventory.assets.manage', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], $academic, $finance, $accounting, [
                 'procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.approve',
                 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign'], $timetables),
-            'headmaster' => array_merge(['dashboard.headmaster', 'inventory.view', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'procurement.requisitions.create'], $academic, $finance, [
+            'headmaster' => array_merge(['dashboard.headmaster', 'inventory.view', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.assets.view', 'procurement.requisitions.create'], $academic, $finance, [
                 'procurement.view', 'procurement.approve', 'procurement.vendors.view',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
-            'deputy-headmaster' => array_merge(['dashboard.deputy-headmaster', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'procurement.requisitions.create'], $academic, $finance, [
+            'deputy-headmaster' => array_merge(['dashboard.deputy-headmaster', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.assets.view', 'procurement.requisitions.create'], $academic, $finance, [
                 'procurement.view', 'procurement.approve',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
             'accounts-clerk' => array_merge(['dashboard.accounts-clerk'],
@@ -98,7 +98,7 @@ class RolePermissionSeeder extends Seeder
                 ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
                 ['communication.view', 'communication.create', 'communication.sms', 'communication.email'],
                 ['reports.view', 'reports.financial', 'reports.attendance']),
-            'bursar' => array_merge(['dashboard.bursar', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage'],
+            'bursar' => array_merge(['dashboard.bursar', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.assets.view'],
                 ['students.view', 'procurement.requisitions.create', 'inventory.view', 'inventory.ledger.view'], $finance, ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
                 ['procurement.view', 'procurement.approve', 'procurement.vendors.view'],
                 ['procurement.supplier-invoices.view', 'procurement.supplier-invoices.approve'],
@@ -113,11 +113,12 @@ class RolePermissionSeeder extends Seeder
                 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view',
                 'inventory.stock-requests.view', 'inventory.stock-issues.create',
                 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-levels.manage',
+                'inventory.assets.view', 'inventory.assets.manage',
                 'procurement.requisitions.create', 'procurement.grv.view', 'procurement.grv.create',
                 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create',
             ],
             'teacher' => array_merge(['dashboard.view', 'procurement.requisitions.create', 'inventory.stock-requests.view', 'inventory.stock-requests.create'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3), ['timetables.view', 'timetables.export']),
-            'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view', 'procurement.requisitions.create', 'procurement.grv.view', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
+            'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view', 'inventory.assets.view', 'procurement.requisitions.create', 'procurement.grv.view', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
         ];
     }
 

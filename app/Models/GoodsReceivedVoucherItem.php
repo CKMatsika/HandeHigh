@@ -41,4 +41,9 @@ class GoodsReceivedVoucherItem extends Model
     {
         return $this->hasMany(ProcurementSupplierInvoiceItem::class);
     }
+
+    public function fixedAssets(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SchoolFixedAsset::class, 'goods_received_voucher_item_id');
+    }
 }

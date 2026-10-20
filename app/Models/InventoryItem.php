@@ -42,4 +42,9 @@ class InventoryItem extends Model
     {
         return $this->hasMany(InventoryTransaction::class);
     }
+
+    public function fixedAssets(): HasMany
+    {
+        return $this->hasMany(SchoolFixedAsset::class);
+    }
 }

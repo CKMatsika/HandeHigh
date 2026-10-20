@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProcurementSupplierInvoiceItem extends Model
 {
@@ -31,5 +32,10 @@ class ProcurementSupplierInvoiceItem extends Model
     public function goodsReceivedItem(): BelongsTo
     {
         return $this->belongsTo(GoodsReceivedVoucherItem::class, 'goods_received_voucher_item_id');
+    }
+
+    public function fixedAssets(): HasMany
+    {
+        return $this->hasMany(SchoolFixedAsset::class, 'supplier_invoice_item_id');
     }
 }

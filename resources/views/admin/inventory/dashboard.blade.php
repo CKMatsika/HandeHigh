@@ -7,7 +7,7 @@
         <p class="mt-1 text-sm text-slate-400">{{ $school->name }} · Stores Person workspace</p>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
             <p class="text-sm text-slate-400">Active items</p>
             <p class="mt-2 text-2xl font-bold text-slate-100">{{ number_format($stats['items']) }}</p>
@@ -32,9 +32,19 @@
             <p class="text-sm text-slate-400">Stock value</p>
             <p class="mt-2 text-lg font-bold text-slate-100">{{ number_format((float) $stats['inventory_value'], 2) }}</p>
         </div>
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
+            <p class="text-sm text-slate-400">Capitalized asset value</p>
+            <p class="mt-2 text-lg font-bold text-slate-100">{{ number_format((float) $stats['fixed_asset_value'], 2) }}</p>
+        </div>
+        @can('accounts.edit')
+            <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
+                <p class="text-sm text-slate-400">Capitalization threshold</p>
+                <p class="mt-2 text-lg font-bold text-slate-100">{{ $stats['capitalization_threshold'] === null ? 'All asset items' : number_format((float) $stats['capitalization_threshold'], 2) }}</p>
+            </div>
+        @endcan
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-6">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
         @can('inventory.catalog.manage')
             <a href="{{ route('admin.inventory.items.index') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
                 <h2 class="font-semibold text-slate-100">Item catalogue</h2>
@@ -74,6 +84,18 @@
             <a href="{{ route('admin.inventory.stock-levels') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
                 <h2 class="font-semibold text-slate-100">Stock on hand & reorder</h2>
                 <p class="mt-1 text-sm text-slate-400">View warehouse balances and set reorder alerts and quantities.</p>
+            </a>
+        @endcan
+        @can('inventory.assets.view')
+            <a href="{{ route('admin.inventory.fixed-assets.index') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
+                <h2 class="font-semibold text-slate-100">Fixed asset register</h2>
+                <p class="mt-1 text-sm text-slate-400">Track capitalized purchases, asset tags, serial numbers and custodians.</p>
+            </a>
+        @endcan
+        @can('accounts.edit')
+            <a href="{{ route('admin.inventory.settings.edit') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">
+                <h2 class="font-semibold text-slate-100">Asset capitalization</h2>
+                <p class="mt-1 text-sm text-slate-400">Set the school’s per-unit threshold for fixed asset purchases.</p>
             </a>
         @endcan
     </div>

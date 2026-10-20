@@ -23,13 +23,37 @@ class ProcurementAccountingService
             return $existing;
         }
 
-        $voucher->loadMissing('items');
+        $voucher->loadMissing('items.item.category.assetAccount');
         $amount = (float) $voucher->items->sum('line_total');
         if ($amount <= 0) {
             return null;
         }
 
         $accounts = $this->procurementAccounts($voucher->school);
+        $debitAmounts = [];
+        foreach ($voucher->items as $line) {
+            $assetAccount = app(SchoolFixedAssetService::class)->assetAccountFor($line);
+            $account = $assetAccount ?? $accounts['inventory'];
+            $debitAmounts[$account->id] ??= ['account' => $account, 'amount' => 0.0];
+            $debitAmounts[$account->id]['amount'] += (float) $line->line_total;
+        }
+        $entries = [];
+        foreach ($debitAmounts as $debit) {
+            if ($debit['amount'] > 0) {
+                $entries[] = [
+                    'account_id' => $debit['account']->id,
+                    'entry_type' => 'debit',
+                    'amount' => round($debit['amount'], 2),
+                    'memo' => 'Inventory or fixed assets received - '.$voucher->voucher_number,
+                ];
+            }
+        }
+        $entries[] = [
+            'account_id' => $accounts['received_not_invoiced']->id,
+            'entry_type' => 'credit',
+            'amount' => $amount,
+            'memo' => 'Goods received not invoiced - '.$voucher->voucher_number,
+        ];
 
         return app(AccountingService::class)->createJournalBatch([
             'school_id' => $voucher->school_id,
@@ -40,20 +64,7 @@ class ProcurementAccountingService
             'source_id' => $voucher->id,
             'status' => 'posted',
             'created_by' => $voucher->received_by,
-            'entries' => [
-                [
-                    'account_id' => $accounts['inventory']->id,
-                    'entry_type' => 'debit',
-                    'amount' => $amount,
-                    'memo' => 'Inventory received - '.$voucher->voucher_number,
-                ],
-                [
-                    'account_id' => $accounts['received_not_invoiced']->id,
-                    'entry_type' => 'credit',
-                    'amount' => $amount,
-                    'memo' => 'Goods received not invoiced - '.$voucher->voucher_number,
-                ],
-            ],
+            'entries' => $entries,
         ]);
     }
 
@@ -69,11 +80,14 @@ class ProcurementAccountingService
             }
 
             $accounts = $this->procurementAccounts($bill->school);
-            $supplierInvoice->loadMissing('items');
+            $supplierInvoice->loadMissing([
+                'items.goodsReceivedItem.item.category.assetAccount',
+                'items.goodsReceivedItem.fixedAssets.assetAccount',
+            ]);
             $receivedCostBasis = (float) $supplierInvoice->items->sum('stock_cost_basis');
             $invoiceAmount = (float) $supplierInvoice->total_amount;
-            $variance = round($invoiceAmount - $receivedCostBasis, 2);
             $entries = [];
+            $varianceByAccount = [];
 
             if ($receivedCostBasis > 0) {
                 $entries[] = [
@@ -84,13 +98,34 @@ class ProcurementAccountingService
                 ];
             }
 
-            if (abs($variance) >= 0.01) {
-                $entries[] = [
-                    'account_id' => $accounts['price_variance']->id,
-                    'entry_type' => $variance > 0 ? 'debit' : 'credit',
-                    'amount' => abs($variance),
-                    'memo' => 'Supplier invoice price variance - '.$supplierInvoice->invoice_number,
+            foreach ($supplierInvoice->items as $line) {
+                $variance = round((float) $line->line_total - (float) $line->stock_cost_basis, 2);
+                if (abs($variance) < 0.01) {
+                    continue;
+                }
+
+                $asset = $line->goodsReceivedItem->fixedAssets->first(fn ($record) => $record->is_capitalized);
+                $account = $asset?->assetAccount ?? $accounts['price_variance'];
+                $entryType = $variance > 0 ? 'debit' : 'credit';
+                $varianceByAccount[$account->id] ??= [
+                    'account' => $account,
+                    'debit' => 0.0,
+                    'credit' => 0.0,
                 ];
+                $varianceByAccount[$account->id][$entryType] += abs($variance);
+            }
+
+            foreach ($varianceByAccount as $variance) {
+                foreach (['debit', 'credit'] as $entryType) {
+                    if ($variance[$entryType] >= 0.01) {
+                        $entries[] = [
+                            'account_id' => $variance['account']->id,
+                            'entry_type' => $entryType,
+                            'amount' => round($variance[$entryType], 2),
+                            'memo' => 'Supplier invoice price variance - '.$supplierInvoice->invoice_number,
+                        ];
+                    }
+                }
             }
 
             if ($invoiceAmount > 0) {

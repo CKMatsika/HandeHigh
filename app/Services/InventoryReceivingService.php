@@ -84,6 +84,20 @@ class InventoryReceivingService
                     ->whereKey($item->id)
                     ->lockForUpdate()
                     ->firstOrFail();
+                $unitCost = (float) $orderItem->unit_cost;
+                $receivedItem = $voucher->items()->create([
+                    'purchase_order_item_id' => $orderItem->id,
+                    'inventory_item_id' => $item->id,
+                    'quantity_received' => $quantity,
+                    'unit_cost' => $unitCost,
+                    'line_total' => round($quantity * $unitCost, 2),
+                ]);
+                $assetService = app(SchoolFixedAssetService::class);
+                $assetService->recordReceivedAssets($receivedItem, $warehouse, $receiver);
+                if ($assetService->shouldCapitalize($item, $unitCost)) {
+                    continue;
+                }
+
                 $balance = InventoryBalance::where('school_id', $school->id)
                     ->where('inventory_item_id', $item->id)
                     ->where('inventory_warehouse_id', $warehouse->id)
@@ -103,19 +117,10 @@ class InventoryReceivingService
 
                 $oldQuantity = (float) $balance->quantity_on_hand;
                 $oldAverageCost = (float) $balance->average_unit_cost;
-                $unitCost = (float) $orderItem->unit_cost;
                 $newQuantity = $oldQuantity + $quantity;
                 $newAverageCost = $newQuantity > 0
                     ? round((($oldQuantity * $oldAverageCost) + ($quantity * $unitCost)) / $newQuantity, 4)
                     : 0;
-
-                $voucher->items()->create([
-                    'purchase_order_item_id' => $orderItem->id,
-                    'inventory_item_id' => $item->id,
-                    'quantity_received' => $quantity,
-                    'unit_cost' => $unitCost,
-                    'line_total' => round($quantity * $unitCost, 2),
-                ]);
 
                 $balance->update([
                     'quantity_on_hand' => $newQuantity,

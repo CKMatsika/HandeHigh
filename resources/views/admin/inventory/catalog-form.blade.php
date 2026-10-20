@@ -86,6 +86,17 @@
                     <p class="mt-1 text-xs text-slate-500">Finance can assign category issues to the appropriate expense ledger.</p>
                     @error('issue_expense_account_id')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
                 </div>
+                <div class="sm:col-span-2">
+                    <label for="asset_account_id" class="mb-1 block text-xs font-medium text-slate-300">Fixed-asset account</label>
+                    <select id="asset_account_id" name="asset_account_id" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                        <option value="">Not mapped</option>
+                        @foreach($assetAccounts as $account)
+                            <option value="{{ $account->id }}" @selected(old('asset_account_id', $record?->asset_account_id) == $account->id)>{{ $account->code }} · {{ $account->name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500">Required before capitalized items in this category can be received.</p>
+                    @error('asset_account_id')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+                </div>
             @endif
 
             @if($kind !== 'warehouses')

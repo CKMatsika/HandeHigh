@@ -94,6 +94,12 @@
                             <span>Stock Levels</span>
                         </a>
                     @endcan
+                    @can('inventory.assets.view')
+                        <a href="{{ route('admin.inventory.fixed-assets.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.fixed-assets.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
+                            <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                            <span>Fixed Assets</span>
+                        </a>
+                    @endcan
                     @can('procurement.requisitions.create')
                         <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.*') ? 'bg-indigo-500/20 text-indigo-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-indigo-400"></span>

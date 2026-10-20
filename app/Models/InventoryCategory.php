@@ -14,6 +14,7 @@ class InventoryCategory extends Model
         'name',
         'description',
         'issue_expense_account_id',
+        'asset_account_id',
         'is_active',
     ];
 
@@ -34,5 +35,10 @@ class InventoryCategory extends Model
     public function issueExpenseAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'issue_expense_account_id');
+    }
+
+    public function assetAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'asset_account_id');
     }
 }

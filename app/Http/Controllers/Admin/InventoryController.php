@@ -11,6 +11,7 @@ use App\Models\InventorySetting;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryWarehouse;
 use App\Models\School;
+use App\Models\SchoolFixedAsset;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -38,6 +39,19 @@ class InventoryController extends Controller
             ->get();
 
         $settings = InventorySetting::where('school_id', $schoolId)->first();
+        $capitalizationThreshold = $settings?->asset_capitalization_threshold;
+        $inventoryValue = InventoryBalance::where('school_id', $schoolId)
+            ->where(function ($query) use ($capitalizationThreshold) {
+                $query->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_type', 'consumable'));
+                if ($capitalizationThreshold !== null) {
+                    $query->orWhere(function ($assetQuery) use ($capitalizationThreshold) {
+                        $assetQuery->where('average_unit_cost', '<', $capitalizationThreshold)
+                            ->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_type', 'asset'));
+                    });
+                }
+            })
+            ->selectRaw('COALESCE(SUM(quantity_on_hand * average_unit_cost), 0) as inventory_value')
+            ->value('inventory_value');
 
         $stats = [
             'items' => InventoryItem::where('school_id', $schoolId)->where('is_active', true)->count(),
@@ -48,9 +62,12 @@ class InventoryController extends Controller
                 ->whereColumn('quantity_on_hand', '<=', 'reorder_level')
                 ->count(),
             'valuation_method' => $settings?->valuation_method ?? 'weighted_average',
-            'inventory_value' => InventoryBalance::where('school_id', $schoolId)
-                ->selectRaw('COALESCE(SUM(quantity_on_hand * average_unit_cost), 0) as inventory_value')
-                ->value('inventory_value'),
+            'inventory_value' => $inventoryValue,
+            'fixed_asset_value' => SchoolFixedAsset::where('school_id', $schoolId)
+                ->where('is_capitalized', true)
+                ->where('status', '!=', 'disposed')
+                ->sum('capitalized_cost'),
+            'capitalization_threshold' => $capitalizationThreshold,
         ];
 
         return view('admin.inventory.dashboard', compact('school', 'stats', 'lowStockBalances', 'recentTransactions'));
@@ -86,6 +103,7 @@ class InventoryController extends Controller
         ]);
         if (auth()->user()->can('accounts.edit')) {
             $validated['issue_expense_account_id'] = $this->validateIssueExpenseAccount($request, $school);
+            $validated['asset_account_id'] = $this->validateAssetAccount($request, $school);
         }
 
         InventoryCategory::create([...$validated, 'school_id' => $school->id]);
@@ -112,6 +130,7 @@ class InventoryController extends Controller
         ]);
         if (auth()->user()->can('accounts.edit')) {
             $validated['issue_expense_account_id'] = $this->validateIssueExpenseAccount($request, $school);
+            $validated['asset_account_id'] = $this->validateAssetAccount($request, $school);
         }
 
         $category->update($validated);
@@ -222,8 +241,11 @@ class InventoryController extends Controller
         $expenseAccounts = $kind === 'categories' && auth()->user()->can('accounts.edit')
             ? Account::where('school_id', $school->id)->where('type', 'expense')->where('is_active', true)->where('is_postable', true)->orderBy('code')->get()
             : collect();
+        $assetAccounts = $kind === 'categories' && auth()->user()->can('accounts.edit')
+            ? Account::where('school_id', $school->id)->where('type', 'asset')->where('category', 'fixed_asset')->where('is_active', true)->where('is_postable', true)->orderBy('code')->get()
+            : collect();
 
-        return view('admin.inventory.catalog-form', compact('kind', 'record', 'categories', 'users', 'expenseAccounts'));
+        return view('admin.inventory.catalog-form', compact('kind', 'record', 'categories', 'users', 'expenseAccounts', 'assetAccounts'));
     }
 
     private function validateIssueExpenseAccount(Request $request, School $school): ?int
@@ -247,6 +269,23 @@ class InventoryController extends Controller
         }
 
         return (int) $account->id;
+    }
+
+    private function validateAssetAccount(Request $request, School $school): ?int
+    {
+        $validated = $request->validate([
+            'asset_account_id' => [
+                'nullable',
+                Rule::exists('accounts', 'id')
+                    ->where('school_id', $school->id)
+                    ->where('type', 'asset')
+                    ->where('category', 'fixed_asset')
+                    ->where('is_active', true)
+                    ->where('is_postable', true),
+            ],
+        ]);
+
+        return isset($validated['asset_account_id']) ? (int) $validated['asset_account_id'] : null;
     }
 
     private function validateItem(Request $request, School $school, ?InventoryItem $item = null): array
