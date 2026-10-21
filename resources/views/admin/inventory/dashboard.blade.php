@@ -91,6 +91,14 @@
                 <h2 class="font-semibold text-slate-100">Fixed asset register</h2>
                 <p class="mt-1 text-sm text-slate-400">Track capitalized purchases, asset tags, serial numbers and custodians.</p>
             </a>
+            <a href="{{ route('admin.inventory.fixed-assets.depreciation') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-violet-500/50">
+                <h2 class="font-semibold text-slate-100">Depreciation schedules</h2>
+                <p class="mt-1 text-sm text-slate-400">Run monthly straight-line and reducing-balance amortisations and view journal postings.</p>
+            </a>
+            <a href="{{ route('admin.inventory.fixed-assets.maintenance') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-amber-500/50">
+                <h2 class="font-semibold text-slate-100">Asset maintenance</h2>
+                <p class="mt-1 text-sm text-slate-400">Schedule preventative maintenance, log repairs, and track service costs and GL postings.</p>
+            </a>
         @endcan
         @can('accounts.edit')
             <a href="{{ route('admin.inventory.settings.edit') }}" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50">

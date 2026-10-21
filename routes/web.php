@@ -880,10 +880,26 @@ Route::middleware(['auth'])->group(function () {
             ->name('inventory.settings.update')->middleware('permission:accounts.edit');
         Route::get('inventory/fixed-assets', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'index'])
             ->name('inventory.fixed-assets.index')->middleware('permission:inventory.assets.view|inventory.assets.manage');
+        Route::get('inventory/fixed-assets/depreciation', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'depreciationIndex'])
+            ->name('inventory.fixed-assets.depreciation')->middleware('permission:inventory.assets.view|inventory.assets.manage');
+        Route::post('inventory/fixed-assets/depreciation/run', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'runDepreciation'])
+            ->name('inventory.fixed-assets.depreciation.run')->middleware('permission:inventory.assets.manage');
+        Route::get('inventory/fixed-assets/maintenance', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'maintenanceIndex'])
+            ->name('inventory.fixed-assets.maintenance')->middleware('permission:inventory.assets.view|inventory.assets.manage');
+        Route::put('inventory/fixed-assets/maintenance/{maintenance}/complete', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'maintenanceComplete'])
+            ->name('inventory.fixed-assets.maintenance.complete')->middleware('permission:inventory.assets.manage');
         Route::get('inventory/fixed-assets/{fixedAsset}', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'show'])
             ->name('inventory.fixed-assets.show')->middleware('permission:inventory.assets.view|inventory.assets.manage');
         Route::put('inventory/fixed-assets/{fixedAsset}/custody', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'updateCustody'])
             ->name('inventory.fixed-assets.custody')->middleware('permission:inventory.assets.manage');
+        Route::put('inventory/fixed-assets/{fixedAsset}/depreciation', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'updateDepreciation'])
+            ->name('inventory.fixed-assets.depreciation.update')->middleware('permission:inventory.assets.manage');
+        Route::post('inventory/fixed-assets/{fixedAsset}/transfer', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'transfer'])
+            ->name('inventory.fixed-assets.transfer')->middleware('permission:inventory.assets.manage');
+        Route::post('inventory/fixed-assets/{fixedAsset}/dispose', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'dispose'])
+            ->name('inventory.fixed-assets.dispose')->middleware('permission:inventory.assets.manage');
+        Route::post('inventory/fixed-assets/{fixedAsset}/maintenance', [\App\Http\Controllers\Admin\SchoolFixedAssetController::class, 'maintenanceStore'])
+            ->name('inventory.fixed-assets.maintenance.store')->middleware('permission:inventory.assets.manage');
     });
 
     Route::middleware(['tenant'])->prefix('admin')->name('admin.')->group(function () {
