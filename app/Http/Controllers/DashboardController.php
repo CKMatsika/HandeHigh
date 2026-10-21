@@ -35,6 +35,7 @@ class DashboardController extends Controller
                 'bursar' => 'admin.dashboard.bursar',
                 'procurement-officer' => 'admin.dashboard.procurement-officer',
                 'stores-person' => 'admin.inventory.index',
+                'stores-manager' => 'admin.dashboard.stores-manager',
                 'teacher' => 'teacher.dashboard',
                 'student' => 'student.dashboard',
                 'parent' => 'parent.dashboard',

@@ -639,4 +639,15 @@ class DashboardController extends Controller
 
         return view('admin.dashboard.procurement-officer', compact('stats'));
     }
+
+    public function storesManager()
+    {
+        $user = Auth::user();
+        if (! $user?->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'procurement-officer', 'headmaster', 'deputy-headmaster', 'accountant']) && ! $user?->can('inventory.view')) {
+            abort(403);
+        }
+
+        return app(\App\Http\Controllers\Admin\InventoryController::class)->dashboard();
+    }
 }
+

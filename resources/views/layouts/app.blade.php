@@ -38,7 +38,7 @@
                         <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                         <span>Dashboard</span>
                     </a>
-                    @if($user && $user->hasAnyRole(['super-admin', 'headmaster', 'deputy-headmaster', 'accounts-clerk', 'bursar', 'procurement-officer']))
+                    @if($user && ($user->hasAnyRole(['super-admin', 'school-admin', 'headmaster', 'deputy-headmaster', 'accounts-clerk', 'bursar', 'procurement-officer', 'stores-person', 'stores-manager', 'accountant']) || $user->can('inventory.view')))
                         @can('dashboard.headmaster')
                             <a href="{{ route('admin.dashboard.headmaster') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.headmaster') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                 <span class="h-2 w-2 rounded-full bg-blue-400"></span>
@@ -69,43 +69,49 @@
                                 <span>Procurement Officer Dashboard</span>
                             </a>
                         @endcan
+                        @if($user->can('inventory.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'procurement-officer', 'accountant', 'headmaster']))
+                            <a href="{{ route('admin.dashboard.stores-manager') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.stores-manager') ? 'bg-emerald-600 text-slate-50 font-medium' : 'text-slate-300' }}">
+                                <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                <span>Stores Manager Dashboard</span>
+                            </a>
+                        @endif
                     @endif
-                    @can('inventory.view')
-                        <a href="{{ route('admin.inventory.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
+                    @if($user && ($user->can('inventory.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster'])))
+                        <a href="{{ route('admin.inventory.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.index') || request()->routeIs('admin.inventory.items.*') || request()->routeIs('admin.inventory.categories.*') || request()->routeIs('admin.inventory.warehouses.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
                             <span>Stores & Inventory</span>
                         </a>
-                    @endcan
-                    @can('inventory.stock-requests.view')
+                    @endif
+                    @if($user && ($user->can('inventory.stock-requests.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster', 'deputy-headmaster', 'teacher'])))
                         <a href="{{ route('admin.inventory.stock-requests.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-requests.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                             <span>Stock Requests</span>
                         </a>
-                    @endcan
-                    @can('inventory.stock-takes.view')
+                    @endif
+                    @if($user && ($user->can('inventory.stock-takes.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster'])))
                         <a href="{{ route('admin.inventory.stock-takes.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-takes.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
                             <span>Stock Takes</span>
                         </a>
-                    @endcan
-                    @can('inventory.stock-levels.manage')
+                    @endif
+                    @if($user && ($user->can('inventory.stock-levels.manage') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar'])))
                         <a href="{{ route('admin.inventory.stock-levels') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-levels*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-violet-400"></span>
                             <span>Stock Levels</span>
                         </a>
-                    @endcan
-                    @can('inventory.assets.view')
+                    @endif
+                    @if($user && ($user->can('inventory.assets.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'accountant'])))
                         <a href="{{ route('admin.inventory.fixed-assets.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.fixed-assets.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
                             <span>Fixed Assets</span>
                         </a>
-                    @endcan
-                    @can('procurement.requisitions.create')
+                    @endif
+                    @if($user && ($user->can('procurement.requisitions.create') || $user->can('procurement.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'procurement-officer', 'bursar'])))
                         <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.*') ? 'bg-indigo-500/20 text-indigo-100' : 'text-slate-300' }}">
                             <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
                             <span>Procurement</span>
                         </a>
-                    @endcan
+                    @endif
                     @if($user && $user->hasRole(['super-admin','school-admin']))
                         <!-- Academic Management -->
                         <div class="space-y-1">

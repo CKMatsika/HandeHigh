@@ -8,10 +8,13 @@ use App\Models\InventoryBalance;
 use App\Models\InventoryCategory;
 use App\Models\InventoryItem;
 use App\Models\InventorySetting;
+use App\Models\InventoryStockRequest;
+use App\Models\InventoryStockTake;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryWarehouse;
 use App\Models\School;
 use App\Models\SchoolFixedAsset;
+use App\Models\SchoolFixedAssetMaintenance;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -68,6 +71,10 @@ class InventoryController extends Controller
                 ->where('status', '!=', 'disposed')
                 ->sum('capitalized_cost'),
             'capitalization_threshold' => $capitalizationThreshold,
+            'pending_requests' => InventoryStockRequest::where('school_id', $schoolId)->whereIn('status', ['submitted', 'pending'])->count(),
+            'pending_stock_takes' => InventoryStockTake::where('school_id', $schoolId)->whereIn('status', ['draft', 'in_progress', 'submitted'])->count(),
+            'total_fixed_assets' => SchoolFixedAsset::where('school_id', $schoolId)->where('status', '!=', 'disposed')->count(),
+            'pending_maintenance' => SchoolFixedAssetMaintenance::where('school_id', $schoolId)->whereIn('status', ['scheduled', 'in_progress'])->count(),
         ];
 
         return view('admin.inventory.dashboard', compact('school', 'stats', 'lowStockBalances', 'recentTransactions'));

@@ -103,6 +103,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('dashboard.bursar')->middleware('permission:dashboard.bursar');
         Route::get('dashboard/procurement-officer', [\App\Http\Controllers\Admin\DashboardController::class, 'procurementOfficer'])
             ->name('dashboard.procurement-officer')->middleware('permission:dashboard.procurement-officer');
+        Route::get('dashboard/stores-manager', [\App\Http\Controllers\Admin\DashboardController::class, 'storesManager'])
+            ->name('dashboard.stores-manager');
         Route::get('dashboard/drilldown', [\App\Http\Controllers\Admin\DashboardController::class, 'drilldown'])
             ->name('dashboard.drilldown');
     });
