@@ -7,12 +7,20 @@
             <div class="flex items-center gap-2">
                 <span class="inline-flex items-center rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/20">Stores & Inventory</span>
                 <span class="text-xs text-slate-500">·</span>
-                <span class="text-xs text-slate-400">Workspace</span>
+                <span class="text-xs text-slate-400">Stores Manager Workspace</span>
             </div>
             <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">Stores Manager Dashboard</h1>
-            <p class="mt-1 text-sm text-slate-400">{{ $school->name }} · Real-time inventory balances, stock movements, requests, physical counts & asset register</p>
+            <p class="mt-1 text-sm text-slate-400">{{ $school->name }} · Approved Purchase Orders, GRN Inward Receipts, Delivery Notes, Supplier Returns &amp; Physical Stock Ledger</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+            <a href="#approved-pos" class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 transition">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Receive Approved PO
+            </a>
+            <a href="{{ route('admin.inventory.returns.index') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-800/80 bg-rose-950/40 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-900/60 transition">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H4m0 0l4-4m-4 4l4 4m6 4v1a3 3 0 003 3h3a3 3 0 003-3V7a3 3 0 00-3-3h-3a3 3 0 00-3 3v1"/></svg>
+                Supplier Returns
+            </a>
             <a href="{{ route('admin.inventory.stock-requests.create') }}" class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 transition">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 New Stock Request
@@ -75,154 +83,249 @@
         </div>
     </div>
 
-    <!-- Secondary Operations KPIs -->
+    <!-- Stores Receiving & Returns Operations KPIs -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <a href="{{ route('admin.inventory.stock-requests.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-amber-500/40 transition">
+        <a href="#approved-pos" class="group rounded-2xl border border-indigo-900/50 bg-slate-900/70 p-4 hover:border-indigo-500/50 transition">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-slate-400">Pending Stock Requests</span>
-                <span class="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-300">
-                    {{ $stats['pending_requests'] ?? 0 }} pending
+                <span class="text-xs font-medium text-slate-400">Approved POs Pending Inward</span>
+                <span class="inline-flex items-center rounded-full bg-indigo-500/10 px-2 py-0.5 text-xs font-semibold text-indigo-300">
+                    {{ $stats['pending_po_receipts'] ?? 0 }} awaiting receipt
                 </span>
             </div>
-            <p class="mt-2 text-sm text-slate-300 group-hover:text-amber-200">Review staff requisition queues &rarr;</p>
+            <p class="mt-2 text-sm text-slate-300 group-hover:text-indigo-200">Receive goods against supplier POs &rarr;</p>
         </a>
 
-        <a href="{{ route('admin.inventory.stock-takes.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/40 transition">
+        <a href="#recent-grns" class="group rounded-2xl border border-emerald-900/50 bg-slate-900/70 p-4 hover:border-emerald-500/50 transition">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-slate-400">Stock Takes in Progress</span>
-                <span class="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-semibold text-cyan-300">
-                    {{ $stats['pending_stock_takes'] ?? 0 }} active
-                </span>
-            </div>
-            <p class="mt-2 text-sm text-slate-300 group-hover:text-cyan-200">Open physical stock counts &rarr;</p>
-        </a>
-
-        <a href="{{ route('admin.inventory.fixed-assets.depreciation') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-violet-500/40 transition">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-slate-400">Depreciation Schedules</span>
-                <span class="inline-flex items-center rounded-full bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-300">
-                    Monthly Run
-                </span>
-            </div>
-            <p class="mt-2 text-sm text-slate-300 group-hover:text-violet-200">Run straight-line amortisation &rarr;</p>
-        </a>
-
-        <a href="{{ route('admin.inventory.fixed-assets.maintenance') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-emerald-500/40 transition">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-slate-400">Asset Maintenance Tasks</span>
+                <span class="text-xs font-medium text-slate-400">Goods Received Notes (GRN)</span>
                 <span class="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-                    {{ $stats['pending_maintenance'] ?? 0 }} scheduled
+                    {{ $stats['total_grvs'] ?? 0 }} vouchers
                 </span>
             </div>
-            <p class="mt-2 text-sm text-slate-300 group-hover:text-emerald-200">Track repairs & service logs &rarr;</p>
+            <p class="mt-2 text-sm text-slate-300 group-hover:text-emerald-200">View logged receipts &amp; stocks &rarr;</p>
+        </a>
+
+        <a href="#recent-grns" class="group rounded-2xl border border-cyan-900/50 bg-slate-900/70 p-4 hover:border-cyan-500/50 transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400">Delivery Notes (D/Notes)</span>
+                <span class="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-semibold text-cyan-300">
+                    {{ $stats['active_delivery_notes'] ?? 0 }} tracked
+                </span>
+            </div>
+            <p class="mt-2 text-sm text-slate-300 group-hover:text-cyan-200">Supplier D/Note references &rarr;</p>
+        </a>
+
+        <a href="{{ route('admin.inventory.returns.index') }}" class="group rounded-2xl border border-rose-900/50 bg-slate-900/70 p-4 hover:border-rose-500/50 transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-400">Supplier Returns (Debit Notes)</span>
+                <span class="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-300">
+                    {{ $stats['total_returns'] ?? 0 }} processed
+                </span>
+            </div>
+            <p class="mt-2 text-sm text-slate-300 group-hover:text-rose-200">Return damaged / rejected items &rarr;</p>
         </a>
     </div>
 
-    <!-- Quick Navigation Modules -->
-    <div>
-        <h2 class="text-base font-semibold text-slate-200 mb-3">Inventory & Asset Management Modules</h2>
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-            <a href="{{ route('admin.inventory.items.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 group-hover:bg-emerald-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-emerald-300 transition">Item Catalogue</h3>
+    <!-- Section 1: Approved Purchase Orders Awaiting Receipt (Pending Inward Deliveries) -->
+    <section id="approved-pos" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
+        <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                    <h2 class="text-base font-bold text-slate-100">Approved Purchase Orders Awaiting Delivery / Receipt</h2>
                 </div>
-                <p class="mt-2 text-sm text-slate-400">Maintain stocked supplies, assets, consumable units, and codes.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.categories.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-blue-500/10 p-2.5 text-blue-400 group-hover:bg-blue-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-emerald-300 transition">Categories</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Organize stock using school-specific inventory and asset categories.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.warehouses.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-amber-500/10 p-2.5 text-amber-400 group-hover:bg-amber-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-emerald-300 transition">Warehouses & Stores</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">View and manage physical store locations and warehouse managers.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.stock-requests.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-amber-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-amber-500/10 p-2.5 text-amber-400 group-hover:bg-amber-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-amber-300 transition">Stock Requests</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Review staff requisitions, approvals, and post controlled stock issues.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.stock-takes.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-cyan-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-cyan-500/10 p-2.5 text-cyan-400 group-hover:bg-cyan-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-cyan-300 transition">Stock Takes</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Conduct physical counts, review variances, and approve stock adjustments.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.stock-levels') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-violet-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-violet-500/10 p-2.5 text-violet-400 group-hover:bg-violet-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-violet-300 transition">Stock on Hand & Reorder</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">View balances by warehouse and configure reorder minimums.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.fixed-assets.index') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-indigo-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-indigo-500/10 p-2.5 text-indigo-400 group-hover:bg-indigo-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-indigo-300 transition">Fixed Asset Register</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Asset tags, serials, custodians, room allocations, transfers & disposals.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.fixed-assets.depreciation') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-violet-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-violet-500/10 p-2.5 text-violet-400 group-hover:bg-violet-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-violet-300 transition">Depreciation Schedules</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Run monthly straight-line amortisation and post journal entries.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.fixed-assets.maintenance') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-amber-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-amber-500/10 p-2.5 text-amber-400 group-hover:bg-amber-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-amber-300 transition">Asset Maintenance</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Preventative maintenance, repair logs, service vendors, and GL postings.</p>
-            </a>
-
-            <a href="{{ route('admin.inventory.settings.edit') }}" class="group rounded-2xl border border-slate-800 bg-slate-900/80 p-5 hover:border-emerald-500/50 hover:bg-slate-900 transition">
-                <div class="flex items-center gap-3">
-                    <span class="rounded-xl bg-teal-500/10 p-2.5 text-teal-400 group-hover:bg-teal-500/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                    </span>
-                    <h3 class="font-semibold text-slate-100 group-hover:text-teal-300 transition">Asset Capitalization</h3>
-                </div>
-                <p class="mt-2 text-sm text-slate-400">Threshold: {{ $stats['capitalization_threshold'] === null ? 'All asset items' : number_format((float) $stats['capitalization_threshold'], 2) }}</p>
-            </a>
+                <p class="text-xs text-slate-400 mt-0.5">Approved supplier orders ready for warehouse inspection and Goods Received Note (GRN) posting.</p>
+            </div>
+            <a href="{{ route('admin.procurement.index') }}" class="text-xs font-semibold text-indigo-400 hover:text-indigo-300">Procurement Hub &rarr;</a>
         </div>
-    </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="text-xs uppercase text-slate-500 border-b border-slate-800 bg-slate-950/40">
+                    <tr>
+                        <th class="py-2.5 px-3">PO Number</th>
+                        <th class="py-2.5 px-3">Supplier</th>
+                        <th class="py-2.5 px-3">Order Date</th>
+                        <th class="py-2.5 px-3">Delivery Warehouse</th>
+                        <th class="py-2.5 px-3">Items Ordered</th>
+                        <th class="py-2.5 px-3">Status</th>
+                        <th class="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    @forelse($approvedPurchaseOrders as $po)
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 px-3 font-mono font-medium text-indigo-300">
+                                <a href="{{ route('admin.procurement.purchase-orders.show', $po) }}" class="hover:underline">{{ $po->purchase_order_number }}</a>
+                            </td>
+                            <td class="py-3 px-3 text-slate-200 font-medium">{{ $po->vendor->name }}</td>
+                            <td class="py-3 px-3 text-slate-400 text-xs">{{ $po->order_date?->format('d M Y') ?? '—' }}</td>
+                            <td class="py-3 px-3 text-slate-300 text-xs">{{ $po->requisition?->deliveryWarehouse?->name ?? 'Default Warehouse' }}</td>
+                            <td class="py-3 px-3 text-slate-300 text-xs">
+                                {{ $po->items->count() }} line items
+                            </td>
+                            <td class="py-3 px-3">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $po->status === 'partially_received' ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20' }}">
+                                    {{ ucfirst(str_replace('_', ' ', $po->status)) }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3 text-right">
+                                <a href="{{ route('admin.procurement.goods-received-vouchers.create', $po) }}" class="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 transition">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Receive Goods / GRN
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-slate-500">
+                                <p class="text-sm font-medium">No issued purchase orders awaiting receipt at this time.</p>
+                                <p class="text-xs text-slate-600 mt-1">Purchase orders issued by procurement will appear here automatically for stores receiving.</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Section 2: Recent Goods Received Notes (GRN / GRV) with Delivery Notes (D/Notes) -->
+    <section id="recent-grns" class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
+        <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                    <h2 class="text-base font-bold text-slate-100">Recent Goods Received Notes (GRN / GRV) &amp; Delivery Notes (D/Notes)</h2>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Physical deliveries received into store, cross-referenced with supplier delivery notes.</p>
+            </div>
+            <span class="text-xs text-slate-400">Total GRVs: {{ number_format($stats['total_grvs'] ?? 0) }}</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="text-xs uppercase text-slate-500 border-b border-slate-800 bg-slate-950/40">
+                    <tr>
+                        <th class="py-2.5 px-3">GRN / Voucher #</th>
+                        <th class="py-2.5 px-3">PO Reference</th>
+                        <th class="py-2.5 px-3">Supplier Delivery Note (D/Note)</th>
+                        <th class="py-2.5 px-3">Supplier</th>
+                        <th class="py-2.5 px-3">Warehouse</th>
+                        <th class="py-2.5 px-3">Received Date</th>
+                        <th class="py-2.5 px-3">Received By</th>
+                        <th class="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    @forelse($recentGoodsReceived as $grv)
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 px-3 font-mono font-medium text-emerald-300">
+                                <a href="{{ route('admin.procurement.goods-received-vouchers.show', $grv) }}" class="hover:underline">{{ $grv->voucher_number }}</a>
+                            </td>
+                            <td class="py-3 px-3 font-mono text-xs text-indigo-300">
+                                <a href="{{ route('admin.procurement.purchase-orders.show', $grv->purchaseOrder) }}" class="hover:underline">{{ $grv->purchaseOrder->purchase_order_number }}</a>
+                            </td>
+                            <td class="py-3 px-3">
+                                @if($grv->delivery_note_number)
+                                    <span class="inline-flex items-center rounded-md bg-cyan-500/10 px-2 py-0.5 text-xs font-mono font-medium text-cyan-300 ring-1 ring-inset ring-cyan-500/20">
+                                        {{ $grv->delivery_note_number }}
+                                    </span>
+                                    @if($grv->delivery_note_date)
+                                        <span class="text-[10px] text-slate-500 block">{{ $grv->delivery_note_date->format('d M Y') }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-xs text-slate-500">Not recorded</span>
+                                @endif
+                            </td>
+                            <td class="py-3 px-3 text-slate-200 text-xs font-medium">{{ $grv->purchaseOrder->vendor->name }}</td>
+                            <td class="py-3 px-3 text-slate-300 text-xs">{{ $grv->warehouse->name }}</td>
+                            <td class="py-3 px-3 text-slate-400 text-xs">{{ $grv->received_date?->format('d M Y') }}</td>
+                            <td class="py-3 px-3 text-slate-400 text-xs">{{ $grv->receiver->name }}</td>
+                            <td class="py-3 px-3 text-right space-x-1">
+                                <a href="{{ route('admin.procurement.goods-received-vouchers.show', $grv) }}" class="inline-flex items-center rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 hover:bg-slate-700">
+                                    View GRN
+                                </a>
+                                <a href="{{ route('admin.inventory.returns.create', $grv) }}" class="inline-flex items-center rounded border border-rose-800/80 bg-rose-950/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-900/60" title="Return damaged or rejected items to vendor">
+                                    Return Items
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-slate-500">
+                                <p class="text-sm font-medium">No Goods Received Notes posted yet.</p>
+                                <p class="text-xs text-slate-600 mt-1">Receive an approved purchase order to log your first GRN and supplier delivery note.</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Section 3: Recent Goods Returns to Vendor (Debit Notes) -->
+    <section class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-sm">
+        <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="h-2 w-2 rounded-full bg-rose-400"></span>
+                    <h2 class="text-base font-bold text-slate-100">Recent Goods Returns to Vendor (Purchase Returns &amp; Debit Notes)</h2>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Defective, damaged, or rejected stock returned to suppliers with formal debit note tracking.</p>
+            </div>
+            <a href="{{ route('admin.inventory.returns.index') }}" class="text-xs font-semibold text-rose-400 hover:text-rose-300">All Returns &rarr;</a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="text-xs uppercase text-slate-500 border-b border-slate-800 bg-slate-950/40">
+                    <tr>
+                        <th class="py-2.5 px-3">Return #</th>
+                        <th class="py-2.5 px-3">Debit Note #</th>
+                        <th class="py-2.5 px-3">Supplier</th>
+                        <th class="py-2.5 px-3">GRN Reference</th>
+                        <th class="py-2.5 px-3">Return Date</th>
+                        <th class="py-2.5 px-3">Reason</th>
+                        <th class="py-2.5 px-3">Items Returned</th>
+                        <th class="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    @forelse($recentReturns as $ret)
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 px-3 font-mono font-medium text-rose-300">
+                                <a href="{{ route('admin.inventory.returns.show', $ret) }}" class="hover:underline">{{ $ret->return_number }}</a>
+                            </td>
+                            <td class="py-3 px-3 font-mono text-xs text-amber-300">{{ $ret->debit_note_number ?? '—' }}</td>
+                            <td class="py-3 px-3 text-slate-200 font-medium text-xs">{{ $ret->vendor->name }}</td>
+                            <td class="py-3 px-3 font-mono text-xs text-emerald-300">{{ $ret->goodsReceivedVoucher->voucher_number }}</td>
+                            <td class="py-3 px-3 text-slate-400 text-xs">{{ $ret->return_date?->format('d M Y') }}</td>
+                            <td class="py-3 px-3">
+                                <span class="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-300 border border-rose-500/20">
+                                    {{ ucfirst(str_replace('_', ' ', $ret->reason)) }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3 text-slate-300 text-xs">
+                                {{ $ret->items->count() }} items
+                            </td>
+                            <td class="py-3 px-3 text-right">
+                                <a href="{{ route('admin.inventory.returns.show', $ret) }}" class="inline-flex items-center rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-700">
+                                    View Return Note
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-slate-500">
+                                <p class="text-sm font-medium">No purchase returns or debit notes logged.</p>
+                                <p class="text-xs text-slate-600 mt-1">If items from a GRN fail inspection, use "Return Items" to issue a debit note and deduct stock.</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
 
     <!-- Data Tables: Low Stock Alerts & Recent Ledger Audit -->
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">

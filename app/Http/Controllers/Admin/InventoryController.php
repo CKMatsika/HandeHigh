@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\GoodsReceivedVoucher;
 use App\Models\InventoryBalance;
 use App\Models\InventoryCategory;
 use App\Models\InventoryItem;
@@ -12,6 +13,8 @@ use App\Models\InventoryStockRequest;
 use App\Models\InventoryStockTake;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryWarehouse;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseReturn;
 use App\Models\School;
 use App\Models\SchoolFixedAsset;
 use App\Models\SchoolFixedAssetMaintenance;
@@ -56,6 +59,25 @@ class InventoryController extends Controller
             ->selectRaw('COALESCE(SUM(quantity_on_hand * average_unit_cost), 0) as inventory_value')
             ->value('inventory_value');
 
+        $approvedPurchaseOrders = PurchaseOrder::where('school_id', $schoolId)
+            ->whereIn('status', ['issued', 'partially_received'])
+            ->with(['vendor', 'items.item', 'requisition.deliveryWarehouse'])
+            ->latest('order_date')
+            ->limit(10)
+            ->get();
+
+        $recentGoodsReceived = GoodsReceivedVoucher::where('school_id', $schoolId)
+            ->with(['purchaseOrder.vendor', 'warehouse', 'receiver', 'items.item'])
+            ->latest('received_date')
+            ->limit(10)
+            ->get();
+
+        $recentReturns = PurchaseReturn::where('school_id', $schoolId)
+            ->with(['goodsReceivedVoucher', 'vendor', 'warehouse', 'items.item'])
+            ->latest('return_date')
+            ->limit(10)
+            ->get();
+
         $stats = [
             'items' => InventoryItem::where('school_id', $schoolId)->where('is_active', true)->count(),
             'categories' => InventoryCategory::where('school_id', $schoolId)->where('is_active', true)->count(),
@@ -75,9 +97,21 @@ class InventoryController extends Controller
             'pending_stock_takes' => InventoryStockTake::where('school_id', $schoolId)->whereIn('status', ['draft', 'in_progress', 'submitted'])->count(),
             'total_fixed_assets' => SchoolFixedAsset::where('school_id', $schoolId)->where('status', '!=', 'disposed')->count(),
             'pending_maintenance' => SchoolFixedAssetMaintenance::where('school_id', $schoolId)->whereIn('status', ['scheduled', 'in_progress'])->count(),
+            'pending_po_receipts' => PurchaseOrder::where('school_id', $schoolId)->whereIn('status', ['issued', 'partially_received'])->count(),
+            'total_grvs' => GoodsReceivedVoucher::where('school_id', $schoolId)->count(),
+            'total_returns' => PurchaseReturn::where('school_id', $schoolId)->count(),
+            'active_delivery_notes' => GoodsReceivedVoucher::where('school_id', $schoolId)->whereNotNull('delivery_note_number')->count(),
         ];
 
-        return view('admin.inventory.dashboard', compact('school', 'stats', 'lowStockBalances', 'recentTransactions'));
+        return view('admin.inventory.dashboard', compact(
+            'school',
+            'stats',
+            'lowStockBalances',
+            'recentTransactions',
+            'approvedPurchaseOrders',
+            'recentGoodsReceived',
+            'recentReturns'
+        ));
     }
 
     public function categories()

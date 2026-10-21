@@ -30,6 +30,21 @@
                 <input type="date" id="received_date" name="received_date" value="{{ old('received_date', now()->toDateString()) }}" required class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
                 @error('received_date')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
             </div>
+            <div>
+                <label for="delivery_note_number" class="mb-1 block text-xs font-medium text-slate-300">Supplier Delivery Note (D/Note) #</label>
+                <input type="text" id="delivery_note_number" name="delivery_note_number" value="{{ old('delivery_note_number') }}" placeholder="e.g. DN-84920" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                @error('delivery_note_number')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label for="delivery_note_date" class="mb-1 block text-xs font-medium text-slate-300">Delivery Note Date</label>
+                <input type="date" id="delivery_note_date" name="delivery_note_date" value="{{ old('delivery_note_date', now()->toDateString()) }}" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                @error('delivery_note_date')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+            </div>
+            <div class="md:col-span-2">
+                <label for="carrier_name" class="mb-1 block text-xs font-medium text-slate-300">Carrier / Transporter / Driver</label>
+                <input type="text" id="carrier_name" name="carrier_name" value="{{ old('carrier_name') }}" placeholder="e.g. DHL Express, Swift Logistics, Driver John Doe" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                @error('carrier_name')<p class="mt-1 text-xs text-rose-400">{{ $message }}</p>@enderror
+            </div>
         </div>
 
         <div class="overflow-x-auto rounded-xl border border-slate-800">

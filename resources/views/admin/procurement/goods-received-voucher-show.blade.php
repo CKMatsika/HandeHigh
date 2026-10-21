@@ -25,6 +25,9 @@
         <div><p class="text-xs uppercase text-slate-500">Supplier</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->purchaseOrder->vendor->name }}</p></div>
         <div><p class="text-xs uppercase text-slate-500">Warehouse</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->warehouse->name }}</p></div>
         <div><p class="text-xs uppercase text-slate-500">Received date</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->received_date?->format('d M Y') }}</p></div>
+        <div><p class="text-xs uppercase text-slate-500">Delivery Note (D/Note) #</p><p class="mt-1 text-sm font-mono text-cyan-300">{{ $voucher->delivery_note_number ?? 'Not recorded' }}</p></div>
+        <div><p class="text-xs uppercase text-slate-500">Delivery Note Date</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->delivery_note_date?->format('d M Y') ?? '—' }}</p></div>
+        <div><p class="text-xs uppercase text-slate-500">Carrier / Transporter</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->carrier_name ?? '—' }}</p></div>
         <div><p class="text-xs uppercase text-slate-500">Received by</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->receiver->name }}</p></div>
         <div><p class="text-xs uppercase text-slate-500">Posted at</p><p class="mt-1 text-sm text-slate-200">{{ $voucher->posted_at?->format('d M Y H:i') }}</p></div>
         @if($voucher->notes)

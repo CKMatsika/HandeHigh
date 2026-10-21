@@ -987,6 +987,40 @@ Route::middleware(['auth'])->group(function () {
             ->name('procurement.supplier-invoices.update')->middleware('permission:procurement.supplier-invoices.create');
         Route::post('procurement/supplier-invoices/{supplierInvoice}/review', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'review'])
             ->name('procurement.supplier-invoices.review')->middleware('permission:procurement.supplier-invoices.approve');
+
+        // Procurement Tender & RFQ Cycle
+        Route::get('procurement/rfq', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'index'])
+            ->name('procurement.rfq.index')->middleware('permission:procurement.rfq.view|procurement.rfq.create|procurement.view|procurement.approve');
+        Route::get('procurement/rfq/create', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'create'])
+            ->name('procurement.rfq.create')->middleware('permission:procurement.rfq.create');
+        Route::post('procurement/rfq', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'store'])
+            ->name('procurement.rfq.store')->middleware('permission:procurement.rfq.create');
+        Route::get('procurement/rfq/{rfq}', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'show'])
+            ->name('procurement.rfq.show')->middleware('permission:procurement.rfq.view|procurement.rfq.create|procurement.view|procurement.approve');
+        Route::post('procurement/rfq/{rfq}/publish', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'publish'])
+            ->name('procurement.rfq.publish')->middleware('permission:procurement.rfq.publish|procurement.approve');
+        Route::get('procurement/rfq/{rfq}/quotations/create', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'createQuotation'])
+            ->name('procurement.rfq.quotations.create')->middleware('permission:procurement.quotations.create|procurement.rfq.create');
+        Route::post('procurement/rfq/{rfq}/quotations', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'storeQuotation'])
+            ->name('procurement.rfq.quotations.store')->middleware('permission:procurement.quotations.create|procurement.rfq.create');
+        Route::get('procurement/quotations/{quotation}', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'showQuotation'])
+            ->name('procurement.quotations.show')->middleware('permission:procurement.quotations.view|procurement.rfq.view|procurement.view');
+        Route::get('procurement/rfq/{rfq}/comparison', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'comparison'])
+            ->name('procurement.rfq.comparison')->middleware('permission:procurement.comparison.view|procurement.comparison.create|procurement.approve|procurement.view');
+        Route::post('procurement/rfq/{rfq}/comparison', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'storeComparison'])
+            ->name('procurement.rfq.comparison.store')->middleware('permission:procurement.comparison.create|procurement.approve');
+        Route::post('procurement/rfq/{rfq}/comparison/approve', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'approveComparison'])
+            ->name('procurement.rfq.comparison.approve')->middleware('permission:procurement.approve');
+
+        // Goods Return to Vendor / Debit Notes
+        Route::get('inventory/returns', [\App\Http\Controllers\Admin\PurchaseReturnController::class, 'index'])
+            ->name('inventory.returns.index')->middleware('permission:inventory.returns.view|inventory.returns.create|inventory.view|inventory.manage');
+        Route::get('inventory/vouchers/{voucher}/returns/create', [\App\Http\Controllers\Admin\PurchaseReturnController::class, 'create'])
+            ->name('inventory.returns.create')->middleware('permission:inventory.returns.create|inventory.manage');
+        Route::post('inventory/vouchers/{voucher}/returns', [\App\Http\Controllers\Admin\PurchaseReturnController::class, 'store'])
+            ->name('inventory.returns.store')->middleware('permission:inventory.returns.create|inventory.manage');
+        Route::get('inventory/returns/{purchaseReturn}', [\App\Http\Controllers\Admin\PurchaseReturnController::class, 'show'])
+            ->name('inventory.returns.show')->middleware('permission:inventory.returns.view|inventory.returns.create|inventory.view|inventory.manage');
     });
 
     // ICT Coordination & Staff Helpdesk Routes

@@ -49,6 +49,8 @@ class ProcurementController extends Controller
         $stats = [
             'awaiting_review' => (clone $requisitionStats)->where('status', 'submitted')->count(),
             'approved' => (clone $requisitionStats)->where('status', 'approved')->count(),
+            'open_rfqs' => \App\Models\ProcurementRfq::where('school_id', $school->id)->whereIn('status', ['published', 'draft'])->count(),
+            'pending_comparisons' => \App\Models\ProcurementComparison::where('school_id', $school->id)->where('status', 'submitted')->count(),
             'draft_orders' => (clone $purchaseOrderStats)->where('status', 'draft')->count(),
             'issued_orders' => (clone $purchaseOrderStats)->where('status', 'issued')->count(),
         ];
@@ -303,6 +305,9 @@ class ProcurementController extends Controller
                     ->where('school_id', $school->id)
                     ->where('is_active', true),
             ],
+            'delivery_note_number' => ['nullable', 'string', 'max:100'],
+            'delivery_note_date' => ['nullable', 'date'],
+            'carrier_name' => ['nullable', 'string', 'max:150'],
             'received_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'received_quantities' => ['required', 'array', 'min:1'],
@@ -317,7 +322,10 @@ class ProcurementController extends Controller
             $request->user(),
             $validated['received_quantities'],
             $validated['received_date'],
-            $validated['notes'] ?? null
+            $validated['notes'] ?? null,
+            $validated['delivery_note_number'] ?? null,
+            $validated['delivery_note_date'] ?? null,
+            $validated['carrier_name'] ?? null
         );
 
         return redirect()->route('admin.procurement.goods-received-vouchers.show', $voucher)

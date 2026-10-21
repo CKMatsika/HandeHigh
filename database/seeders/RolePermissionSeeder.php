@@ -32,6 +32,9 @@ class RolePermissionSeeder extends Seeder
             'procurement.approve', 'procurement.committee', 'procurement.vendors.view',
             'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             'procurement.reports.view',
+            'procurement.rfq.view', 'procurement.rfq.create', 'procurement.rfq.edit', 'procurement.rfq.delete', 'procurement.rfq.publish',
+            'procurement.quotations.view', 'procurement.quotations.create', 'procurement.quotations.edit', 'procurement.quotations.delete',
+            'procurement.comparison.view', 'procurement.comparison.create', 'procurement.comparison.edit', 'procurement.comparison.approve',
             'procurement.requisitions.create', 'procurement.requisitions.edit', 'procurement.requisitions.delete',
             'procurement.purchase-orders.view', 'procurement.purchase-orders.create', 'procurement.purchase-orders.edit', 'procurement.purchase-orders.delete', 'procurement.purchase-orders.issue',
             'procurement.grv.view', 'procurement.grv.create', 'procurement.grv.edit', 'procurement.grv.delete',
@@ -45,6 +48,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-requests.delete', 'inventory.stock-issues.create',
             'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-takes.delete',
             'inventory.stock-levels.manage',
+            'inventory.returns.view', 'inventory.returns.create', 'inventory.returns.edit', 'inventory.returns.delete',
             'inventory.assets.view', 'inventory.assets.manage', 'inventory.assets.create', 'inventory.assets.edit', 'inventory.assets.delete',
             'inventory.settings.view', 'inventory.settings.edit',
             'communication.view', 'communication.create', 'communication.sms', 'communication.email', 'communication.chat',
@@ -87,7 +91,7 @@ class RolePermissionSeeder extends Seeder
 
         return [
             'super-admin' => self::permissions(),
-            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.assets.view', 'inventory.assets.manage', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], $academic, $finance, $accounting, [
+            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.returns.view', 'inventory.returns.create', 'inventory.returns.edit', 'inventory.returns.delete', 'inventory.assets.view', 'inventory.assets.manage', 'procurement.requisitions.create', 'procurement.rfq.view', 'procurement.rfq.create', 'procurement.rfq.edit', 'procurement.rfq.delete', 'procurement.rfq.publish', 'procurement.quotations.view', 'procurement.quotations.create', 'procurement.quotations.edit', 'procurement.quotations.delete', 'procurement.comparison.view', 'procurement.comparison.create', 'procurement.comparison.edit', 'procurement.comparison.approve', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], $academic, $finance, $accounting, [
                 'procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.approve',
                 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign'], $timetables),
@@ -111,8 +115,8 @@ class RolePermissionSeeder extends Seeder
                 ['procurement.supplier-invoices.view', 'procurement.supplier-invoices.approve'],
                 ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial', 'reports.procurement']),
             'procurement-officer' => array_merge(['dashboard.procurement-officer'],
-                ['procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.committee', 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete', 'procurement.reports.view', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue'],
-                ['procurement.grv.view'],
+                ['procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.committee', 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete', 'procurement.reports.view', 'procurement.rfq.view', 'procurement.rfq.create', 'procurement.rfq.edit', 'procurement.rfq.delete', 'procurement.rfq.publish', 'procurement.quotations.view', 'procurement.quotations.create', 'procurement.quotations.edit', 'procurement.quotations.delete', 'procurement.comparison.view', 'procurement.comparison.create', 'procurement.comparison.edit', 'procurement.requisitions.create', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue'],
+                ['procurement.grv.view', 'inventory.returns.view'],
                 ['procurement.supplier-invoices.view', 'procurement.supplier-invoices.create'],
                 ['inventory.view', 'inventory.catalog.manage'],
                 $communication, ['reports.view', 'reports.procurement']),
@@ -120,6 +124,7 @@ class RolePermissionSeeder extends Seeder
                 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view',
                 'inventory.stock-requests.view', 'inventory.stock-issues.create',
                 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-levels.manage',
+                'inventory.returns.view', 'inventory.returns.create',
                 'inventory.assets.view', 'inventory.assets.manage',
                 'procurement.requisitions.create', 'procurement.grv.view', 'procurement.grv.create',
                 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create',

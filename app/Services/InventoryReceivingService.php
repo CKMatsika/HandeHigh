@@ -24,9 +24,12 @@ class InventoryReceivingService
         User $receiver,
         array $quantities,
         string $receivedDate,
-        ?string $notes
+        ?string $notes,
+        ?string $deliveryNoteNumber = null,
+        ?string $deliveryNoteDate = null,
+        ?string $carrierName = null
     ): GoodsReceivedVoucher {
-        return DB::transaction(function () use ($purchaseOrder, $warehouse, $school, $receiver, $quantities, $receivedDate, $notes) {
+        return DB::transaction(function () use ($purchaseOrder, $warehouse, $school, $receiver, $quantities, $receivedDate, $notes, $deliveryNoteNumber, $deliveryNoteDate, $carrierName) {
             $order = PurchaseOrder::whereKey($purchaseOrder->id)->lockForUpdate()->firstOrFail();
             abort_unless((int) $order->school_id === (int) $school->id, 404);
             abort_unless(in_array($order->status, ['issued', 'partially_received'], true), 409);
@@ -71,6 +74,9 @@ class InventoryReceivingService
                 'purchase_order_id' => $order->id,
                 'inventory_warehouse_id' => $warehouse->id,
                 'voucher_number' => 'GRV-'.Str::upper((string) Str::ulid()),
+                'delivery_note_number' => $deliveryNoteNumber,
+                'delivery_note_date' => $deliveryNoteDate,
+                'carrier_name' => $carrierName,
                 'received_date' => $receivedDate,
                 'received_by' => $receiver->id,
                 'notes' => $notes,

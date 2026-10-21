@@ -118,9 +118,46 @@
                                     <span class="h-2 w-2 rounded-full bg-sky-400"></span>
                                     <span>Stock Takes & Audits</span>
                                 </a>
-                                <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                <a href="{{ route('admin.inventory.returns.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.returns.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-rose-400"></span>
+                                    <span>Goods Returns</span>
+                                </a>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($user && ($user->can('procurement.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'procurement-officer', 'bursar', 'stores-person', 'headmaster', 'accountant'])))
+                        <!-- Procurement & Tenders -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('procurement')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-pink-400"></span>
-                                    <span>Procurement & POs</span>
+                                    <span class="text-[10px] font-medium tracking-wider">PROCUREMENT HUB</span>
+                                </div>
+                                <svg id="procurement-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="procurement-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.index') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-pink-400"></span>
+                                    <span>Procurement Hub</span>
+                                </a>
+                                <a href="{{ route('admin.procurement.rfq.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.rfq.*') || request()->routeIs('admin.procurement.quotations.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span>RFQs & Tender Bids</span>
+                                </a>
+                                <a href="{{ route('admin.procurement.requisitions.create') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.requisitions.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Requisitions</span>
+                                </a>
+                                <a href="{{ route('admin.dashboard.stores-manager') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.goods-received-vouchers.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span>Inward GRN Receipts</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.returns.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.returns.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-rose-400"></span>
+                                    <span>Supplier Returns (Debit Notes)</span>
                                 </a>
                             </div>
                         </div>
@@ -917,7 +954,9 @@
                     toggleMenu('hr');
                 } else if (currentRoute.includes('/fixed-assets') || currentRoute.includes('/inventory/settings')) {
                     toggleMenu('assets');
-                } else if (currentRoute.includes('/inventory') || currentRoute.includes('/procurement') || currentRoute.includes('/dashboard/stores-manager')) {
+                } else if (currentRoute.includes('/procurement')) {
+                    toggleMenu('procurement');
+                } else if (currentRoute.includes('/inventory') || currentRoute.includes('/dashboard/stores-manager')) {
                     toggleMenu('inventory');
                 } else if (currentRoute.includes('/fees') || currentRoute.includes('/invoices') || 
                        currentRoute.includes('/receipts') || currentRoute.includes('/customers') || 

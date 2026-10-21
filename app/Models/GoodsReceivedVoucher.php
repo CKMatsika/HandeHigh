@@ -13,6 +13,9 @@ class GoodsReceivedVoucher extends Model
         'purchase_order_id',
         'inventory_warehouse_id',
         'voucher_number',
+        'delivery_note_number',
+        'delivery_note_date',
+        'carrier_name',
         'received_date',
         'received_by',
         'notes',
@@ -21,6 +24,7 @@ class GoodsReceivedVoucher extends Model
 
     protected $casts = [
         'received_date' => 'date',
+        'delivery_note_date' => 'date',
         'posted_at' => 'datetime',
     ];
 
@@ -52,5 +56,10 @@ class GoodsReceivedVoucher extends Model
     public function supplierInvoices(): HasMany
     {
         return $this->hasMany(ProcurementSupplierInvoice::class);
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class);
     }
 }
