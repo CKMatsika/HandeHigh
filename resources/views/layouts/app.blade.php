@@ -69,48 +69,94 @@
                                 <span>Procurement Officer Dashboard</span>
                             </a>
                         @endcan
-                        @if($user->can('inventory.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'procurement-officer', 'accountant', 'headmaster']))
+                        @can('dashboard.stores-manager')
                             <a href="{{ route('admin.dashboard.stores-manager') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.stores-manager') ? 'bg-emerald-600 text-slate-50 font-medium' : 'text-slate-300' }}">
                                 <span class="h-2 w-2 rounded-full bg-teal-400"></span>
                                 <span>Stores Manager Dashboard</span>
                             </a>
-                        @endif
+                        @endcan
                     @endif
-                    @if($user && ($user->can('inventory.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster'])))
-                        <a href="{{ route('admin.inventory.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.index') || request()->routeIs('admin.inventory.items.*') || request()->routeIs('admin.inventory.categories.*') || request()->routeIs('admin.inventory.warehouses.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
-                            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                            <span>Stores & Inventory</span>
-                        </a>
+
+                    @if($user && ($user->can('inventory.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster', 'procurement-officer', 'accountant', 'teacher'])))
+                        <!-- Inventory Management -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('inventory')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span class="text-[10px] font-medium tracking-wider">INVENTORY MANAGEMENT</span>
+                                </div>
+                                <svg id="inventory-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="inventory-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.dashboard.stores-manager') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.dashboard.stores-manager') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-teal-400"></span>
+                                    <span>Stores Dashboard</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.items.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.items.*') || request()->routeIs('admin.inventory.index') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Item Catalogue</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.categories.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.categories.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-lime-400"></span>
+                                    <span>Categories</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.warehouses.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.warehouses.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                                    <span>Warehouses & Storage</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.stock-levels') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-levels*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                    <span>Stock Levels & Reorder</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.stock-requests.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-requests.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Stock Requests & Issues</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.stock-takes.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-takes.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-sky-400"></span>
+                                    <span>Stock Takes & Audits</span>
+                                </a>
+                                <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-pink-400"></span>
+                                    <span>Procurement & POs</span>
+                                </a>
+                            </div>
+                        </div>
                     @endif
-                    @if($user && ($user->can('inventory.stock-requests.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster', 'deputy-headmaster', 'teacher'])))
-                        <a href="{{ route('admin.inventory.stock-requests.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-requests.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
-                            <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-                            <span>Stock Requests</span>
-                        </a>
-                    @endif
-                    @if($user && ($user->can('inventory.stock-takes.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'headmaster'])))
-                        <a href="{{ route('admin.inventory.stock-takes.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-takes.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
-                            <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
-                            <span>Stock Takes</span>
-                        </a>
-                    @endif
-                    @if($user && ($user->can('inventory.stock-levels.manage') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar'])))
-                        <a href="{{ route('admin.inventory.stock-levels') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.stock-levels*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
-                            <span class="h-2 w-2 rounded-full bg-violet-400"></span>
-                            <span>Stock Levels</span>
-                        </a>
-                    @endif
-                    @if($user && ($user->can('inventory.assets.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'accountant'])))
-                        <a href="{{ route('admin.inventory.fixed-assets.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.fixed-assets.*') ? 'bg-emerald-500/20 text-emerald-100' : 'text-slate-300' }}">
-                            <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
-                            <span>Fixed Assets</span>
-                        </a>
-                    @endif
-                    @if($user && ($user->can('procurement.requisitions.create') || $user->can('procurement.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'procurement-officer', 'bursar'])))
-                        <a href="{{ route('admin.procurement.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.procurement.*') ? 'bg-indigo-500/20 text-indigo-100' : 'text-slate-300' }}">
-                            <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
-                            <span>Procurement</span>
-                        </a>
+
+                    @if($user && ($user->can('inventory.assets.view') || $user->hasAnyRole(['super-admin', 'school-admin', 'stores-person', 'stores-manager', 'bursar', 'accountant', 'headmaster'])))
+                        <!-- Asset Management -->
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('assets')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span class="text-[10px] font-medium tracking-wider">ASSET MANAGEMENT</span>
+                                </div>
+                                <svg id="assets-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="assets-menu" class="hidden space-y-1 pl-6">
+                                <a href="{{ route('admin.inventory.fixed-assets.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.fixed-assets.index') || request()->routeIs('admin.inventory.fixed-assets.show') || request()->routeIs('admin.inventory.fixed-assets.create') || request()->routeIs('admin.inventory.fixed-assets.edit') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-indigo-400"></span>
+                                    <span>Fixed Asset Register</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.fixed-assets.depreciation') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.fixed-assets.depreciation*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span>Depreciation Schedules</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.fixed-assets.maintenance') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.fixed-assets.maintenance*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span>Maintenance & Repairs</span>
+                                </a>
+                                <a href="{{ route('admin.inventory.settings.edit') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.inventory.settings.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                                    <span>Capitalization Policies</span>
+                                </a>
+                            </div>
+                        </div>
                     @endif
                     @if($user && $user->hasRole(['super-admin','school-admin']))
                         <!-- Academic Management -->
@@ -869,6 +915,10 @@
                     currentRoute.includes('/leaves') || currentRoute.includes('/payroll') || 
                     currentRoute.includes('/loans') || currentRoute.includes('/teachers')) {
                     toggleMenu('hr');
+                } else if (currentRoute.includes('/fixed-assets') || currentRoute.includes('/inventory/settings')) {
+                    toggleMenu('assets');
+                } else if (currentRoute.includes('/inventory') || currentRoute.includes('/procurement') || currentRoute.includes('/dashboard/stores-manager')) {
+                    toggleMenu('inventory');
                 } else if (currentRoute.includes('/fees') || currentRoute.includes('/invoices') || 
                        currentRoute.includes('/receipts') || currentRoute.includes('/customers') || 
                        currentRoute.includes('/vendors') || currentRoute.includes('/budgets') ||

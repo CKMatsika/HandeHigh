@@ -113,6 +113,10 @@ class AppServiceProvider extends ServiceProvider
             return \App\Models\TimetableSlot::whereHas('timetable', fn ($q) => $q->where('school_id', $school->id))->findOrFail($value);
         });
 
+        Gate::before(function ($user, $ability) {
+            return (method_exists($user, 'hasRole') && $user->hasRole('super-admin')) ? true : null;
+        });
+
         Gate::policy(School::class, SchoolPolicy::class);
         foreach ($bindings as $model) {
             Gate::policy($model, TenantRecordPolicy::class);
