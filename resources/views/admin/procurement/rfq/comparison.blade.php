@@ -26,9 +26,9 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <button type="button" onclick="window.print()" class="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700">
-                Print Report
-            </button>
+            <a href="{{ route('admin.procurement.rfq.comparison.print', $rfq) }}" target="_blank" class="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700">
+                Print Schedule
+            </a>
             <a href="{{ route('admin.procurement.rfq.show', $rfq) }}" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500">
                 View RFQ
             </a>

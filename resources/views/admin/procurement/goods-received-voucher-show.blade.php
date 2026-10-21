@@ -2,20 +2,28 @@
 
 @section('content')
 <div class="mx-auto max-w-5xl space-y-6">
-    <div>
-        <a href="{{ route('admin.procurement.purchase-orders.show', $voucher->purchaseOrder) }}" class="text-xs text-indigo-300 hover:text-indigo-200">&larr; Back to purchase order</a>
-        <h1 class="mt-2 text-2xl font-bold text-slate-50">Goods received {{ $voucher->voucher_number }}</h1>
-        <p class="mt-1 text-sm text-slate-400">Posted to stock · Purchase order {{ $voucher->purchaseOrder->purchase_order_number }}</p>
+    <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+            <a href="{{ route('admin.procurement.purchase-orders.show', $voucher->purchaseOrder) }}" class="text-xs text-indigo-300 hover:text-indigo-200">&larr; Back to purchase order</a>
+            <h1 class="mt-2 text-2xl font-bold text-slate-50">Goods received {{ $voucher->voucher_number }}</h1>
+            <p class="mt-1 text-sm text-slate-400">Posted to stock · Purchase order {{ $voucher->purchaseOrder->purchase_order_number }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.procurement.goods-received-vouchers.print', $voucher) }}" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-700">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print GRV
+            </a>
+            @can('procurement.supplier-invoices.create')
+                @if($hasPendingInvoice)
+                    <span class="inline-flex rounded-lg border border-amber-700/50 px-4 py-2 text-sm text-amber-200">Supplier invoice under review</span>
+                @elseif($unbilledQuantity <= 0)
+                    <span class="inline-flex rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-400">Received quantity fully invoiced</span>
+                @else
+                    <a href="{{ route('admin.procurement.supplier-invoices.create', $voucher) }}" class="inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Record supplier invoice</a>
+                @endif
+            @endcan
+        </div>
     </div>
-    @can('procurement.supplier-invoices.create')
-        @if($hasPendingInvoice)
-            <span class="inline-flex rounded-lg border border-amber-700/50 px-4 py-2 text-sm text-amber-200">Supplier invoice under review</span>
-        @elseif($unbilledQuantity <= 0)
-            <span class="inline-flex rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-400">Received quantity fully invoiced</span>
-        @else
-            <a href="{{ route('admin.procurement.supplier-invoices.create', $voucher) }}" class="inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Record supplier invoice</a>
-        @endif
-    @endcan
 
     @if(session('success'))
         <div class="rounded-lg border border-emerald-700 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-200">{{ session('success') }}</div>

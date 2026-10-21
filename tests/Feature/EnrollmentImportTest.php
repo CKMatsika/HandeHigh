@@ -34,7 +34,7 @@ class EnrollmentImportTest extends TestCase
         ]);
 
         $this->admin = User::factory()->create(['school_id' => $this->school->id]);
-        Role::create(['name' => 'school-admin', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'school-admin', 'guard_name' => 'web']);
         $this->admin->assignRole('school-admin');
 
         $this->class = SchoolClass::create([

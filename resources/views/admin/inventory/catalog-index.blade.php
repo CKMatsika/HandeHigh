@@ -56,15 +56,22 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3">
-                                @if($kind === 'categories' && auth()->user()->can('accounts.edit'))
-                                    <a href="{{ route('admin.inventory.' . $kind . '.edit', $record) }}" class="text-emerald-300 hover:text-emerald-200">Edit</a>
-                                @else
-                                @can($kind === 'warehouses' ? 'inventory.warehouses.manage' : 'inventory.catalog.manage')
-                                    <a href="{{ route('admin.inventory.' . $kind . '.edit', $record) }}" class="text-emerald-300 hover:text-emerald-200">Edit</a>
-                                @else
-                                    <span class="text-slate-600">-</span>
-                                @endcan
-                                @endif
+                                <div class="flex items-center gap-2.5">
+                                    @if($kind === 'items')
+                                        <a href="{{ route('admin.inventory.items.bincard', $record) }}" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300">Bin Card</a>
+                                    @endif
+                                    @if($kind === 'categories' && auth()->user()->can('accounts.edit'))
+                                        <a href="{{ route('admin.inventory.' . $kind . '.edit', $record) }}" class="text-emerald-300 hover:text-emerald-200">Edit</a>
+                                    @else
+                                    @can($kind === 'warehouses' ? 'inventory.warehouses.manage' : 'inventory.catalog.manage')
+                                        <a href="{{ route('admin.inventory.' . $kind . '.edit', $record) }}" class="text-emerald-300 hover:text-emerald-200">Edit</a>
+                                    @else
+                                        @if($kind !== 'items')
+                                            <span class="text-slate-600">-</span>
+                                        @endif
+                                    @endcan
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty

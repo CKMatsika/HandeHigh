@@ -270,6 +270,24 @@ class ProcurementController extends Controller
         return view('admin.procurement.purchase-order-show', compact('purchaseOrder'));
     }
 
+    public function printPurchaseOrder(PurchaseOrder $purchaseOrder)
+    {
+        $this->authorizePurchaseOrderView($purchaseOrder);
+        $purchaseOrder->load([
+            'vendor',
+            'creator',
+            'issuer',
+            'requisition.requester',
+            'requisition.department',
+            'requisition.deliveryWarehouse',
+            'items.item',
+        ]);
+        $school = $this->school();
+        $branding = app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getBrandingPayload($school);
+
+        return view('admin.procurement.purchase-order-print', compact('purchaseOrder', 'school', 'branding'));
+    }
+
     public function createGoodsReceivedVoucher(PurchaseOrder $purchaseOrder)
     {
         abort_unless(auth()->user()->can('procurement.grv.create'), 403);
@@ -364,6 +382,29 @@ class ProcurementController extends Controller
             'hasPendingInvoice',
             'unbilledQuantity'
         ));
+    }
+
+    public function printGoodsReceivedVoucher(GoodsReceivedVoucher $voucher)
+    {
+        abort_unless(
+            auth()->user()->can('procurement.grv.view')
+                || auth()->user()->can('procurement.grv.create')
+                || auth()->user()->can('procurement.view'),
+            403
+        );
+        $this->assertSchoolRecord($voucher);
+        $voucher->load([
+            'warehouse',
+            'receiver',
+            'purchaseOrder.vendor',
+            'purchaseOrder.requisition',
+            'items.item',
+            'items.purchaseOrderItem',
+        ]);
+        $school = $this->school();
+        $branding = app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getBrandingPayload($school);
+
+        return view('admin.procurement.goods-received-voucher-print', compact('voucher', 'school', 'branding'));
     }
 
     private function validateRequisition(Request $request, School $school): array

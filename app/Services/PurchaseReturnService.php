@@ -162,6 +162,8 @@ class PurchaseReturnService
                 ]);
             }
 
+            app(ProcurementAccountingService::class)->postPurchaseReturn($purchaseReturn);
+
             return $purchaseReturn;
         });
     }

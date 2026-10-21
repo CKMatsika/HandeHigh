@@ -282,6 +282,46 @@ class ProcurementRfqController extends Controller
         return view('admin.procurement.rfq.comparison', compact('school', 'rfq', 'matrix'));
     }
 
+    public function printComparison(ProcurementRfq $rfq)
+    {
+        $school = $this->school();
+        abort_unless((int) $rfq->school_id === (int) $school->id, 404);
+
+        $rfq->load([
+            'items.item',
+            'quotations.vendor',
+            'quotations.items',
+            'comparison.winningQuotation.vendor',
+            'comparison.evaluator',
+            'comparison.approver',
+            'comparison.purchaseOrder',
+        ]);
+
+        abort_if($rfq->quotations->isEmpty(), 422, 'At least one quotation must be submitted before generating a comparison report.');
+
+        $matrix = [];
+        foreach ($rfq->items as $rfqItem) {
+            $matrix[$rfqItem->id] = [
+                'item' => $rfqItem->item,
+                'quantity' => $rfqItem->quantity,
+                'specifications' => $rfqItem->specifications,
+                'quotes' => [],
+            ];
+
+            foreach ($rfq->quotations as $quotation) {
+                $quoteLine = $quotation->items->firstWhere('procurement_rfq_item_id', $rfqItem->id);
+                $matrix[$rfqItem->id]['quotes'][$quotation->id] = [
+                    'unit_price' => $quoteLine ? (float) $quoteLine->unit_price : null,
+                    'total_price' => $quoteLine ? (float) $quoteLine->total_price : null,
+                ];
+            }
+        }
+
+        $branding = app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getBrandingPayload($school);
+
+        return view('admin.procurement.rfq.comparison-print', compact('school', 'rfq', 'matrix', 'branding'));
+    }
+
     public function storeComparison(Request $request, ProcurementRfq $rfq)
     {
         $school = $this->school();

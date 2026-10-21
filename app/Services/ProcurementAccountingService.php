@@ -7,6 +7,7 @@ use App\Models\Bill;
 use App\Models\GoodsReceivedVoucher;
 use App\Models\JournalBatch;
 use App\Models\ProcurementSupplierInvoice;
+use App\Models\PurchaseReturn;
 use App\Models\School;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -153,6 +154,74 @@ class ProcurementAccountingService
                 'entries' => $entries,
             ]);
         });
+    }
+
+    public function postPurchaseReturn(PurchaseReturn $purchaseReturn): ?JournalBatch
+    {
+        $existing = JournalBatch::where('school_id', $purchaseReturn->school_id)
+            ->where('source_type', 'purchase_return')
+            ->where('source_id', $purchaseReturn->id)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $purchaseReturn->loadMissing([
+            'items.goodsReceivedVoucherItem.item.category.assetAccount',
+            'goodsReceivedVoucher',
+            'vendor',
+            'school',
+        ]);
+
+        $amount = (float) $purchaseReturn->items->sum('total_cost');
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $accounts = $this->procurementAccounts($purchaseReturn->school);
+        $creditAmounts = [];
+        foreach ($purchaseReturn->items as $line) {
+            $grvItem = $line->goodsReceivedVoucherItem;
+            $assetAccount = $grvItem ? app(SchoolFixedAssetService::class)->assetAccountFor($grvItem) : null;
+            $account = $assetAccount ?? $accounts['inventory'];
+            $creditAmounts[$account->id] ??= ['account' => $account, 'amount' => 0.0];
+            $creditAmounts[$account->id]['amount'] += (float) $line->total_cost;
+        }
+
+        $entries = [];
+        // Debit Received Not Invoiced (reducing the accrual liability)
+        $entries[] = [
+            'account_id' => $accounts['received_not_invoiced']->id,
+            'entry_type' => 'debit',
+            'amount' => round($amount, 2),
+            'memo' => 'Goods returned to vendor - '.$purchaseReturn->return_number.' (DN: '.$purchaseReturn->debit_note_number.')',
+        ];
+
+        // Credit Inventory or Fixed Assets
+        foreach ($creditAmounts as $credit) {
+            if ($credit['amount'] > 0) {
+                $entries[] = [
+                    'account_id' => $credit['account']->id,
+                    'entry_type' => 'credit',
+                    'amount' => round($credit['amount'], 2),
+                    'memo' => 'Inventory/assets returned - '.$purchaseReturn->return_number,
+                ];
+            }
+        }
+
+        $transDate = $purchaseReturn->return_date ? $purchaseReturn->return_date->toDateString() : now()->toDateString();
+
+        return app(AccountingService::class)->createJournalBatch([
+            'school_id' => $purchaseReturn->school_id,
+            'transaction_date' => $transDate,
+            'reference_number' => $purchaseReturn->debit_note_number ?: $purchaseReturn->return_number,
+            'description' => 'Goods returned to vendor '.($purchaseReturn->vendor?->name ?? '').' on '.$purchaseReturn->return_number,
+            'source_type' => 'purchase_return',
+            'source_id' => $purchaseReturn->id,
+            'status' => 'posted',
+            'created_by' => $purchaseReturn->created_by,
+            'entries' => $entries,
+        ]);
     }
 
     public function procurementAccounts(School $school): array

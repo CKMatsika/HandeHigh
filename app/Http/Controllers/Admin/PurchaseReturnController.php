@@ -95,4 +95,22 @@ class PurchaseReturnController extends Controller
 
         return view('admin.inventory.returns.show', compact('school', 'purchaseReturn'));
     }
+
+    public function print(PurchaseReturn $purchaseReturn)
+    {
+        $school = $this->school();
+        abort_unless((int) $purchaseReturn->school_id === (int) $school->id, 404);
+
+        $purchaseReturn->load([
+            'goodsReceivedVoucher',
+            'purchaseOrder.vendor',
+            'warehouse',
+            'creator',
+            'items.item',
+            'items.goodsReceivedVoucherItem',
+        ]);
+        $branding = app(\App\Services\Branding\SchoolDocumentBrandingService::class)->getBrandingPayload($school);
+
+        return view('admin.inventory.returns.print', compact('school', 'purchaseReturn', 'branding'));
+    }
 }

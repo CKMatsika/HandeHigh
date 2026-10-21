@@ -963,7 +963,7 @@ class AccountingService
                 $creditEntries[] = [
                     'account_id' => $itemAccId,
                     'entry_type' => 'credit',
-                    'amount' => (float) ($item->total ?? $item->amount ?? 0),
+                    'amount' => (float) ($item->line_total ?? $item->total ?? $item->amount ?? 0),
                     'memo' => 'Receipt ' . $receipt->receipt_number . ($item->description ? ' - ' . $item->description : ''),
                     'project_id' => $itemProjectId,
                     'cost_center_id' => $itemCostCenterId,

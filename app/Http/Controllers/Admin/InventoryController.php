@@ -347,6 +347,54 @@ class InventoryController extends Controller
         ]);
     }
 
+    public function bincard(Request $request, InventoryItem $item)
+    {
+        $this->assertSchoolRecord($item);
+        $school = $this->school();
+
+        $item->load(['category', 'balances.warehouse']);
+
+        $warehouseId = $request->query('warehouse_id');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        $warehouses = InventoryWarehouse::where('school_id', $school->id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $transactionsQuery = InventoryTransaction::where('school_id', $school->id)
+            ->where('inventory_item_id', $item->id)
+            ->with(['warehouse', 'recorder'])
+            ->when($warehouseId, fn ($q) => $q->where('inventory_warehouse_id', $warehouseId))
+            ->when($startDate, fn ($q) => $q->whereDate('occurred_at', '>=', $startDate))
+            ->when($endDate, fn ($q) => $q->whereDate('occurred_at', '<=', $endDate))
+            ->orderBy('occurred_at', 'asc')
+            ->orderBy('id', 'asc');
+
+        $transactions = $transactionsQuery->paginate(30)->withQueryString();
+
+        $totalOnHand = (float) $item->balances()
+            ->when($warehouseId, fn ($q) => $q->where('inventory_warehouse_id', $warehouseId))
+            ->sum('quantity_on_hand');
+
+        $averageCost = (float) $item->balances()
+            ->when($warehouseId, fn ($q) => $q->where('inventory_warehouse_id', $warehouseId))
+            ->avg('average_unit_cost');
+
+        return view('admin.inventory.bincard', compact(
+            'school',
+            'item',
+            'warehouses',
+            'warehouseId',
+            'startDate',
+            'endDate',
+            'transactions',
+            'totalOnHand',
+            'averageCost'
+        ));
+    }
+
     private function validateWarehouse(Request $request, School $school, ?InventoryWarehouse $warehouse = null): array
     {
         $uniqueCode = Rule::unique('inventory_warehouses')->where('school_id', $school->id);

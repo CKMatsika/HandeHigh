@@ -691,6 +691,7 @@
             <div class="school-identity">
                 @if(!empty($logoSrc))
                     <img src="{{ $logoSrc }}" 
+                         data-logo="{{ $schoolModel?->logo }}"
                          alt="{{ $branding['display_name'] ?? $branding['name'] ?? 'School Logo' }}" 
                          class="school-logo-img">
                 @else

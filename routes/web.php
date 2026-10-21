@@ -860,6 +860,8 @@ Route::middleware(['auth'])->group(function () {
                 ->name('inventory.items.store')->middleware('permission:inventory.catalog.manage');
             Route::get('inventory/items/{item}/edit', [\App\Http\Controllers\Admin\InventoryController::class, 'editItem'])
                 ->name('inventory.items.edit')->middleware('permission:inventory.catalog.manage');
+            Route::get('inventory/items/{item}/bincard', [\App\Http\Controllers\Admin\InventoryController::class, 'bincard'])
+                ->name('inventory.items.bincard')->middleware('permission:inventory.view');
             Route::put('inventory/items/{item}', [\App\Http\Controllers\Admin\InventoryController::class, 'updateItem'])
                 ->name('inventory.items.update')->middleware('permission:inventory.catalog.manage');
 
@@ -967,6 +969,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('procurement.purchase-orders.store')->middleware('permission:procurement.purchase-orders.create');
         Route::get('procurement/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showPurchaseOrder'])
             ->name('procurement.purchase-orders.show')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve|procurement.grv.view|procurement.supplier-invoices.view');
+        Route::get('procurement/purchase-orders/{purchaseOrder}/print', [\App\Http\Controllers\Admin\ProcurementController::class, 'printPurchaseOrder'])
+            ->name('procurement.purchase-orders.print')->middleware('permission:procurement.requisitions.create|procurement.view|procurement.approve|procurement.grv.view|procurement.supplier-invoices.view');
         Route::post('procurement/purchase-orders/{purchaseOrder}/issue', [\App\Http\Controllers\Admin\ProcurementController::class, 'issuePurchaseOrder'])
             ->name('procurement.purchase-orders.issue')->middleware('permission:procurement.purchase-orders.issue');
         Route::get('procurement/purchase-orders/{purchaseOrder}/goods-received-vouchers/create', [\App\Http\Controllers\Admin\ProcurementController::class, 'createGoodsReceivedVoucher'])
@@ -975,6 +979,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('procurement.goods-received-vouchers.store')->middleware('permission:procurement.grv.create');
         Route::get('procurement/goods-received-vouchers/{voucher}', [\App\Http\Controllers\Admin\ProcurementController::class, 'showGoodsReceivedVoucher'])
             ->name('procurement.goods-received-vouchers.show')->middleware('permission:procurement.grv.view|procurement.grv.create|procurement.view|procurement.supplier-invoices.view|procurement.supplier-invoices.create');
+        Route::get('procurement/goods-received-vouchers/{voucher}/print', [\App\Http\Controllers\Admin\ProcurementController::class, 'printGoodsReceivedVoucher'])
+            ->name('procurement.goods-received-vouchers.print')->middleware('permission:procurement.grv.view|procurement.grv.create|procurement.view|procurement.supplier-invoices.view|procurement.supplier-invoices.create');
         Route::get('procurement/goods-received-vouchers/{voucher}/supplier-invoice/create', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'create'])
             ->name('procurement.supplier-invoices.create')->middleware('permission:procurement.supplier-invoices.create');
         Route::post('procurement/goods-received-vouchers/{voucher}/supplier-invoice', [\App\Http\Controllers\Admin\ProcurementSupplierInvoiceController::class, 'store'])
@@ -1007,6 +1013,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('procurement.quotations.show')->middleware('permission:procurement.quotations.view|procurement.rfq.view|procurement.view');
         Route::get('procurement/rfq/{rfq}/comparison', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'comparison'])
             ->name('procurement.rfq.comparison')->middleware('permission:procurement.comparison.view|procurement.comparison.create|procurement.approve|procurement.view');
+        Route::get('procurement/rfq/{rfq}/comparison/print', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'printComparison'])
+            ->name('procurement.rfq.comparison.print')->middleware('permission:procurement.comparison.view|procurement.comparison.create|procurement.approve|procurement.view');
         Route::post('procurement/rfq/{rfq}/comparison', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'storeComparison'])
             ->name('procurement.rfq.comparison.store')->middleware('permission:procurement.comparison.create|procurement.approve');
         Route::post('procurement/rfq/{rfq}/comparison/approve', [\App\Http\Controllers\Admin\ProcurementRfqController::class, 'approveComparison'])
@@ -1021,6 +1029,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('inventory.returns.store')->middleware('permission:inventory.returns.create|inventory.manage');
         Route::get('inventory/returns/{purchaseReturn}', [\App\Http\Controllers\Admin\PurchaseReturnController::class, 'show'])
             ->name('inventory.returns.show')->middleware('permission:inventory.returns.view|inventory.returns.create|inventory.view|inventory.manage');
+        Route::get('inventory/returns/{purchaseReturn}/print', [\App\Http\Controllers\Admin\PurchaseReturnController::class, 'print'])
+            ->name('inventory.returns.print')->middleware('permission:inventory.returns.view|inventory.returns.create|inventory.view|inventory.manage');
     });
 
     // ICT Coordination & Staff Helpdesk Routes
