@@ -22,14 +22,16 @@ return new class extends Migration
                 $table->timestamps();
 
                 $table->unique(['school_id', 'voucher_number']);
-                $table->index(['school_id', 'purchase_order_id', 'received_date']);
+                $table->index(['school_id', 'purchase_order_id', 'received_date'], 'grv_school_po_date_idx');
             });
         }
 
         if (! Schema::hasTable('goods_received_voucher_items')) {
             Schema::create('goods_received_voucher_items', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('goods_received_voucher_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('goods_received_voucher_id')
+                    ->constrained('goods_received_vouchers', 'id', 'grvi_voucher_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('purchase_order_item_id')->constrained()->restrictOnDelete();
                 $table->foreignId('inventory_item_id')->constrained('inventory_items')->restrictOnDelete();
                 $table->decimal('quantity_received', 14, 4);

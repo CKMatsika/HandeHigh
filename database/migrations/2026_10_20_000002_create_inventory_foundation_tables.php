@@ -80,7 +80,7 @@ return new class extends Migration
                 $table->decimal('reorder_quantity', 14, 4)->nullable();
                 $table->timestamps();
 
-                $table->unique(['inventory_item_id', 'inventory_warehouse_id']);
+                $table->unique(['inventory_item_id', 'inventory_warehouse_id'], 'inv_bal_item_wh_unique');
                 $table->index(['school_id', 'inventory_warehouse_id']);
             });
         }

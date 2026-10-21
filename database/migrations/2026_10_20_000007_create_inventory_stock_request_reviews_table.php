@@ -11,7 +11,9 @@ return new class extends Migration
         if (! Schema::hasTable('inventory_stock_request_reviews')) {
             Schema::create('inventory_stock_request_reviews', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('inventory_stock_request_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('inventory_stock_request_id')
+                    ->constrained('inventory_stock_requests', 'id', 'isrr_request_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('reviewed_by')->constrained('users')->restrictOnDelete();
                 $table->string('decision', 30);
                 $table->text('comments')->nullable();

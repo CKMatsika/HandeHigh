@@ -29,7 +29,7 @@ return new class extends Migration
                 $table->timestamps();
 
                 $table->unique(['school_id', 'vendor_id', 'invoice_number'], 'proc_supplier_invoice_number_unique');
-                $table->index(['school_id', 'status', 'invoice_date']);
+                $table->index(['school_id', 'status', 'invoice_date'], 'psi_school_status_date_idx');
             });
         }
 
@@ -37,10 +37,10 @@ return new class extends Migration
             Schema::create('procurement_supplier_invoice_items', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('procurement_supplier_invoice_id')
-                    ->constrained('procurement_supplier_invoices')
+                    ->constrained('procurement_supplier_invoices', 'id', 'psii_invoice_id_fk')
                     ->cascadeOnDelete();
                 $table->foreignId('goods_received_voucher_item_id')
-                    ->constrained('goods_received_voucher_items')
+                    ->constrained('goods_received_voucher_items', 'id', 'psii_grv_item_id_fk')
                     ->restrictOnDelete();
                 $table->decimal('quantity_invoiced', 14, 4);
                 $table->decimal('unit_price', 14, 4);
@@ -59,7 +59,7 @@ return new class extends Migration
             Schema::create('procurement_supplier_invoice_reviews', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('procurement_supplier_invoice_id')
-                    ->constrained('procurement_supplier_invoices')
+                    ->constrained('procurement_supplier_invoices', 'id', 'psir_invoice_id_fk')
                     ->cascadeOnDelete();
                 $table->foreignId('reviewed_by')->constrained('users')->restrictOnDelete();
                 $table->string('decision', 30);

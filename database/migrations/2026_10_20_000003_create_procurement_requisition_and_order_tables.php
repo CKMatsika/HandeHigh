@@ -31,7 +31,9 @@ return new class extends Migration
         if (! Schema::hasTable('procurement_requisition_items')) {
             Schema::create('procurement_requisition_items', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('procurement_requisition_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('procurement_requisition_id')
+                    ->constrained('procurement_requisitions', 'id', 'pri_requisition_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('inventory_item_id')->constrained('inventory_items')->restrictOnDelete();
                 $table->decimal('quantity', 14, 4);
                 $table->text('notes')->nullable();
@@ -44,7 +46,9 @@ return new class extends Migration
         if (! Schema::hasTable('procurement_requisition_reviews')) {
             Schema::create('procurement_requisition_reviews', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('procurement_requisition_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('procurement_requisition_id')
+                    ->constrained('procurement_requisitions', 'id', 'prr_requisition_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('reviewed_by')->constrained('users')->restrictOnDelete();
                 $table->string('decision', 30);
                 $table->text('comments')->nullable();

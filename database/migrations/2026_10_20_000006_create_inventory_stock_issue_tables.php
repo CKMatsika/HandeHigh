@@ -42,14 +42,16 @@ return new class extends Migration
         if (! Schema::hasTable('inventory_stock_request_items')) {
             Schema::create('inventory_stock_request_items', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('inventory_stock_request_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('inventory_stock_request_id')
+                    ->constrained('inventory_stock_requests', 'id', 'isri_request_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('inventory_item_id')->constrained('inventory_items')->restrictOnDelete();
                 $table->decimal('quantity_requested', 14, 4);
                 $table->decimal('quantity_issued', 14, 4)->default(0);
                 $table->text('notes')->nullable();
                 $table->timestamps();
 
-                $table->unique(['inventory_stock_request_id', 'inventory_item_id']);
+                $table->unique(['inventory_stock_request_id', 'inventory_item_id'], 'isri_request_item_unique');
             });
         }
 
@@ -67,7 +69,7 @@ return new class extends Migration
                 $table->timestamps();
 
                 $table->unique(['school_id', 'issue_number']);
-                $table->index(['school_id', 'inventory_stock_request_id', 'issued_date']);
+                $table->index(['school_id', 'inventory_stock_request_id', 'issued_date'], 'isi_school_req_date_idx');
             });
         }
 
@@ -75,7 +77,9 @@ return new class extends Migration
             Schema::create('inventory_stock_issue_items', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('inventory_stock_issue_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('inventory_stock_request_item_id')->constrained()->restrictOnDelete();
+                $table->foreignId('inventory_stock_request_item_id')
+                    ->constrained('inventory_stock_request_items', 'id', 'isii_request_item_id_fk')
+                    ->restrictOnDelete();
                 $table->foreignId('inventory_item_id')->constrained('inventory_items')->restrictOnDelete();
                 $table->decimal('quantity_issued', 14, 4);
                 $table->decimal('unit_cost', 14, 4);

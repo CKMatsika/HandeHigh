@@ -32,7 +32,9 @@ return new class extends Migration
             Schema::create('school_fixed_asset_depreciations', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('school_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('school_fixed_asset_id')->constrained('school_fixed_assets')->cascadeOnDelete();
+                $table->foreignId('school_fixed_asset_id')
+                    ->constrained('school_fixed_assets', 'id', 'sfad_asset_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('journal_batch_id')->nullable()->constrained('journal_batches')->nullOnDelete();
                 $table->date('depreciation_date');
                 $table->string('period_name', 100);
@@ -45,7 +47,7 @@ return new class extends Migration
                 $table->foreignId('recorded_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
 
-                $table->index(['school_id', 'depreciation_date']);
+                $table->index(['school_id', 'depreciation_date'], 'sfad_school_date_idx');
                 $table->index(['school_fixed_asset_id', 'depreciation_date'], 'asset_deprec_date_idx');
             });
         }
@@ -54,7 +56,9 @@ return new class extends Migration
             Schema::create('school_fixed_asset_maintenances', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('school_id')->constrained()->cascadeOnDelete();
-                $table->foreignId('school_fixed_asset_id')->constrained('school_fixed_assets')->cascadeOnDelete();
+                $table->foreignId('school_fixed_asset_id')
+                    ->constrained('school_fixed_assets', 'id', 'sfam_asset_id_fk')
+                    ->cascadeOnDelete();
                 $table->foreignId('journal_batch_id')->nullable()->constrained('journal_batches')->nullOnDelete();
                 $table->string('title');
                 $table->string('maintenance_type', 50)->default('preventive');
@@ -72,7 +76,7 @@ return new class extends Migration
                 $table->timestamps();
 
                 $table->index(['school_id', 'status']);
-                $table->index(['school_fixed_asset_id', 'status']);
+                $table->index(['school_fixed_asset_id', 'status'], 'sfam_asset_status_idx');
                 $table->index(['school_id', 'next_service_due']);
             });
         }
