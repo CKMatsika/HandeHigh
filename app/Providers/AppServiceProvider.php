@@ -59,6 +59,14 @@ class AppServiceProvider extends ServiceProvider
 
         $bindings = [
             'student' => Student::class,
+            'scholarship' => \App\Models\StudentScholarship::class,
+            'application' => \App\Models\ScholarshipApplication::class,
+            'scholarshipReceipt' => \App\Models\ScholarshipSponsorReceipt::class,
+            'fundingSponsor'=>\App\Models\FundingSponsor::class,
+            'claimBatch'=>\App\Models\SponsorClaimBatch::class,
+            'fundingClaim'=>\App\Models\SponsorClaim::class,
+            'sponsorSettlement'=>\App\Models\SponsorSettlement::class,
+            'fundingApproval'=>\App\Models\ScholarshipApproval::class,
             'enrollment' => Enrollment::class,
             'invoice' => Invoice::class,
             'fee' => FeeStructure::class,

@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class JournalEntry extends Model
 {
+    protected static function booted(): void
+    {
+        $protect=function($entry){$source=$entry->batch?->source_type??'';
+            if($entry->batch?->status==='posted' && (str_starts_with($source,'scholarship')||str_starts_with($source,'sponsor_'))){throw new \LogicException('Posted funding journal entries require a compensating correction.');}};
+        static::updating($protect); static::deleting($protect);
+    }
     use HasFactory;
 
     protected $fillable = [
@@ -27,6 +33,11 @@ class JournalEntry extends Model
     public function batch()
     {
         return $this->belongsTo(JournalBatch::class, 'journal_batch_id');
+    }
+
+    public function journalBatch()
+    {
+        return $this->batch();
     }
 
     public function account()

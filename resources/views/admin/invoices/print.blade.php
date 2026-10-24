@@ -638,6 +638,7 @@
 <body>
     @php
         $totalPaid = (float) ($invoice->allocations?->sum('amount') ?? 0);
+        $scholarshipCovered = (float) $invoice->scholarshipApplications()->where('status', 'posted')->sum('amount');
         $schoolModel = $invoice->school ?: ($school ?? auth()->user()?->school);
         $branding = $invoice->school_branding;
         $status = strtolower($invoice->status);
@@ -843,6 +844,9 @@
             <div class="summary-row">
                 <span class="summary-label-sub">LESS PAYMENTS</span>
                 <span class="summary-val-sub">${{ number_format($totalPaid, 2) }}</span>
+                @if($scholarshipCovered > 0)
+                    <p>Scholarship coverage (non-cash): ${{ number_format($scholarshipCovered, 2) }}</p>
+                @endif
             </div>
             <div class="balance-banner">
                 <span class="balance-banner-label">BALANCE DUE</span>

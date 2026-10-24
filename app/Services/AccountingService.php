@@ -14,7 +14,7 @@ class AccountingService
 {
     /**
      * Create a journal batch with entries
-     * 
+     *
      * @param array $data
      * @return JournalBatch
      * @throws \Exception
@@ -22,7 +22,7 @@ class AccountingService
     public function createJournalBatch(array $data): JournalBatch
     {
         DB::beginTransaction();
-        
+
         try {
             // Period Validation: ensure accounting period is open for transaction date
             app(\App\Services\Finance\AccountingPeriodService::class)->assertPeriodOpen(
@@ -34,14 +34,14 @@ class AccountingService
             // Validate entries are balanced
             $debitTotal = collect($data['entries'])->where('entry_type', 'debit')->sum('amount');
             $creditTotal = collect($data['entries'])->where('entry_type', 'credit')->sum('amount');
-            
+
             if (abs($debitTotal - $creditTotal) > 0.01) {
                 throw new \Exception('Journal entries are not balanced. Debits: ' . $debitTotal . ', Credits: ' . $creditTotal);
             }
 
             // Validate all accounts are postable, active, and belong to the correct school tenant
             $accountIds = collect($data['entries'])->pluck('account_id')->unique();
-            $accounts = Account::whereIn('id', $accountIds)->get()->keyBy('id');
+            $accounts = Account::whereIn('id', $accountIds)->lockForUpdate()->get()->keyBy('id');
 
             foreach ($data['entries'] as $entryData) {
                 $acc = $accounts->get($entryData['account_id']);
@@ -58,10 +58,10 @@ class AccountingService
                     throw new \InvalidArgumentException("Cross-tenant violation: Account {$acc->code} does not belong to school {$data['school_id']}.");
                 }
             }
-            
+
             // Generate batch number
-            $batchNumber = $this->generateBatchNumber($data['school_id']);
-            
+            $batchNumber = $this->generateBatchNumber();
+
             // Create batch
             $batch = JournalBatch::create([
                 'school_id' => $data['school_id'],
@@ -75,7 +75,7 @@ class AccountingService
                 'created_by' => $data['created_by'] ?? auth()->id(),
                 'notes' => $data['notes'] ?? null,
             ]);
-            
+
             // Create entries
             foreach ($data['entries'] as $entryData) {
                 JournalEntry::create([
@@ -89,7 +89,7 @@ class AccountingService
                     'reference' => $entryData['reference'] ?? null,
                 ]);
             }
-            
+
             // Post batch if status is posted and it wasn't created as posted
             if ($batch->status === 'posted' && !isset($data['status'])) {
                 $this->postBatch($batch);
@@ -104,15 +104,15 @@ class AccountingService
                         $entry->amount
                     );
                 }
-                
+
                 $batch->update([
                     'status' => 'posted',
                     'posted_at' => now(),
                 ]);
             }
-            
+
             DB::commit();
-            
+
             return $batch;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -120,7 +120,7 @@ class AccountingService
             throw $e;
         }
     }
-    
+
     /**
      * Post a journal batch
      */
@@ -129,7 +129,7 @@ class AccountingService
         if ($batch->status === 'posted') {
             throw new \Exception('Batch is already posted');
         }
-        
+
         if (!$batch->isBalanced()) {
             throw new \Exception('Batch is not balanced and cannot be posted');
         }
@@ -140,15 +140,15 @@ class AccountingService
             $batch->school_id,
             'post journal batch'
         );
-        
+
         DB::beginTransaction();
-        
+
         try {
             $batch->update([
                 'status' => 'posted',
                 'posted_at' => now(),
             ]);
-            
+
             // Update account balances
             foreach ($batch->entries as $entry) {
                 $this->updateAccountBalance(
@@ -159,14 +159,14 @@ class AccountingService
                     $entry->amount
                 );
             }
-            
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
         }
     }
-    
+
     /**
      * Update account balance for a period
      */
@@ -174,51 +174,76 @@ class AccountingService
     {
         $year = date('Y', strtotime($date));
         $month = (int)date('m', strtotime($date));
-        
-        $balance = AccountBalance::firstOrNew([
+
+        $balance = AccountBalance::where([
             'school_id' => $schoolId,
             'account_id' => $accountId,
             'fiscal_year' => $year,
             'period' => $month,
-        ]);
-        
+        ])->lockForUpdate()->first();
+
+        if (! $balance) {
+            $balance = new AccountBalance([
+                'school_id' => $schoolId,
+                'account_id' => $accountId,
+                'fiscal_year' => $year,
+                'period' => $month,
+                'debit_total' => 0,
+                'credit_total' => 0,
+                'balance' => 0,
+            ]);
+        }
+
         if ($entryType === 'debit') {
             $balance->debit_total += $amount;
         } else {
             $balance->credit_total += $amount;
         }
-        
+
         // Calculate balance based on account type
         $account = Account::find($accountId);
-        if (in_array($account->type, ['asset', 'expense'])) {
+        if ($account && in_array($account->type, ['asset', 'expense'])) {
             $balance->balance = $balance->debit_total - $balance->credit_total;
         } else {
             $balance->balance = $balance->credit_total - $balance->debit_total;
         }
-        
+
         $balance->save();
     }
-    
+
     /**
      * Generate unique batch number
      */
-    protected function generateBatchNumber(int $schoolId): string
+    protected function generateBatchNumber(): string
     {
         $year = date('Y');
-        $count = JournalBatch::where('school_id', $schoolId)
-            ->whereYear('created_at', $year)
-            ->count() + 1;
-        
-        return 'JB-' . $year . '-' . str_pad($count, 6, '0', STR_PAD_LEFT);
+        $latestBatchNumber = JournalBatch::where('batch_number', 'like', "JB-{$year}-%")
+            ->orderByDesc('batch_number')
+            ->value('batch_number');
+        $sequence = 1;
+
+        if ($latestBatchNumber && preg_match('/^JB-' . preg_quote($year, '/') . '-(\d+)$/', $latestBatchNumber, $matches)) {
+            $sequence = (int) $matches[1] + 1;
+        }
+
+        do {
+            $batchNumber = 'JB-' . $year . '-' . str_pad($sequence++, 6, '0', STR_PAD_LEFT);
+        } while (JournalBatch::where('batch_number', $batchNumber)->exists());
+
+        return $batchNumber;
     }
-    
+
     /**
      * Post invoice to accounting with itemized revenue account allocation
      */
     public function postInvoice($invoice): JournalBatch
     {
+        if (\Illuminate\Support\Facades\Schema::hasTable('sponsor_claims')) {
+            $openingClaim=$invoice->sponsorClaims()->where('opening_inclusion','student_control')->whereNotNull('opening_journal_batch_id')->first();
+            if($openingClaim){return JournalBatch::where('school_id',$invoice->school_id)->findOrFail($openingClaim->opening_journal_batch_id);}
+        }
         $school = $invoice->school;
-        
+
         $invoice->load(['items.feeStructure', 'student', 'school']);
 
         // Check if batch already exists for this invoice
@@ -226,8 +251,12 @@ class AccountingService
             ->where('source_type', 'invoice')
             ->where('source_id', $invoice->id)
             ->first();
-            
+
         if ($existingBatch) {
+            // Scholarship corrections have their own journals; never rebuild their original invoice posting.
+            if ($invoice->scholarshipApplications()->exists()) {
+                return $existingBatch;
+            }
             // If items now exist and existing batch only had 1 un-itemized credit entry, update it
             if ($invoice->items && $invoice->items->count() > 1 && $existingBatch->entries()->where('entry_type', 'credit')->count() <= 1) {
                 $existingBatch->entries()->delete();
@@ -237,21 +266,8 @@ class AccountingService
             }
         }
 
-        // Accounts Receivable Account
-        $feesReceivableAccount = Account::where('school_id', $school->id)
-            ->where('code', '1201')
-            ->first() ?? Account::where('school_id', $school->id)->where('code', '1200')->first();
-        
-        if (! $feesReceivableAccount) {
-            $feesReceivableAccount = Account::create([
-                'school_id' => $school->id,
-                'code' => '1201',
-                'name' => 'Student Fees Receivable',
-                'type' => 'asset',
-                'category' => 'receivable',
-                'is_active' => true,
-            ]);
-        }
+        // Accounts Receivable Account resolved dynamically via FinancialAccountResolver
+        $feesReceivableAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getReceivableAccount($school);
 
         $resolver = app(\App\Services\Finance\FeeRevenueAccountResolver::class);
         $creditEntries = [];
@@ -336,7 +352,7 @@ class AccountingService
                 'cost_center_id' => $invoice->cost_center_id ?? null,
             ],
         ], $creditEntries);
-        
+
         if (! empty($repostExisting) && $existingBatch) {
             foreach ($entries as $entryData) {
                 JournalEntry::create([
@@ -576,14 +592,23 @@ class AccountingService
             'notes' => 'Kiosk / Canteen retail sale',
         ]);
     }
-    
+
     /**
      * Post payment to accounting
      */
     public function postPayment($payment, $invoice, $selectedAccountId = null): JournalBatch
     {
         $school = $payment->school;
-        
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'payment')
+            ->where('source_id', $payment->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
         $cashAccount = null;
         $targetAccountId = $selectedAccountId ?? $payment->account_id;
         if ($targetAccountId) {
@@ -593,73 +618,15 @@ class AccountingService
         }
 
         if (!$cashAccount) {
-            // Determine cash account based on payment method
-            $cashAccountCode = match($payment->method) {
-                'cash' => '1102', // Petty Cash - where physical cash is stored
-                'bank' => '1301', // Main operating bank
-                'mobile_money' => '1303', // Mobile money account
-                default => '1102',
-            };
-            
-            $cashAccount = Account::where('school_id', $school->id)
-                ->where('code', $cashAccountCode)
-                ->first();
-            
-            if (!$cashAccount) {
-                $cashAccount = Account::where('school_id', $school->id)
-                    ->whereIn('code', ['1101', '1102', '1100', '1301', '1300'])
-                    ->first();
-            }
-
-            if (!$cashAccount) {
-                $cashAccount = Account::create([
-                    'school_id' => $school->id,
-                    'code' => $cashAccountCode,
-                    'name' => match($payment->method) {
-                        'bank' => 'Main Operating Account',
-                        'mobile_money' => 'Mobile Money Account',
-                        default => 'Petty Cash',
-                    },
-                    'type' => 'asset',
-                    'category' => match($payment->method) {
-                        'bank', 'mobile_money' => 'bank',
-                        default => 'cash',
-                    },
-                    'currency' => 'USD',
-                    'is_active' => true,
-                    'is_postable' => true,
-                ]);
-            }
+            $cashAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getPaymentMethodAccount($school, $payment->method ?? 'cash');
         }
 
         if (empty($payment->account_id) && $cashAccount) {
             $payment->updateQuietly(['account_id' => $cashAccount->id]);
         }
-        
-        $feesReceivableAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['1201', '1200'])
-            ->first();
-        
-        if (!$feesReceivableAccount) {
-            $feesReceivableAccount = Account::where('school_id', $school->id)
-                ->where('type', 'asset')
-                ->where('category', 'receivable')
-                ->first();
-        }
 
-        if (!$feesReceivableAccount) {
-            $feesReceivableAccount = Account::create([
-                'school_id' => $school->id,
-                'code' => '1201',
-                'name' => 'Student Fees Receivable',
-                'type' => 'asset',
-                'category' => 'receivable',
-                'currency' => 'USD',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
-        }
-        
+        $feesReceivableAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getReceivableAccount($school);
+
         // Create journal batch
         $journalBatch = $this->createJournalBatch([
             'school_id' => $school->id,
@@ -685,34 +652,34 @@ class AccountingService
                 ],
             ],
         ]);
-        
+
         // Create cashbook entry
         $this->createCashbookEntry($payment, $invoice, $cashAccount, $journalBatch);
-        
+
         return $journalBatch;
     }
-    
+
     /**
      * Create cashbook entry for payment
      */
     private function createCashbookEntry($payment, $invoice, $cashAccount, $journalBatch = null): void
     {
         $school = $payment->school;
-        
+
         // Get current balance for the account
         $lastBalance = \App\Models\Cashbook::where('school_id', $school->id)
             ->where('account_id', $cashAccount->id)
             ->orderBy('transaction_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->value('balance_after') ?? 0;
-        
+
         // Calculate new balance
         $newBalance = $lastBalance + $payment->amount;
         $studentName = $payment->student ? ($payment->student->first_name . ' ' . $payment->student->last_name) : 'Student';
-        $desc = $invoice 
-            ? 'Payment for invoice ' . $invoice->number 
+        $desc = $invoice
+            ? 'Payment for invoice ' . $invoice->number
             : 'Advance fee payment' . ($payment->mopse_receipt_number ? ' (MOPSE: ' . $payment->mopse_receipt_number . ')' : '') . ' - ' . $studentName;
-        
+
         // Create cashbook entry (legacy cashbook model)
         \App\Models\Cashbook::create([
             'school_id' => $school->id,
@@ -757,6 +724,15 @@ class AccountingService
     {
         $school = $payment->school;
 
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'advance_payment')
+            ->where('source_id', $payment->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
         $cashAccount = null;
         $targetAccountId = $selectedAccountId ?? $payment->account_id;
         if ($targetAccountId) {
@@ -766,76 +742,15 @@ class AccountingService
         }
 
         if (!$cashAccount) {
-            $cashAccountCode = match($payment->method) {
-                'cash' => '1102',
-                'bank' => '1301',
-                'mobile_money' => '1303',
-                default => '1102',
-            };
-
-            $cashAccount = Account::where('school_id', $school->id)
-                ->where('code', $cashAccountCode)
-                ->first();
-
-            if (!$cashAccount) {
-                $cashAccount = Account::where('school_id', $school->id)
-                    ->whereIn('code', ['1101', '1102', '1100', '1301', '1300'])
-                    ->first();
-            }
-
-            if (!$cashAccount) {
-                $cashAccount = Account::create([
-                    'school_id' => $school->id,
-                    'code' => $cashAccountCode,
-                    'name' => match($payment->method) {
-                        'bank' => 'Main Operating Account',
-                        'mobile_money' => 'Mobile Money Account',
-                        default => 'Petty Cash',
-                    },
-                    'type' => 'asset',
-                    'category' => match($payment->method) {
-                        'bank', 'mobile_money' => 'bank',
-                        default => 'cash',
-                    },
-                    'currency' => 'USD',
-                    'is_active' => true,
-                    'is_postable' => true,
-                ]);
-            }
+            $cashAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getPaymentMethodAccount($school, $payment->method ?? 'cash');
         }
 
         if (empty($payment->account_id) && $cashAccount) {
             $payment->updateQuietly(['account_id' => $cashAccount->id]);
         }
 
-        // Prepaid fees liability account
-        $prepaidFeesAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['2105', '2100', '2101'])
-            ->first();
-
-        if (!$prepaidFeesAccount) {
-            $prepaidFeesAccount = Account::where('school_id', $school->id)
-                ->where('type', 'liability')
-                ->where(function ($q) {
-                    $q->where('category', 'prepaid')
-                      ->orWhere('name', 'like', '%prepaid%')
-                      ->orWhere('name', 'like', '%advance%');
-                })
-                ->first();
-        }
-
-        if (!$prepaidFeesAccount) {
-            $prepaidFeesAccount = Account::create([
-                'school_id' => $school->id,
-                'code' => '2105',
-                'name' => 'Prepaid Student Fees (Fees in Advance)',
-                'type' => 'liability',
-                'category' => 'current_liability',
-                'currency' => 'USD',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
-        }
+        // Prepaid fees liability account resolved dynamically
+        $prepaidFeesAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getPrepaidFeesAccount($school);
 
         $studentName = $payment->student ? ($payment->student->first_name . ' ' . $payment->student->last_name) : 'Student';
         $ref = $payment->mopse_receipt_number ?? ($payment->reference ?? 'PAY-' . $payment->id);
@@ -877,26 +792,8 @@ class AccountingService
     {
         $school = $payment->school;
 
-        $prepaidFeesAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['2105', '2100', '2101'])
-            ->first();
-
-        if (!$prepaidFeesAccount) {
-            $prepaidFeesAccount = Account::where('school_id', $school->id)
-                ->where('type', 'liability')
-                ->first();
-        }
-
-        $feesReceivableAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['1201', '1200'])
-            ->first();
-
-        if (!$feesReceivableAccount) {
-            $feesReceivableAccount = Account::where('school_id', $school->id)
-                ->where('type', 'asset')
-                ->where('category', 'receivable')
-                ->first();
-        }
+        $prepaidFeesAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getPrepaidFeesAccount($school);
+        $feesReceivableAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getReceivableAccount($school);
 
         $studentName = $payment->student ? ($payment->student->first_name . ' ' . $payment->student->last_name) : 'Student';
 
@@ -933,22 +830,31 @@ class AccountingService
     {
         $school = $receipt->school;
 
-        $cashAccountCode = match($receipt->payment_method) {
-            'cash' => '1102', // Petty Cash - where physical cash is stored
-            'bank_transfer' => '1301', // Main operating bank
-            'mobile_money' => '1303', // Mobile money account
-            default => '1102',
-        };
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'receipt')
+            ->where('source_id', $receipt->id)
+            ->first();
 
-        $cashAccount = Account::where('school_id', $school->id)
-            ->where('code', $cashAccountCode)
-            ->firstOrFail();
+        if ($existingBatch) {
+            return $existingBatch;
+        }
 
-        // Default other revenue
-        $revenueAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['5801', '5800'])
-            ->orderBy('code')
-            ->firstOrFail();
+        $cashAccount = null;
+        if (!empty($receipt->account_id)) {
+            $cashAccount = Account::where('school_id', $school->id)->find($receipt->account_id);
+        } elseif (!empty($receipt->bank_account_id)) {
+            $bankAcc = \App\Models\BankAccount::where('school_id', $school->id)->find($receipt->bank_account_id);
+            if ($bankAcc && $bankAcc->account_id) {
+                $cashAccount = Account::where('school_id', $school->id)->find($bankAcc->account_id);
+            }
+        }
+
+        if (! $cashAccount) {
+            $cashAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getPaymentMethodAccount($school, $receipt->payment_method ?? 'cash');
+        }
+
+        // Resolved revenue account via FinancialAccountResolver
+        $revenueAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getMappedAccount($school, 'revenue_category', 'other_revenue');
 
         $receipt->loadMissing(['items']);
         $projectId = $receipt->project_id;
@@ -1003,30 +909,30 @@ class AccountingService
                 ],
             ], $creditEntries),
         ]);
-        
+
         // Create cashbook entry for receipt
         $this->createCashbookEntryForReceipt($receipt, $cashAccount, $journalBatch);
-        
+
         return $journalBatch;
     }
-    
+
     /**
      * Create cashbook entry for receipt
      */
     private function createCashbookEntryForReceipt($receipt, $cashAccount, $journalBatch = null): void
     {
         $school = $receipt->school;
-        
+
         // Get current balance for the account
         $lastBalance = \App\Models\Cashbook::where('school_id', $school->id)
             ->where('account_id', $cashAccount->id)
             ->orderBy('transaction_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->value('balance_after') ?? 0;
-        
+
         // Calculate new balance
         $newBalance = $lastBalance + $receipt->grand_total;
-        
+
         // Create cashbook entry
         \App\Models\Cashbook::create([
             'school_id' => $school->id,
@@ -1071,16 +977,16 @@ class AccountingService
     {
         $school = auth()->user()->school;
         $transactionDate = $transactionDate ?? now();
-        
+
         // Get accounts
         $fromAccount = Account::where('school_id', $school->id)
             ->where('code', $fromAccountCode)
             ->firstOrFail();
-            
+
         $toAccount = Account::where('school_id', $school->id)
             ->where('code', $toAccountCode)
             ->firstOrFail();
-        
+
         // Create journal batch for the transfer
         $journalBatch = $this->createJournalBatch([
             'school_id' => $school->id,
@@ -1106,13 +1012,13 @@ class AccountingService
                 ],
             ],
         ]);
-        
+
         // Create cashbook entries for both accounts
         $this->createTransferCashbookEntries($fromAccount, $toAccount, $amount, $description, $transactionDate, $journalBatch);
-        
+
         return $journalBatch;
     }
-    
+
     /**
      * Create cashbook entries for inter-account transfers
      */
@@ -1134,7 +1040,7 @@ class AccountingService
 
         $refOut = 'TRANSFER-OUT-' . date('YmdHis');
         $refIn = 'TRANSFER-IN-' . date('YmdHis');
-        
+
         // Create cashbook entry for source account (money going out)
         \App\Models\Cashbook::create([
             'school_id' => $school->id,
@@ -1150,7 +1056,7 @@ class AccountingService
             'created_by' => auth()->id(),
             'notes' => 'Transfer out: ' . $description,
         ]);
-        
+
         // Create cashbook entry for destination account (money coming in)
         \App\Models\Cashbook::create([
             'school_id' => $school->id,
@@ -1211,6 +1117,15 @@ class AccountingService
     {
         $school = $transfer->school;
 
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'bank_transfer')
+            ->where('source_id', $transfer->id)
+            ->first();
+
+        if ($existingBatch) {
+            return $existingBatch;
+        }
+
         $fromAccount = Account::where('school_id', $school->id)
             ->where('id', $transfer->from_bank_account_id)
             ->first() ?? Account::where('school_id', $school->id)->where('code', '1301')->firstOrFail();
@@ -1258,29 +1173,80 @@ class AccountingService
 
     /**
      * Post a manually recorded Cashbook transaction to the general ledger
+     * using the authoritative accounting posting matrix.
      */
     public function postManualCashbookTransaction($cashbook): JournalBatch
     {
         $school = $cashbook->school;
-        
-        // Cash/Bank account is the cashbook's account
-        $cashAccount = $cashbook->account;
-        
-        // Find offsetting account based on category or type
-        $offsetAccount = $this->determineOffsetAccount($school->id, $cashbook->category, $cashbook->transaction_type);
-        
-        if (!$cashAccount || !$offsetAccount) {
-            throw new \Exception('Required account setup not found for posting cashbook transaction.');
+
+        // Idempotency: return existing batch if already posted
+        if ($cashbook->journal_batch_id) {
+            $existing = JournalBatch::find($cashbook->journal_batch_id);
+            if ($existing) {
+                return $existing;
+            }
         }
-        
-        $isExpense = $cashbook->transaction_type === 'expense';
-        
-        // Double entry:
-        // If expense: Debit Offset Account (Expense), Credit Cash/Bank (Asset)
-        // If income: Debit Cash/Bank (Asset), Credit Offset Account (Revenue)
-        $debitAccountId = $isExpense ? $offsetAccount->id : $cashAccount->id;
-        $creditAccountId = $isExpense ? $cashAccount->id : $offsetAccount->id;
-        
+
+        $existingBatch = JournalBatch::where('school_id', $school->id)
+            ->where('source_type', 'cashbook')
+            ->where('source_id', $cashbook->id)
+            ->first();
+
+        if ($existingBatch) {
+            if (!$cashbook->journal_batch_id) {
+                $cashbook->updateQuietly(['journal_batch_id' => $existingBatch->id, 'status' => 'posted']);
+            }
+            return $existingBatch;
+        }
+
+        // Cash/Bank account is the cashbook's primary account
+        $cashAccount = $cashbook->account;
+        if (!$cashAccount) {
+            throw new \App\Exceptions\MissingAccountMappingException(
+                "Cashbook transaction reference '{$cashbook->reference_number}' does not have a valid GL bank or cash account selected.",
+                'bank_account',
+                'cashbook_account',
+                $school->id
+            );
+        }
+
+        if (!$cashAccount->is_postable || !$cashAccount->is_active) {
+            throw new \InvalidArgumentException("Cannot post to non-postable or inactive account {$cashAccount->code} - {$cashAccount->name}.");
+        }
+
+        // Resolve offsetting account dynamically based on accounting classification
+        $resolver = app(\App\Services\Finance\FinancialAccountResolver::class);
+        $offsetAccount = $resolver->resolveOffsetAccountForCashbook($cashbook);
+
+        if (!$offsetAccount) {
+            throw new \App\Exceptions\MissingAccountMappingException(
+                "Required offsetting account mapping not found for cashbook transaction (Classification: {$cashbook->classification}, Category: {$cashbook->category}).",
+                'cashbook_offset',
+                $cashbook->category ?? 'general',
+                $school->id
+            );
+        }
+
+        // Determine whether cash account is debited (inflow) or credited (outflow)
+        $classification = $cashbook->classification ?? match ($cashbook->category) {
+            'fees', 'tuition' => 'debtor_receipt',
+            'opening_balance' => 'opening_balance',
+            'transfer' => 'bank_transfer',
+            'salaries', 'supplies', 'maintenance', 'utilities', 'rent', 'bank_charge' => 'direct_expense',
+            default => $cashbook->transaction_type === 'expense' ? 'direct_expense' : 'direct_revenue',
+        };
+
+        // Standard Double-Entry Matrix:
+        // - debtor_receipt / student_advance / direct_revenue / opening_balance => Debit Bank, Credit Offset
+        // - supplier_payment / direct_expense / refund => Debit Offset, Credit Bank
+        // - bank_transfer => Handled via transfer flow
+        $isCashInflow = in_array($classification, ['debtor_receipt', 'student_advance', 'direct_revenue', 'opening_balance'])
+            || ($classification === 'clearing' && $cashbook->transaction_type === 'income')
+            || ($cashbook->transaction_type === 'income');
+
+        $debitAccountId = $isCashInflow ? $cashAccount->id : $offsetAccount->id;
+        $creditAccountId = $isCashInflow ? $offsetAccount->id : $cashAccount->id;
+
         $batch = $this->createJournalBatch([
             'school_id' => $school->id,
             'transaction_date' => $cashbook->transaction_date,
@@ -1310,6 +1276,11 @@ class AccountingService
             ],
         ]);
 
+        $cashbook->updateQuietly([
+            'journal_batch_id' => $batch->id,
+            'status' => 'posted',
+            'offset_account_id' => $offsetAccount->id,
+        ]);
 
         // Dual sync: Ensure CashbookTransaction exists for bank reconciliation
         $entry = $batch->entries->firstWhere('account_id', $cashAccount->id);
@@ -1321,8 +1292,10 @@ class AccountingService
             'transaction_date' => $cashbook->transaction_date,
             'description' => $cashbook->description,
             'amount' => $cashbook->amount,
-            'transaction_type' => $isExpense ? 'credit' : 'debit',
-            'category' => $isExpense ? 'expense' : 'income',
+            'transaction_type' => $isCashInflow ? 'debit' : 'credit',
+            'category' => in_array($cashbook->category, ['income', 'expense', 'transfer', 'bank_charge', 'interest', 'other'])
+                ? $cashbook->category
+                : ($isCashInflow ? 'income' : 'expense'),
             'journal_entry_id' => $entry?->id,
             'status' => 'unmatched',
             'created_by' => $cashbook->created_by ?? auth()->id(),
@@ -1331,7 +1304,7 @@ class AccountingService
 
         return $batch;
     }
-    
+
     /**
      * Ensure chart of accounts exist for the given school.
      */
@@ -1445,24 +1418,7 @@ class AccountingService
             return $existingBatch;
         }
 
-        $accountsPayable = Account::where('school_id', $school->id)
-            ->whereIn('code', ['3100', '3101'])
-            ->first() ?? Account::where('school_id', $school->id)
-            ->where('type', 'liability')
-            ->where('category', 'payable')
-            ->first();
-
-        if (! $accountsPayable) {
-            $accountsPayable = Account::create([
-                'school_id' => $school->id,
-                'code' => '3100',
-                'name' => 'Accounts Payable',
-                'type' => 'liability',
-                'category' => 'payable',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
-        }
+        $accountsPayable = app(\App\Services\Finance\FinancialAccountResolver::class)->getPayableAccount($school);
 
         $debitEntries = [];
         $bill->loadMissing(['items.expenseAccount', 'expenseAccount', 'vendor']);
@@ -1605,53 +1561,27 @@ class AccountingService
             return $existingBatch;
         }
 
-        $cashAccountCode = match($payment->payment_method) {
-            'cash' => '1102',
-            'bank_transfer', 'check', 'bank' => '1301',
-            'mobile_money' => '1303',
-            default => '1102',
-        };
-
-        $cashAccount = Account::where('school_id', $school->id)
-            ->where('code', $cashAccountCode)
-            ->first() ?? Account::where('school_id', $school->id)->whereIn('code', ['1101', '1102', '1301', '1300'])->first();
+        $cashAccount = null;
+        if (!empty($payment->account_id)) {
+            $cashAccount = Account::where('school_id', $school->id)->find($payment->account_id);
+        } elseif (!empty($payment->bank_account_id)) {
+            $bankAcc = BankAccount::where('school_id', $school->id)->find($payment->bank_account_id);
+            if ($bankAcc) {
+                $cashAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getBankAccountGLAccount($bankAcc);
+            }
+        }
 
         if (! $cashAccount) {
-            $cashAccount = Account::create([
-                'school_id' => $school->id,
-                'code' => $cashAccountCode,
-                'name' => match ($payment->payment_method) {
-                    'bank_transfer', 'check', 'bank' => 'Main Operating Account',
-                    'mobile_money' => 'Mobile Money Account',
-                    default => 'Petty Cash',
-                },
-                'type' => 'asset',
-                'category' => 'cash',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
+            $cashAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getPaymentMethodAccount($school, $payment->payment_method ?? 'cash');
         }
 
-        $accountsPayable = Account::where('school_id', $school->id)
-            ->whereIn('code', ['3100', '3101'])
-            ->first() ?? Account::where('school_id', $school->id)
-            ->where('type', 'liability')
-            ->where('category', 'payable')
-            ->first();
-
-        if (! $accountsPayable) {
-            $accountsPayable = Account::create([
-                'school_id' => $school->id,
-                'code' => '3100',
-                'name' => 'Accounts Payable',
-                'type' => 'liability',
-                'category' => 'payable',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
+        if (empty($payment->account_id) && $cashAccount) {
+            $payment->updateQuietly(['account_id' => $cashAccount->id]);
         }
 
-        return $this->createJournalBatch([
+        $accountsPayable = app(\App\Services\Finance\FinancialAccountResolver::class)->getPayableAccount($school);
+
+        $journalBatch = $this->createJournalBatch([
             'school_id' => $school->id,
             'transaction_date' => $payment->payment_date ?? now()->toDateString(),
             'reference_number' => $payment->reference ?? 'BPAY-' . $payment->id,
@@ -1680,6 +1610,57 @@ class AccountingService
             ],
         ]);
 
+        $payment->updateQuietly(['journal_batch_id' => $journalBatch->id]);
+
+        // Dual sync: Create Cashbook and CashbookTransaction records
+        $lastBalance = \App\Models\Cashbook::where('school_id', $school->id)
+            ->where('account_id', $cashAccount->id)
+            ->orderBy('transaction_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->value('balance_after') ?? 0;
+
+        $newBalance = $lastBalance - (float) $payment->amount;
+
+        $vendorName = $bill?->vendor?->name ?? $bill?->supplier_name ?? ('Bill #' . $payment->bill_id);
+        $desc = 'Supplier payment - ' . $vendorName;
+
+        \App\Models\Cashbook::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_type' => 'expense',
+            'category' => 'supplies',
+            'description' => $desc,
+            'amount' => (float) $payment->amount,
+            'balance_after' => $newBalance,
+            'transaction_date' => $payment->payment_date ?? now()->toDateString(),
+            'reference_number' => $payment->reference ?? 'BPAY-' . $payment->id,
+            'voucher_number' => $payment->reference ?? 'BPAY-' . $payment->id,
+            'payment_method' => $payment->payment_method ?? 'bank_transfer',
+            'status' => 'active',
+            'created_by' => $payment->created_by ?? auth()->id(),
+            'notes' => $payment->notes ?? ('Bill payment for ' . ($bill?->bill_number ?? '')),
+            'project_id' => $bill?->project_id,
+            'cost_center_id' => $bill?->cost_center_id,
+        ]);
+
+        $creditEntryId = $journalBatch->entries->firstWhere('account_id', $cashAccount->id)?->id;
+
+        \App\Models\CashbookTransaction::create([
+            'school_id' => $school->id,
+            'account_id' => $cashAccount->id,
+            'transaction_date' => $payment->payment_date ?? now()->toDateString(),
+            'reference_number' => $payment->reference ?? 'BPAY-' . $payment->id,
+            'description' => $desc,
+            'amount' => (float) $payment->amount,
+            'transaction_type' => 'credit',
+            'category' => 'expense',
+            'journal_entry_id' => $creditEntryId,
+            'status' => 'unmatched',
+            'created_by' => $payment->created_by ?? auth()->id(),
+            'notes' => $payment->notes ?? ('Bill payment for ' . ($bill?->bill_number ?? '')),
+        ]);
+
+        return $journalBatch;
     }
 
     /**
@@ -1699,17 +1680,8 @@ class AccountingService
             return $existingBatch;
         }
 
-        $feesReceivable = Account::where('school_id', $school->id)
-            ->whereIn('code', ['1201', '1200'])
-            ->first();
-
-        $revenueAccount = Account::where('school_id', $school->id)
-            ->whereIn('code', ['5100', '4100'])
-            ->first();
-
-        if (!$feesReceivable || !$revenueAccount) {
-            throw new \Exception('Required accounts not found for credit note posting.');
-        }
+        $feesReceivable = app(\App\Services\Finance\FinancialAccountResolver::class)->getReceivableAccount($school);
+        $revenueAccount = app(\App\Services\Finance\FinancialAccountResolver::class)->getFeeVoteRevenueAccount($school, 'TUITION');
 
         return $this->createJournalBatch([
             'school_id' => $school->id,
@@ -1958,25 +1930,125 @@ class AccountingService
     }
 
     /**
-     * Determine the offsite ledger account based on cashbook category and type
+     * Determine the offsite ledger account based on cashbook category and type dynamically.
      */
     public function determineOffsetAccount(int $schoolId, string $category, string $type): ?Account
     {
-        $code = match($category) {
-            'salaries' => '6100',       // Salaries Expense
-            'supplies' => '6500',       // Supplies Expense
-            'maintenance' => '6400',    // Maintenance Expense
-            'utilities' => '6300',      // Utilities Expense
-            'rent' => '6600',           // Rent Expense
-            'bank_charge' => '7100',    // Bank Charges Expense
-            'fees' => '5100',           // Fees revenue
-            default => $type === 'expense' ? '7200' : '5800', // Misc Expense vs Other Revenue
-        };
-        
-        return Account::where('school_id', $schoolId)
-            ->where('code', $code)
-            ->first() ?? Account::where('school_id', $schoolId)->where('type', $type === 'expense' ? 'expense' : 'revenue')->first();
+        $resolver = app(\App\Services\Finance\FinancialAccountResolver::class);
+        try {
+            if ($type === 'expense') {
+                return $resolver->getExpenseAccount($schoolId, $category);
+            } else {
+                return $resolver->getMappedAccount($schoolId, 'revenue_category', $category);
+            }
+        } catch (\Exception $e) {
+            return Account::where('school_id', $schoolId)
+                ->where('type', $type === 'expense' ? 'expense' : 'revenue')
+                ->where('is_postable', true)
+                ->where('is_active', true)
+                ->first();
+        }
+    }
+
+    /**
+     * Post authoritative opening balances as of cutover date (e.g. 2026-01-01).
+     * Validates balance equality (Debits == Credits), prevents duplicates, and records to GL.
+     */
+    public function postOpeningBalances(
+        School|int $school,
+        array $glBalances,
+        string $asOfDate = '2026-01-01',
+        ?int $userId = null,
+        ?string $reference = null
+    ): JournalBatch {
+        $schoolId = $school instanceof School ? $school->id : $school;
+        $ref = $reference ?? "OPENING-{$asOfDate}-{$schoolId}";
+
+        // Idempotency: prevent duplicate opening balance posting
+        $existing = JournalBatch::where('school_id', $schoolId)
+            ->where(function ($q) use ($ref, $asOfDate) {
+                $q->where('reference_number', $ref)
+                  ->orWhere(function ($sub) use ($asOfDate) {
+                      $sub->where('source_type', 'opening_balance')
+                          ->where('transaction_date', $asOfDate);
+                  });
+            })
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $entries = [];
+        $totalDebit = 0.0;
+        $totalCredit = 0.0;
+
+        foreach ($glBalances as $item) {
+            $accountId = $item['account_id'];
+            $debit = round((float) ($item['debit'] ?? 0), 2);
+            $credit = round((float) ($item['credit'] ?? 0), 2);
+            $memo = $item['memo'] ?? "Opening balance as of {$asOfDate}";
+
+            if ($debit <= 0 && $credit <= 0) {
+                continue;
+            }
+
+            if ($debit > 0) {
+                $entries[] = [
+                    'account_id' => $accountId,
+                    'entry_type' => 'debit',
+                    'amount' => $debit,
+                    'memo' => $memo,
+                ];
+                $totalDebit += $debit;
+            }
+
+            if ($credit > 0) {
+                $entries[] = [
+                    'account_id' => $accountId,
+                    'entry_type' => 'credit',
+                    'amount' => $credit,
+                    'memo' => $memo,
+                ];
+                $totalCredit += $credit;
+            }
+        }
+
+        $diff = round($totalDebit - $totalCredit, 2);
+        if ($diff != 0.0) {
+            // Balance via Opening Balance Equity
+            $resolver = app(\App\Services\Finance\FinancialAccountResolver::class);
+            $equityAccount = $resolver->getOpeningBalanceEquityAccount($schoolId);
+
+            if ($diff > 0) {
+                // Debits exceed credits: Credit Equity
+                $entries[] = [
+                    'account_id' => $equityAccount->id,
+                    'entry_type' => 'credit',
+                    'amount' => abs($diff),
+                    'memo' => 'Opening Balance Equity offset',
+                ];
+            } else {
+                // Credits exceed debits: Debit Equity
+                $entries[] = [
+                    'account_id' => $equityAccount->id,
+                    'entry_type' => 'debit',
+                    'amount' => abs($diff),
+                    'memo' => 'Opening Balance Equity offset',
+                ];
+            }
+        }
+
+        return $this->createJournalBatch([
+            'school_id' => $schoolId,
+            'transaction_date' => $asOfDate,
+            'reference_number' => $ref,
+            'description' => "Opening Balances as of {$asOfDate}",
+            'source_type' => 'opening_balance',
+            'source_id' => null,
+            'status' => 'posted',
+            'created_by' => $userId ?? auth()->id() ?? 1,
+            'entries' => $entries,
+        ]);
     }
 }
-
-

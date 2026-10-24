@@ -14,6 +14,7 @@
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold text-slate-50">{{ $student->full_name }}</h1>
+                    <p class="text-sm text-indigo-300">{{ $student->category_label }}</p>
                     <p class="text-slate-400 text-sm">{{ $student->admission_number ?? 'No admission #' }} | {{ $student->grade ?? 'Ungraded' }} {{ $student->class_name ?? '' }}</p>
                 </div>
             </div>
@@ -25,6 +26,9 @@
             @endphp
             <span class="text-xs px-3 py-1 rounded-full bg-{{ $color }}-500/20 text-{{ $color }}-400 font-medium">{{ ucfirst($student->status) }}</span>
             <a href="{{ route('admin.students.edit', $student) }}" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm transition">Edit Profile</a>
+            @if(auth()->user()->hasAnyRole(['super-admin', 'school-admin', 'headmaster', 'deputy-headmaster', 'bursar', 'accountant']))
+                <a href="{{ route('admin.students.scholarships', $student) }}" class="bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm">Scholarships</a>
+            @endif
         </div>
     </div>
 

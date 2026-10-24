@@ -21,24 +21,82 @@ class Cashbook extends Model
         'balance_after',
         'transaction_date',
         'reference_number',
+        'voucher_number',
         'payment_method',
+        'status',
         'related_invoice_id',
         'related_payment_id',
         'created_by',
         'notes',
         'project_id',
         'cost_center_id',
+        'reversal_batch_id',
+        'reversed_at',
+        'reversed_by',
+        'classification',
+        'student_id',
+        'vendor_id',
+        'counterparty_name',
+        'vote_code',
+        'fund_code',
+        'offset_account_id',
+        'supporting_document_ref',
+        'journal_batch_id',
+        'currency',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'balance_after' => 'decimal:2',
         'transaction_date' => 'date',
+        'reversed_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function ($model) {
+            if (empty($model->category)) {
+                $model->category = $model->classification ?? 'general';
+            }
+            if (!isset($model->balance_after)) {
+                $model->balance_after = 0.00;
+            }
+        });
+    }
 
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
+    }
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
+    }
+
+    public function offsetAccount()
+    {
+        return $this->belongsTo(Account::class, 'offset_account_id');
+    }
+
+    public function journalBatch()
+    {
+        return $this->belongsTo(JournalBatch::class, 'journal_batch_id');
+    }
+
+    public function reversalBatch()
+    {
+        return $this->belongsTo(JournalBatch::class, 'reversal_batch_id');
+    }
+
+    public function reverser()
+    {
+        return $this->belongsTo(User::class, 'reversed_by');
     }
 
     public function project()

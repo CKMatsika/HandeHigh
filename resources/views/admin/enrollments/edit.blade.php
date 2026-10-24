@@ -55,10 +55,7 @@
             </div>
 
             <div class="flex items-center mt-5">
-                <label class="inline-flex items-center gap-2 text-[11px] text-slate-300">
-                    <input type="checkbox" name="is_boarding" value="1" {{ old('is_boarding', $enrollment->is_boarding) ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
-                    <span>Boarding</span>
-                </label>
+                @include('admin.students._category-fields', ['student' => $enrollment->student])
             </div>
 
             <div class="flex items-center mt-5">

@@ -82,6 +82,14 @@ class StudentController extends Controller
         if ($request->filled('boarding')) {
             $query->where('is_boarding', $request->boarding === 'yes');
         }
+        if ($request->category === 'scholarship') {
+            $query->where('funding_status', 'scholarship');
+        } elseif (in_array($request->category, ['boarding', 'day'], true)) {
+            $query->where('is_boarding', $request->category === 'boarding');
+        }
+        if (in_array($request->funding_status, ['regular', 'scholarship'], true)) {
+            $query->where('funding_status', $request->funding_status);
+        }
 
         $students = $query->latest()->paginate(20)->appends($request->query());
 
@@ -129,7 +137,11 @@ class StudentController extends Controller
 
         $totalInvoiced = (float) $invoices->whereNotIn('status', ['cancelled'])->sum('total_amount');
         $totalPaid = (float) $payments->where('status', 'completed')->sum('amount');
-        $totalCredits = (float) $creditNotes->sum('applied_amount');
+        $totalCredits = (float) $creditNotes->sum('applied_amount')
+            + (float) \App\Models\ScholarshipApplication::where('school_id', $school->id)
+                ->whereIn('invoice_id', $invoices->pluck('id'))->where('status', 'posted')->sum('amount');
+        $totalCredits+=(float)\App\Models\SponsorClaim::where('school_id',$school->id)->where('student_id',$student->id)
+            ->whereIn('opening_inclusion',['student_control','current_invoice'])->where('status','posted')->sum('opening_outstanding');
         $outstandingBalance = (float) ($totalInvoiced - $totalPaid - $totalCredits);
 
         $unpaidInvoicesCount = $invoices->whereIn('status', ['unpaid', 'partial', 'overdue'])->count();
@@ -218,9 +230,27 @@ class StudentController extends Controller
                   ) {
                       $hasCondition = false;
 
+                      $scholarshipIds = \App\Models\ScholarshipApplication::where('school_id', $student->school_id)
+                          ->whereHas('scholarship', fn ($sq) => $sq->where('student_id', $student->id))->pluck('id');
+                      if ($scholarshipIds->isNotEmpty()) {
+                          $bq->where(fn ($sq) => $sq->whereIn('source_type', ['scholarship', 'scholarship_reversal'])->whereIn('source_id', $scholarshipIds));
+                          $hasCondition = true;
+                      }
+
                       // 1. Direct source relationships
+                      $claimIds=\App\Models\SponsorClaim::where('school_id',$student->school_id)->where('student_id',$student->id)->pluck('id');
+                      if($claimIds->isNotEmpty()){$method=$hasCondition?'orWhere':'where';$bq->$method(fn($sq)=>$sq->whereIn('source_type',['sponsor_claim_reclass','sponsor_claim_reversal'])->whereIn('source_id',$claimIds));$hasCondition=true;}
+                      $sponsorReceiptIds = \App\Models\ScholarshipSponsorReceipt::where('school_id', $student->school_id)
+                          ->whereIn('scholarship_application_id', $scholarshipIds)->pluck('id');
+                      if ($sponsorReceiptIds->isNotEmpty()) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(fn ($sq) => $sq->whereIn('source_type', ['scholarship_sponsor_receipt', 'scholarship_sponsor_reversal'])->whereIn('source_id', $sponsorReceiptIds));
+                          $hasCondition = true;
+                      }
+
                       if (!empty($invoiceIds)) {
-                          $bq->where(function ($sq) use ($invoiceIds) {
+                          $method = $hasCondition ? 'orWhere' : 'where';
+                          $bq->$method(function ($sq) use ($invoiceIds) {
                               $sq->where('source_type', 'invoice')->whereIn('source_id', $invoiceIds);
                           });
                           $hasCondition = true;
@@ -375,7 +405,7 @@ class StudentController extends Controller
 
         $validated['school_id'] = $school->id;
         $validated['status'] = 'active';
-        $validated['is_boarding'] = $request->boolean('is_boarding');
+        $validated = $this->studentCategory($request, $validated);
         $validated['has_transport'] = $request->boolean('has_transport');
 
         $student = DB::transaction(function () use ($validated, $guardianIds) {
@@ -431,7 +461,7 @@ class StudentController extends Controller
         $guardianIds = $validated['guardian_ids'] ?? [];
         unset($validated['guardian_ids']);
 
-        $validated['is_boarding'] = $request->boolean('is_boarding');
+        $validated = $this->studentCategory($request, $validated, $student);
         $validated['has_transport'] = $request->boolean('has_transport');
 
         DB::transaction(function () use ($student, $validated, $guardianIds) {
@@ -462,6 +492,7 @@ class StudentController extends Controller
                     'class_name' => $validated['class_name'] ?? $activeEnrollment->class_name,
                     'class_id' => $targetClass?->id ?? $activeEnrollment->class_id,
                     'is_boarding' => $validated['is_boarding'],
+                    'student_type' => $validated['is_boarding'] ? 'boarding' : 'day',
                     'has_transport' => $validated['has_transport'],
                     'status' => $validated['status'] ?? $activeEnrollment->status,
                 ], fn($val) => !is_null($val)));
@@ -470,6 +501,11 @@ class StudentController extends Controller
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', 'Student profile updated successfully.');
+    }
+
+    private function studentCategory(Request $request, array $validated, ?Student $student = null): array
+    {
+        return array_merge($validated, app(\App\Services\StudentCategoryService::class)->fromRequest($request, $student));
     }
 
     public function destroy(Student $student)

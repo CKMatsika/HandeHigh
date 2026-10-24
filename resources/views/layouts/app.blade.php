@@ -375,6 +375,9 @@
                                 </svg>
                             </button>
                             <div id="finance-menu" class="hidden space-y-1 pl-6">
+                                @if(auth()->user()->hasAnyRole(['super-admin','school-admin','headmaster','deputy-headmaster','bursar','accountant']))
+                                    <a href="{{ route('admin.funding.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 text-slate-300"><span class="h-2 w-2 rounded-full bg-indigo-400"></span><span>Scholarships, Sponsors & BEAM</span></a>
+                                @endif
                                 <a href="{{ route('admin.fees.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.fees.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                                     <span>Fee Structure</span>

@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class JournalBatch extends Model
 {
+    protected static function booted(): void
+    {
+        static::updating(function($batch){$source=$batch->source_type??'';
+            if($batch->getRawOriginal('status')==='posted' && (str_starts_with($source,'scholarship')||str_starts_with($source,'sponsor_'))
+                && $batch->isDirty(['school_id','batch_number','transaction_date','source_type','source_id','reference_number','description','status'])){throw new \LogicException('Posted funding journals cannot be rewritten.');}});
+        static::deleting(function($batch){$source=$batch->source_type??''; if($batch->status==='posted'&&(str_starts_with($source,'scholarship')||str_starts_with($source,'sponsor_'))){throw new \LogicException('Posted funding journals cannot be deleted.');}});
+    }
     use HasFactory;
 
     protected $fillable = [

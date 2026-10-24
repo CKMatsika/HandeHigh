@@ -11,6 +11,7 @@ class BankAccount extends Model
 
     protected $fillable = [
         'school_id',
+        'account_id',
         'account_name',
         'account_number',
         'bank_name',
@@ -34,9 +35,14 @@ class BankAccount extends Model
         return $this->belongsTo(School::class);
     }
 
+    public function account()
+    {
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
     public function cashbookEntries()
     {
-        return $this->hasMany(Cashbook::class);
+        return $this->hasMany(Cashbook::class, 'account_id', 'account_id');
     }
 
     public function getFormattedBalanceAttribute()
@@ -51,7 +57,7 @@ class BankAccount extends Model
         } elseif ($type === 'expense') {
             $this->current_balance -= $amount;
         }
-        
+
         $this->save();
     }
 

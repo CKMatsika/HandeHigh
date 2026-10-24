@@ -25,7 +25,7 @@ class BankReconciliationService
         try {
             // Handle file import based on extension
             $extension = pathinfo($filePath, PATHINFO_EXTENSION);
-            
+
             if ($extension === 'csv') {
                 $transactions = $this->parseCsvFile($filePath, $options);
             } elseif (in_array($extension, ['xlsx', 'xls'])) {
@@ -92,7 +92,7 @@ class BankReconciliationService
 
         foreach ($bankTransactions as $bankTx) {
             $potentialMatches = $this->findPotentialMatches($bankTx, $cashbookTransactions, $confidence);
-            
+
             foreach ($potentialMatches as $match) {
                 if ($match['confidence'] >= $confidence) {
                     $this->createMatch($bankTx, $match['cashbook_transaction'], $match['amount'], 'auto');
@@ -123,7 +123,7 @@ class BankReconciliationService
         foreach ($cashbookTransactions as $cashbookTx) {
             $matchResult = $this->calculateMatchConfidence($bankTransaction, $cashbookTx);
             $confidence = is_array($matchResult) ? ($matchResult['score'] ?? 0) : (float) $matchResult;
-            
+
             if ($confidence >= $minConfidence) {
                 $matches[] = [
                     'cashbook_transaction' => $cashbookTx,
@@ -208,10 +208,10 @@ class BankReconciliationService
     {
         $str1 = strtolower(trim($str1));
         $str2 = strtolower(trim($str2));
-        
+
         $maxLength = max(strlen($str1), strlen($str2));
         if ($maxLength === 0) return 1.0;
-        
+
         $distance = levenshtein($str1, $str2);
         return 1.0 - ($distance / $maxLength);
     }
@@ -221,7 +221,7 @@ class BankReconciliationService
      */
     private function determineMatchType($bankTx, $cashbookTx)
     {
-        if ($bankTx->amount === $cashbookTx->amount && 
+        if ($bankTx->amount === $cashbookTx->amount &&
             $bankTx->transaction_date->eq($cashbookTx->transaction_date)) {
             return 'exact';
         }
@@ -238,7 +238,7 @@ class BankReconciliationService
         }
 
         DB::beginTransaction();
-        
+
         try {
             // Create match record
             DB::table('transaction_matches')->insert([
@@ -258,7 +258,7 @@ class BankReconciliationService
             $cashbookTransaction->addMatch($bankTransaction->id, $amount, $matchType);
 
             DB::commit();
-            
+
             return true;
         } catch (\Exception $e) {
             DB::rollBack();
@@ -273,7 +273,7 @@ class BankReconciliationService
     public function addBankCharge($accountId, $data)
     {
         $account = Account::findOrFail($accountId);
-        
+
         // Create bank transaction
         $bankTransaction = BankTransaction::create([
             'school_id' => $account->school_id,
@@ -289,7 +289,7 @@ class BankReconciliationService
             'created_by' => auth()->id(),
         ]);
 
-        // Create corresponding cashbook transaction
+        // Create corresponding cashbook transaction (bank charge is an outflow/credit from the school's bank)
         $cashbookTransaction = CashbookTransaction::create([
             'school_id' => $account->school_id,
             'account_id' => $accountId,
@@ -297,7 +297,7 @@ class BankReconciliationService
             'reference_number' => $data['reference'] ?? null,
             'description' => $data['description'],
             'amount' => $data['amount'],
-            'transaction_type' => 'debit',
+            'transaction_type' => 'credit',
             'category' => 'bank_charge',
         ]);
 
@@ -310,38 +310,62 @@ class BankReconciliationService
     public function postCashbookTransactionToLedger(CashbookTransaction $tx): ?int
     {
         try {
+            // Idempotency: If already linked to a journal entry, return it
+            if ($tx->journal_entry_id) {
+                return $tx->journal_entry_id;
+            }
+
+            $existingBatch = JournalBatch::where('school_id', $tx->school_id)
+                ->where('source_type', 'reconciliation')
+                ->where('source_id', $tx->id)
+                ->first();
+
+            if ($existingBatch) {
+                $firstEntry = $existingBatch->entries->first();
+                if ($firstEntry && !$tx->journal_entry_id) {
+                    $tx->updateQuietly(['journal_entry_id' => $firstEntry->id]);
+                }
+                return $firstEntry?->id;
+            }
+
             $school = $tx->school;
             $cashAccount = $tx->account;
-            
-            // Determine offsetting account
+            $isDebit = $tx->transaction_type === 'debit';
+
+            // Determine offsetting account based on transaction direction and category
             $code = match($tx->category) {
                 'bank_charge' => '7100', // Bank Charges Expense
-                'interest' => '5800',    // Fallback Interest/Other Revenue
+                'interest' => '5800',    // Interest / Other Revenue
                 'fees' => '5100',        // Student Fee Revenue
                 'salaries' => '6100',    // Salaries Expense
                 'supplies' => '6500',    // Supplies Expense
-                default => $tx->transaction_type === 'debit' ? '7200' : '5800',
+                default => $isDebit ? '5801' : '6800', // Inflow defaults to Other Revenue; Outflow defaults to Operating Expense
             };
-            
+
             $offsetAccount = Account::where('school_id', $tx->school_id)
                 ->where('code', $code)
                 ->first();
-                
+
             if (!$offsetAccount) {
+                // For a debit (money in), offset is Revenue or Receivable
+                // For a credit (money out), offset is Expense or Payable
+                $targetType = $isDebit ? 'revenue' : 'expense';
                 $offsetAccount = Account::where('school_id', $tx->school_id)
-                    ->where('type', $tx->transaction_type === 'debit' ? 'expense' : 'revenue')
+                    ->where('type', $targetType)
+                    ->where('is_postable', true)
                     ->first();
             }
-            
+
             if (!$cashAccount || !$offsetAccount) {
                 return null;
             }
-            
-            $isDebit = $tx->transaction_type === 'debit';
-            
-            $debitAccountId = $isDebit ? $offsetAccount->id : $cashAccount->id;
-            $creditAccountId = $isDebit ? $cashAccount->id : $offsetAccount->id;
-            
+
+            // Standard Double-Entry Rule for Cash/Bank:
+            // Cashbook Debit (Inflow): Debit Bank (Asset increases), Credit Offset (Revenue/Receivable)
+            // Cashbook Credit (Outflow): Debit Offset (Expense/Payable), Credit Bank (Asset decreases)
+            $debitAccountId = $isDebit ? $cashAccount->id : $offsetAccount->id;
+            $creditAccountId = $isDebit ? $offsetAccount->id : $cashAccount->id;
+
             $accountingService = app(\App\Services\AccountingService::class);
             $batch = $accountingService->createJournalBatch([
                 'school_id' => $tx->school_id,
@@ -367,8 +391,13 @@ class BankReconciliationService
                     ],
                 ],
             ]);
-            
-            return $batch->entries->first()?->id;
+
+            $firstEntryId = $batch->entries->first()?->id;
+            if ($firstEntryId) {
+                $tx->updateQuietly(['journal_entry_id' => $firstEntryId]);
+            }
+
+            return $firstEntryId;
         } catch (\Exception $e) {
             Log::error('Failed to post reconciliation cashbook transaction to ledger: ' . $e->getMessage());
             return null;

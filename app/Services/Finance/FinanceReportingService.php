@@ -133,7 +133,8 @@ class FinanceReportingService
             };
 
             $invoiceCreditNotes = $creditNotes->get($invoice->id, collect());
-            $creditAmount = (float) $invoiceCreditNotes->sum('applied_amount');
+            $creditAmount = (float) $invoiceCreditNotes->sum('applied_amount')
+                + (float) $invoice->scholarshipApplications()->where('status', 'posted')->sum('amount');
             $originalAmount = (float) $invoice->total_amount;
             $outstanding = (float) $invoice->balance;
             $paidAmount = max(0.0, $originalAmount - $outstanding - $creditAmount);
@@ -312,6 +313,16 @@ class FinanceReportingService
 
         // Opening balance calculation: sum of all transactions prior to startDate (or prior terms)
         $openingBalance = 0.0;
+        if (!$startDate && $academicYear && preg_match('/^\d{4}$/',(string)$academicYear)
+            && $student->sponsorClaims()->where('opening_inclusion','student_control')->exists()) {
+            $boundary=$academicYear.'-01-01';
+            $priorGross=(float)Invoice::where('school_id',$school->id)->where('student_id',$student->id)->whereNotIn('status',['draft','cancelled'])->whereDate('issued_at','<',$boundary)->sum('total_amount');
+            $priorPaid=(float)\App\Models\PaymentAllocation::whereHas('invoice',fn($q)=>$q->where('school_id',$school->id)->where('student_id',$student->id))
+                ->whereHas('payment',fn($q)=>$q->where('school_id',$school->id)->where('status','completed')->whereDate('paid_at','<',$boundary))->sum('amount');
+            $priorCredits=(float)CreditNote::where('school_id',$school->id)->where('student_id',$student->id)->whereIn('status',['issued','applied'])->whereDate('credit_note_date','<',$boundary)->sum('applied_amount');
+            $priorFunding=app(ScholarshipService::class)->statementEvents($student)->filter(fn($event)=>$event['raw_date']->toDateString()<$boundary)->sum(fn($event)=>$event['credit']-$event['debit']);
+            $openingBalance=round($priorGross-$priorPaid-$priorCredits-$priorFunding,2);
+        }
         if ($startDate) {
             $priorInvoices = Invoice::where('school_id', $school->id)
                 ->where('student_id', $student->id)
@@ -431,6 +442,17 @@ class FinanceReportingService
                 'due_date' => null,
                 'status' => $cn->status,
             ]);
+        }
+
+        foreach (app(ScholarshipService::class)->statementEvents($student) as $event) {
+            if ($academicYear && $event['academic_year'] !== $academicYear) { continue; }
+            if ($term && $event['term'] !== $term && !str_starts_with($event['reference'],'CLAIM-') && !str_starts_with($event['reference'],'REV-CLAIM-')) { continue; }
+            if ($startDate && $event['raw_date']->lt($startDate)) {
+                $openingBalance += $event['debit'] - $event['credit'];
+                continue;
+            }
+            if ($endDate && $event['raw_date']->gt($endDate)) { continue; }
+            $events->push($event);
         }
 
         // Sort events chronologically

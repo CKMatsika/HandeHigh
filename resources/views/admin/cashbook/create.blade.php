@@ -47,6 +47,36 @@
                 </div>
 
                 <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Accounting Classification</label>
+                    <select name="classification"
+                            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">-- Automatic from Category & Type --</option>
+                        <option value="debtor_receipt">Student Fee / Debtor Receipt (CR Accounts Receivable)</option>
+                        <option value="student_advance">Student Prepayment / Advance (CR Prepaid Fees Liability)</option>
+                        <option value="direct_revenue">Direct Revenue (CR Revenue Account)</option>
+                        <option value="supplier_payment">Supplier Payment (DR Accounts Payable)</option>
+                        <option value="direct_expense">Direct Expense (DR Expense Account)</option>
+                        <option value="bank_transfer">Bank / Cash Transfer (Inter-Account)</option>
+                        <option value="refund">Refund (Contra Entry)</option>
+                        <option value="clearing">Clearing Movement (Cash in Transit)</option>
+                        <option value="opening_balance">Opening Balance (Equity Offset)</option>
+                    </select>
+                    @error('classification')
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Fee Vote / Sub-Account Code (Optional)</label>
+                    <input type="text" name="vote_code"
+                           class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g. TUITION, BUILDING, GPF, SPORTS, ICT">
+                    @error('vote_code')
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
                     <label class="block text-xs font-medium text-slate-300 mb-2">Category *</label>
                     <select name="category" required
                             class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -109,6 +139,26 @@
                            class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                            placeholder="e.g., INV-001 / REC-001">
                     @error('reference_number')
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Counterparty Name (Student / Supplier / Payee)</label>
+                    <input type="text" name="counterparty_name"
+                           class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g., John Doe / ABC Stationers">
+                    @error('counterparty_name')
+                        <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-2">Supporting Document Reference</label>
+                    <input type="text" name="supporting_document_ref"
+                           class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="e.g., Bank Deposit Slip #1234, PV-2026-004">
+                    @error('supporting_document_ref')
                         <p class="mt-1 text-xs text-red-400">{{ $message }}</p>
                     @enderror
                 </div>

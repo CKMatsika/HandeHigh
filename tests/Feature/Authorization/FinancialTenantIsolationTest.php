@@ -518,6 +518,20 @@ class FinancialTenantIsolationTest extends TestCase
         $adminA = $this->userWithRole('school-admin', $this->schoolA);
         $accountA = $this->makeAccount($this->schoolA, '1006-A', 'bank');
 
+        // Successful posting requires an explicit revenue mapping for this school.
+        $revenueAccount = Account::create([
+            'school_id' => $this->schoolA->id,
+            'code' => '5801-A',
+            'name' => 'Other Revenue',
+            'type' => 'revenue',
+            'category' => 'other_revenue',
+            'is_active' => true,
+            'is_postable' => true,
+        ]);
+        app(\App\Services\Finance\FinancialAccountResolver::class)->setMapping(
+            $this->schoolA, 'revenue_category', 'other', $revenueAccount
+        );
+
         // Attempt injecting School B's ID in payload
         $this->actingAs($adminA)
             ->post(route('admin.cashbook.store'), [

@@ -53,10 +53,29 @@ class FeeRevenueAccountResolver
     ];
 
     /**
-     * Resolve account code from category, service_type, or description string.
+     * Vote code to Account Code mapping.
      */
-    public function resolveCode(?string $category, ?string $serviceType = null, ?string $description = null): string
+    protected const VOTE_CODE_MAP = [
+        'TUITION' => '5100',
+        'BUILDING_FUND' => '5120',
+        'SPORTS' => '5130',
+        'PRACTICALS_ICT' => '5140',
+        'SCIENCE_LEVY' => '5160',
+        'GPF_ADMIN' => '5170',
+        'BOARDING_FEES' => '5200',
+        'LUNCH' => '5803',
+    ];
+
+    /**
+     * Resolve account code from vote_code, category, service_type, or description string.
+     */
+    public function resolveCode(?string $category, ?string $serviceType = null, ?string $description = null, ?string $voteCode = null): string
     {
+        // 0. Match explicit vote code first
+        if ($voteCode && isset(self::VOTE_CODE_MAP[strtoupper(trim($voteCode))])) {
+            return self::VOTE_CODE_MAP[strtoupper(trim($voteCode))];
+        }
+
         $normalizedCategory = strtolower(trim($category ?? ''));
         $normalizedService = strtolower(trim($serviceType ?? ''));
         $normalizedDesc = strtolower(trim($description ?? ''));
@@ -75,6 +94,21 @@ class FeeRevenueAccountResolver
         if (str_contains($normalizedDesc, 'boarding') || str_contains($normalizedDesc, 'hostel') || str_contains($normalizedDesc, 'accommodation')) {
             return '5200';
         }
+        if (str_contains($normalizedDesc, 'building')) {
+            return '5120';
+        }
+        if (str_contains($normalizedDesc, 'sports')) {
+            return '5130';
+        }
+        if (str_contains($normalizedDesc, 'ict') || str_contains($normalizedDesc, 'computer')) {
+            return '5140';
+        }
+        if (str_contains($normalizedDesc, 'science')) {
+            return '5160';
+        }
+        if (str_contains($normalizedDesc, 'general purpose') || str_contains($normalizedDesc, 'gpf')) {
+            return '5170';
+        }
         if (str_contains($normalizedDesc, 'tuition')) {
             return '5100';
         }
@@ -87,7 +121,7 @@ class FeeRevenueAccountResolver
         if (str_contains($normalizedDesc, 'levy') || str_contains($normalizedDesc, 'development') || str_contains($normalizedDesc, 'sda')) {
             return '5700';
         }
-        if (str_contains($normalizedDesc, 'kiosk') || str_contains($normalizedDesc, 'canteen') || str_contains($normalizedDesc, 'tuckshop')) {
+        if (str_contains($normalizedDesc, 'kiosk') || str_contains($normalizedDesc, 'canteen') || str_contains($normalizedDesc, 'tuckshop') || str_contains($normalizedDesc, 'lunch')) {
             return '5803';
         }
 
@@ -114,11 +148,22 @@ class FeeRevenueAccountResolver
             }
         }
 
-        // 2. Resolve via mapped code
+        // 2. Resolve via vote_code if present using FinancialAccountResolver
+        $voteCode = $item->vote_code ?? $item->feeStructure?->vote_code;
+        if ($voteCode) {
+            try {
+                return app(FinancialAccountResolver::class)->getFeeVoteRevenueAccount($schoolId, $voteCode);
+            } catch (\Exception $e) {
+                // Continue to secondary resolution
+            }
+        }
+
+        // 3. Resolve via mapped code (incorporating category / service_type / description)
         $code = $this->resolveCode(
             $item->category,
             $item->feeStructure?->service_type,
-            $item->description
+            $item->description,
+            $voteCode
         );
 
         // Find specific account in school
@@ -134,23 +179,42 @@ class FeeRevenueAccountResolver
         }
 
         if (! $account) {
-            // Create specific revenue account if missing
-            $account = Account::create([
-                'school_id' => $schoolId,
-                'code' => $code,
-                'name' => match ($code) {
-                    '5200' => 'Boarding Fees',
-                    '5300' => 'Transport Fees',
-                    '5500' => 'Examination Fees',
-                    '5700' => 'Other Fees / Levies',
-                    '5803' => 'Canteen / Kiosk Sales',
-                    default => 'Tuition Fees',
-                },
-                'type' => 'revenue',
-                'category' => 'tuition_revenue',
-                'is_active' => true,
-                'is_postable' => true,
-            ]);
+            // Check dynamic mapping for fee vote or revenue category
+            try {
+                if ($voteCode) {
+                    return app(FinancialAccountResolver::class)->getFeeVoteRevenueAccount($schoolId, $voteCode);
+                }
+                return app(FinancialAccountResolver::class)->getMappedAccount($schoolId, 'revenue_category', $item->category ?? 'other_revenue');
+            } catch (\Exception $e) {
+                // If account does not exist in chart of accounts, create standard revenue account for this code
+                $account = Account::firstOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'code' => $code,
+                    ],
+                    [
+                        'name' => match ($code) {
+                            '5200' => 'Boarding Fees',
+                            '5300' => 'Transport Fees',
+                            '5500' => 'Examination Fees',
+                            '5700' => 'Other Fees / Levies',
+                            '5801' => 'Book Sales',
+                            '5802' => 'Uniform Sales',
+                            '5803' => 'Canteen / Kiosk Sales',
+                            '5120' => 'Building Fund Levy',
+                            '5130' => 'Sports Levy',
+                            '5140' => 'Practicals & ICT Fees',
+                            '5160' => 'Science Levy',
+                            '5170' => 'General Purpose Fund (GPF)',
+                            default => 'Tuition Fees',
+                        },
+                        'type' => 'revenue',
+                        'category' => 'tuition_revenue',
+                        'is_active' => true,
+                        'is_postable' => true,
+                    ]
+                );
+            }
         }
 
         return $account;

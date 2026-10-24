@@ -19,6 +19,7 @@ class CashbookTransaction extends Model
         'transaction_type',
         'category',
         'journal_entry_id',
+        'reversal_entry_id',
         'status',
         'matched_with',
         'matched_amount',
@@ -124,7 +125,7 @@ class CashbookTransaction extends Model
             'type' => $matchType,
             'matched_at' => now()->toISOString(),
         ];
-        
+
         $this->matched_with = $matchedWith;
         $this->matched_amount += $amount;
         $this->updateMatchStatus();

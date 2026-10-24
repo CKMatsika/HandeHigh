@@ -13,6 +13,8 @@ class BillPayment extends Model
         'school_id',
         'bill_id',
         'bank_account_id',
+        'account_id',
+        'journal_batch_id',
         'amount',
         'payment_date',
         'payment_method',
@@ -40,6 +42,16 @@ class BillPayment extends Model
     public function bankAccount()
     {
         return $this->belongsTo(BankAccount::class);
+    }
+
+    public function account()
+    {
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    public function journalBatch()
+    {
+        return $this->belongsTo(JournalBatch::class);
     }
 
     public function creator()
