@@ -25,6 +25,8 @@
     <!-- Filters -->
     <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <form method="GET" action="{{ route('admin.reports.student-register') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <label>Funding<select name="funding_status" class="block rounded-lg dark:bg-gray-700"><option value="">All funding</option><option value="regular" @selected(request('funding_status') === 'regular')>Regular</option><option value="scholarship" @selected(request('funding_status') === 'scholarship')>Scholarship</option></select></label>
+            <label>Residency<select name="is_boarding" class="block rounded-lg dark:bg-gray-700"><option value="">All residency</option><option value="yes" @selected(request('is_boarding') === 'yes')>Boarding</option><option value="no" @selected(request('is_boarding') === 'no')>Day</option></select></label>
             <div>
                 <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Search Student</label>
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Name or Adm #" class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg">
@@ -109,7 +111,7 @@
                         <td class="px-4 py-3 text-gray-600 dark:text-gray-300 text-xs">{{ $s['date_of_birth'] }} ({{ $s['age'] }} yrs)</td>
                         <td class="px-4 py-3 font-medium text-indigo-600 dark:text-indigo-400">{{ $s['grade'] }} &bull; {{ $s['class_name'] }}</td>
                         <td class="px-4 py-3">
-                            <span class="px-2 py-0.5 text-xs rounded-full {{ $s['is_boarding'] === 'Boarding' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' }}">{{ $s['is_boarding'] }}</span>
+                            <span class="px-2 py-0.5 text-xs rounded-full {{ $s['is_boarding'] === 'Boarding' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300' }}">{{ $s['student_category'] ?? $s['is_boarding'] }}</span>
                         </td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">{{ $s['status'] }}</span>

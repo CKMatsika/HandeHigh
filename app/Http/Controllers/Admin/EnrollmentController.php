@@ -146,24 +146,25 @@ class EnrollmentController extends Controller
                 ->first();
         }
 
+        $classification = app(\App\Services\StudentCategoryService::class)->fromRequest($request, $enrollment->student);
         $enrollment->update([
             'class_id' => $resolvedClass?->id ?? $enrollment->class_id,
             'academic_year' => $validated['academic_year'],
             'term' => $validated['term'],
             'grade' => $validated['grade'],
             'class_name' => $validated['class_name'] ?? null,
-            'is_boarding' => $request->boolean('is_boarding'),
+            'is_boarding' => $classification['is_boarding'],
+            'student_type' => $classification['is_boarding'] ? 'boarding' : 'day',
             'has_transport' => $request->boolean('has_transport'),
             'enrollment_date' => $validated['enrollment_date'],
             'status' => $validated['status'],
         ]);
 
-        $enrollment->student?->update([
+        $enrollment->student?->update(array_merge($classification, [
             'grade' => $validated['grade'],
             'class_name' => $validated['class_name'] ?? null,
-            'is_boarding' => $request->boolean('is_boarding'),
             'has_transport' => $request->boolean('has_transport'),
-        ]);
+        ]));
 
         return redirect()
             ->route('admin.enrollments.show', $enrollment)
@@ -240,10 +241,11 @@ class EnrollmentController extends Controller
             'enrollment_date' => ['required', 'date'],
         ]);
 
-        $isBoarding = $request->boolean('is_boarding');
+        $classification = app(\App\Services\StudentCategoryService::class)->fromRequest($request);
+        $isBoarding = $classification['is_boarding'];
         $hasTransport = $request->boolean('has_transport');
 
-        $enrollment = DB::transaction(function () use ($validated, $school, $isBoarding, $hasTransport) {
+        $enrollment = DB::transaction(function () use ($validated, $school, $isBoarding, $hasTransport, $classification) {
             $guardianQuery = Guardian::where('school_id', $school->id);
 
             if (! empty($validated['guardian_email'])) {
@@ -278,6 +280,7 @@ class EnrollmentController extends Controller
             $student = Student::create([
                 'school_id' => $school->id,
                 'first_name' => $validated['student_first_name'],
+                'funding_status' => $classification['funding_status'] ?? 'regular',
                 'last_name' => $validated['student_last_name'],
                 'gender' => $validated['student_gender'] ?? null,
                 'date_of_birth' => $validated['student_date_of_birth'] ?? null,
@@ -318,6 +321,7 @@ class EnrollmentController extends Controller
                 'grade' => $validated['grade'],
                 'class_name' => $validated['class_name'] ?? null,
                 'is_boarding' => $isBoarding,
+                'student_type' => $isBoarding ? 'boarding' : 'day',
                 'has_transport' => $hasTransport,
                 'enrollment_date' => $validated['enrollment_date'],
                 'status' => 'active',
@@ -332,17 +336,9 @@ class EnrollmentController extends Controller
                 })
                 ->get();
 
-            $selectedFees = $feeStructures->filter(function (FeeStructure $fee) use ($isBoarding, $hasTransport) {
-                $isBoardingFee = $fee->service_type === 'boarding' || str_contains(strtolower($fee->category ?? ''), 'boarding');
-                if ($isBoardingFee && ! $isBoarding) {
-                    return false;
-                }
-                if ($fee->service_type === 'transport' && ! $hasTransport) {
-                    return false;
-                }
-
-                return true;
-            });
+            $selectedFees = app(\App\Services\Finance\InvoiceFeeSelectionService::class)->select(
+                $feeStructures, $validated['grade'], $isBoarding, $hasTransport, false
+            );
 
             $invoiceTotal = 0;
 
@@ -373,6 +369,7 @@ class EnrollmentController extends Controller
                     'school_id' => $school->id,
                     'invoice_id' => $invoice->id,
                     'fee_structure_id' => $fee->id,
+                    'vote_code' => $fee->vote_code,
                     'description' => $fee->label,
                     'category' => $fee->category,
                     'quantity' => $quantity,
@@ -388,6 +385,8 @@ class EnrollmentController extends Controller
                     'total_amount' => $invoiceTotal,
                     'balance' => $invoiceTotal,
                 ]);
+                app(\App\Services\AccountingService::class)->postInvoice($invoice);
+                app(\App\Services\Finance\ScholarshipService::class)->applyEligible($invoice);
 
                 $entryDate = now()->toDateString();
 
@@ -512,17 +511,24 @@ class EnrollmentController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
             $headers = [
                 'student_name', 'email', 'phone', 'address', 'date_of_birth', 'gender',
-                'class_name', 'academic_year', 'term', 'grade', 'is_boarding', 'has_transport', 'status'
+                'class_name', 'academic_year', 'term', 'grade', 'is_boarding', 'has_transport', 'status',
+                'student_category', 'residency', 'funding_status', 'scholarship_reference', 'scholarship_name',
+                'scholarship_sponsor', 'scholarship_coverage_type', 'scholarship_coverage_basis',
+                'scholarship_coverage_value', 'scholarship_covered_votes', 'scholarship_starts_on',
+                'scholarship_ends_on', 'scholarship_accounting_treatment', 'scholarship_supporting_reference',
+                'scholarship_academic_year','scholarship_funding_source','scholarship_sponsor_code','scholarship_recognition_evidence'
             ];
 
             $sheet->fromArray([$headers]);
             $examples = [
                 'John Doe', 'john@example.com', '1234567890', '123 Main St', '2010-05-15', 'male',
-                'Grade 1', '2023-2024', 'First Term', '1', 'no', 'yes', 'active'
+                'Form 1 A', '2026', 'Term 1', 'Form 1', 'no', 'yes', 'active',
+                'day', 'day', 'regular'
             ];
             $sheet->fromArray([$examples], null, 'A2');
 
-            foreach (range('A', 'M') as $col) {
+            foreach (range(1, count($headers)) as $column) {
+                $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column);
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 

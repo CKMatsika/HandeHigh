@@ -97,10 +97,7 @@
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
                 <h3 class="text-sm font-semibold text-slate-300 mb-4">Additional</h3>
                 <div class="space-y-4">
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" name="is_boarding" value="1" {{ old('is_boarding', $student->is_boarding) ? 'checked' : '' }} class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-indigo-500">
-                        <label class="text-sm text-slate-300">Boarding Student</label>
-                    </div>
+                    @include('admin.students._category-fields')
                     <div class="flex items-center gap-3">
                         <input type="checkbox" name="has_transport" value="1" {{ old('has_transport', $student->has_transport) ? 'checked' : '' }} class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-indigo-500">
                         <label class="text-sm text-slate-300">Uses Transport</label>

@@ -202,6 +202,7 @@ class CashbookController extends Controller
     public function update(Request $request, Cashbook $cashbook)
     {
         $this->authorizeSchoolAccess($cashbook);
+        abort_if($cashbook->category === 'sponsor_receipt', 422, 'Correct sponsor receipts through the scholarship audit workflow.');
         $school = auth()->user()?->school;
 
         $request->validate([
@@ -244,6 +245,7 @@ class CashbookController extends Controller
     public function destroy(Cashbook $cashbook)
     {
         $this->authorizeSchoolAccess($cashbook);
+        abort_if($cashbook->category === 'sponsor_receipt', 422, 'Reverse sponsor receipts through the scholarship audit workflow.');
 
         try {
             app(\App\Services\Finance\CashbookReversalService::class)->reverse(

@@ -27,6 +27,11 @@ class StudentRegisterExport implements FromArray, WithHeadings, WithStyles
                 $row['guardian_name'],
                 $row['guardian_phone'],
                 $row['guardian_email'],
+                $row['funding_status'] ?? 'regular',
+                $row['student_category'] ?? $row['is_boarding'],
+                $row['scholarship_references'] ?? '',
+                $row['scholarship_sponsors'] ?? '',
+                $row['scholarship_details'] ?? '',
             ];
         })->toArray();
     }
@@ -46,6 +51,8 @@ class StudentRegisterExport implements FromArray, WithHeadings, WithStyles
             'Primary Guardian',
             'Guardian Phone',
             'Guardian Email',
+            'Funding Status', 'Student Category', 'Scholarship References', 'Sponsors',
+            'Scholarship Coverage and Approval',
         ];
     }
 

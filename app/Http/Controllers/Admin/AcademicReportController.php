@@ -99,7 +99,7 @@ class AcademicReportController extends Controller
     public function studentRegister(Request $request)
     {
         $school = $this->getTenantSchool($request);
-        $filters = $request->only(['grade', 'form', 'class_name', 'gender', 'status', 'is_boarding', 'search']);
+        $filters = $request->only(['grade', 'form', 'class_name', 'gender', 'status', 'is_boarding', 'funding_status', 'search']);
         $report = $this->reportingService->getStudentRegister($school, $filters, 25);
 
         $availableGrades = Student::where('school_id', $school->id)->distinct()->pluck('grade')->filter()->sort()->values();
@@ -116,7 +116,7 @@ class AcademicReportController extends Controller
     public function exportStudentRegister(Request $request)
     {
         $school = $this->getTenantSchool($request);
-        $filters = $request->only(['grade', 'form', 'class_name', 'gender', 'status', 'is_boarding', 'search']);
+        $filters = $request->only(['grade', 'form', 'class_name', 'gender', 'status', 'is_boarding', 'funding_status', 'search']);
         $report = $this->reportingService->getStudentRegister($school, $filters, 0);
 
         $filename = 'student-register-' . ($school->code ?: $school->id) . '-' . date('Ymd') . '.xlsx';

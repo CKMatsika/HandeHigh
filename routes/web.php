@@ -122,6 +122,31 @@ Route::middleware(['auth'])->group(function () {
         ->name('admin.')
         ->group(function () {
             // School Profile, Identity & Branding Management
+            Route::get('funding', [\App\Http\Controllers\Admin\SponsorFundingController::class,'index'])->name('funding.index');
+            Route::post('funding/sponsors', [\App\Http\Controllers\Admin\SponsorFundingController::class,'sponsor'])->name('funding.sponsors');
+            Route::post('funding/sponsors/{fundingSponsor}/mapping', [\App\Http\Controllers\Admin\SponsorFundingController::class,'mapping'])->name('funding.mapping');
+            Route::get('funding/template', [\App\Http\Controllers\Admin\SponsorFundingController::class,'template'])->name('funding.template');
+            Route::post('funding/import', [\App\Http\Controllers\Admin\SponsorFundingController::class,'upload'])->name('funding.import');
+            Route::get('funding/batches/{claimBatch}', [\App\Http\Controllers\Admin\SponsorFundingController::class,'batch'])->name('funding.batch');
+            Route::post('funding/batches/{claimBatch}/rows/{row}', [\App\Http\Controllers\Admin\SponsorFundingController::class,'review'])->name('funding.review');
+            Route::post('funding/batches/{claimBatch}/approve', [\App\Http\Controllers\Admin\SponsorFundingController::class,'approveBatch'])->name('funding.batch.approve');
+            Route::post('funding/claims/{fundingClaim}/recognition', [\App\Http\Controllers\Admin\SponsorFundingController::class,'recognize'])->name('funding.claim.recognition');
+            Route::post('funding/claims/{fundingClaim}/recognition/approve', [\App\Http\Controllers\Admin\SponsorFundingController::class,'approveRecognition'])->name('funding.claim.recognition.approve');
+            Route::post('funding/settlements', [\App\Http\Controllers\Admin\SponsorFundingController::class,'prepareSettlement'])->name('funding.settlements');
+            Route::post('funding/settlements/{sponsorSettlement}/approve', [\App\Http\Controllers\Admin\SponsorFundingController::class,'approveSettlement'])->name('funding.settlement.approve');
+            Route::post('funding/corrections', [\App\Http\Controllers\Admin\SponsorFundingController::class,'correction'])->name('funding.corrections');
+            Route::post('funding/corrections/{fundingApproval}/approve', [\App\Http\Controllers\Admin\SponsorFundingController::class,'approveCorrection'])->name('funding.correction.approve');
+            Route::get('funding/reports', [\App\Http\Controllers\Admin\SponsorFundingController::class,'reports'])->name('funding.reports');
+            Route::get('students/{student}/scholarships', [\App\Http\Controllers\Admin\ScholarshipController::class, 'index'])->name('students.scholarships');
+            Route::post('students/{student}/scholarships', [\App\Http\Controllers\Admin\ScholarshipController::class, 'store'])->name('students.scholarships.store');
+            Route::put('students/{student}/scholarships/{scholarship}', [\App\Http\Controllers\Admin\ScholarshipController::class, 'update'])->name('students.scholarships.update');
+            Route::post('students/{student}/scholarship-mapping', [\App\Http\Controllers\Admin\ScholarshipController::class, 'mapping'])->name('students.scholarships.mapping');
+            Route::post('students/{student}/scholarships/{scholarship}/approve', [\App\Http\Controllers\Admin\ScholarshipController::class, 'approve'])->name('students.scholarships.approve');
+            Route::post('students/{student}/scholarships/{scholarship}/close', [\App\Http\Controllers\Admin\ScholarshipController::class, 'close'])->name('students.scholarships.close');
+            Route::post('students/{student}/scholarships/{scholarship}/apply', [\App\Http\Controllers\Admin\ScholarshipController::class, 'apply'])->name('students.scholarships.apply');
+            Route::post('students/{student}/scholarship-applications/{application}/reverse', [\App\Http\Controllers\Admin\ScholarshipController::class, 'reverse'])->name('students.scholarships.reverse');
+            Route::post('students/{student}/scholarship-applications/{application}/sponsor-receipt', [\App\Http\Controllers\Admin\ScholarshipController::class, 'receiveSponsor'])->name('students.scholarships.sponsor-receipt');
+            Route::post('students/{student}/sponsor-receipts/{scholarshipReceipt}/reverse', [\App\Http\Controllers\Admin\ScholarshipController::class, 'reverseSponsor'])->name('students.scholarships.sponsor-receipt.reverse');
             Route::get('school/profile', [SchoolProfileController::class, 'edit'])->name('school.profile');
             Route::match(['put', 'patch', 'post'], 'school/profile', [SchoolProfileController::class, 'update'])->name('school.profile.update');
 

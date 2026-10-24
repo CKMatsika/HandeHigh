@@ -15,6 +15,21 @@
     <!-- Filters -->
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
         <form method="GET" class="flex flex-wrap items-end gap-3">
+            <label class="text-xs text-slate-400">Category
+                <select name="category" class="block bg-slate-800 rounded-lg px-3 py-2 text-slate-100">
+                    <option value="">All categories</option>
+                    @foreach(['boarding' => 'Boarding', 'day' => 'Day', 'scholarship' => 'Scholarship'] as $value => $label)
+                        <option value="{{ $value }}" @selected(request('category') === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="text-xs text-slate-400">Funding
+                <select name="funding_status" class="block bg-slate-800 rounded-lg px-3 py-2 text-slate-100">
+                    <option value="">All funding</option>
+                    <option value="regular" @selected(request('funding_status') === 'regular')>Regular</option>
+                    <option value="scholarship" @selected(request('funding_status') === 'scholarship')>Scholarship</option>
+                </select>
+            </label>
             <div class="flex-1 min-w-[200px]">
                 <label class="text-xs text-slate-400 mb-1 block">Search</label>
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Name, admission #, or registration #"
@@ -40,7 +55,7 @@
                 </select>
             </div>
             <div class="min-w-[120px]">
-                <label class="text-xs text-slate-400 mb-1 block">Boarding</label>
+                <label class="text-xs text-slate-400 mb-1 block">Residency</label>
                 <select name="boarding" class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
                     <option value="">All</option>
                     <option value="yes" {{ request('boarding') == 'yes' ? 'selected' : '' }}>Boarding</option>
@@ -61,7 +76,7 @@
                         <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Admission #</th>
                         <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Grade / Class</th>
                         <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">House</th>
-                        <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Boarding</th>
+                        <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Category / Residency</th>
                         <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Status</th>
                         <th class="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase">Actions</th>
                     </tr>
@@ -94,6 +109,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3">
+                            <span class="text-xs text-indigo-300 block">{{ $student->category_label }}</span>
                             @if($student->is_boarding && $student->currentBedAssignment)
                                 <span class="text-xs text-blue-400">{{ $student->currentBedAssignment->bed->dormitory->name ?? '' }} (Bed {{ $student->currentBedAssignment->bed->bed_number ?? '' }})</span>
                             @elseif($student->is_boarding)

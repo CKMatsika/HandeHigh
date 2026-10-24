@@ -3,6 +3,8 @@
 @section('content')
     @php
         $totalPaid = (float) ($invoice->allocations?->sum('amount') ?? 0);
+        $scholarshipApplications = $invoice->scholarshipApplications;
+        $scholarshipCovered = (float) $scholarshipApplications->where('status', 'posted')->sum('amount');
         $payments = $invoice->allocations
             ?->loadMissing('payment')
             ?->map(fn($a) => $a->payment)
@@ -15,7 +17,7 @@
             <p class="text-xs text-slate-400 mt-1">View invoice items, payments, and balances.</p>
         </div>
         <div class="flex flex-wrap gap-2">
-            @if($invoice->status !== 'cancelled')
+            @if($invoice->status !== 'cancelled' && $scholarshipApplications->isEmpty())
                 <a href="{{ route('admin.invoices.edit', $invoice) }}" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">Edit</a>
                 <form action="{{ route('admin.invoices.cancel', $invoice) }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to cancel this invoice?')">
                     @csrf
@@ -26,7 +28,7 @@
             @if($invoice->balance > 0 && $invoice->status !== 'cancelled')
                 <a href="{{ route('admin.payments.create', $invoice) }}" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 transition">Record payment</a>
             @endif
-            @if($totalPaid == 0)
+            @if($totalPaid == 0 && $scholarshipApplications->isEmpty())
                 <button type="button" 
                         onclick="openDeleteInvoiceModal('{{ route('admin.invoices.destroy', $invoice) }}', '{{ $invoice->number }}', '{{ addslashes(($invoice->student?->first_name ?? '') . ' ' . ($invoice->student?->last_name ?? '')) }}', '{{ number_format($invoice->total_amount, 2) }}', '{{ $invoice->academic_year }} - {{ $invoice->term }}')"
                         class="inline-flex items-center rounded-full bg-rose-500/20 border border-rose-500/40 px-4 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-600 hover:text-white transition">
@@ -62,6 +64,10 @@
             <div class="text-xs text-slate-200 space-y-1">
                 <div><span class="text-slate-400">Total:</span> {{ number_format($invoice->total_amount, 2) }}</div>
                 <div><span class="text-slate-400">Paid:</span> {{ number_format($totalPaid, 2) }}</div>
+                <div><span class="text-slate-400">Scholarship coverage (non-cash):</span> {{ number_format($scholarshipCovered, 2) }}</div>
+                @foreach($scholarshipApplications as $application)
+                    <div class="text-indigo-300">SCH-{{ $application->id }} · {{ $application->award_snapshot['reference'] }} · {{ $application->amount }} · {{ $application->status }}</div>
+                @endforeach
                 <div><span class="text-slate-400">Balance:</span> {{ number_format($invoice->balance, 2) }}</div>
             </div>
         </div>

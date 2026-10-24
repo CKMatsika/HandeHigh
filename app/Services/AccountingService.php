@@ -238,6 +238,10 @@ class AccountingService
      */
     public function postInvoice($invoice): JournalBatch
     {
+        if (\Illuminate\Support\Facades\Schema::hasTable('sponsor_claims')) {
+            $openingClaim=$invoice->sponsorClaims()->where('opening_inclusion','student_control')->whereNotNull('opening_journal_batch_id')->first();
+            if($openingClaim){return JournalBatch::where('school_id',$invoice->school_id)->findOrFail($openingClaim->opening_journal_batch_id);}
+        }
         $school = $invoice->school;
 
         $invoice->load(['items.feeStructure', 'student', 'school']);
@@ -249,6 +253,10 @@ class AccountingService
             ->first();
 
         if ($existingBatch) {
+            // Scholarship corrections have their own journals; never rebuild their original invoice posting.
+            if ($invoice->scholarshipApplications()->exists()) {
+                return $existingBatch;
+            }
             // If items now exist and existing batch only had 1 un-itemized credit entry, update it
             if ($invoice->items && $invoice->items->count() > 1 && $existingBatch->entries()->where('entry_type', 'credit')->count() <= 1) {
                 $existingBatch->entries()->delete();

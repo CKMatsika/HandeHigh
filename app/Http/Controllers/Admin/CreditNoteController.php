@@ -277,6 +277,9 @@ class CreditNoteController extends Controller
         ]);
 
         $invoice = Invoice::where('school_id', $school->id)->findOrFail($request->invoice_id);
+        if ($invoice->scholarshipApplications()->exists() || $invoice->sponsorClaims()->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['invoice_id' => 'Use the scholarship reversal workflow for invoices with scholarship history; generic credits require a fee-vote allocation review.']);
+        }
 
         DB::beginTransaction();
         try {

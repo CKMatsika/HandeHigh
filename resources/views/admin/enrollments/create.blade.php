@@ -101,10 +101,7 @@
                 </div>
 
                 <div class="flex items-center gap-4 mt-2">
-                    <label class="inline-flex items-center gap-2 text-[11px] text-slate-300">
-                        <input type="checkbox" name="is_boarding" value="1" {{ old('is_boarding') ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
-                        <span>Boarding</span>
-                    </label>
+                    @include('admin.students._category-fields')
                     <label class="inline-flex items-center gap-2 text-[11px] text-slate-300">
                         <input type="checkbox" name="has_transport" value="1" {{ old('has_transport') ? 'checked' : '' }} class="h-3 w-3 rounded border-slate-600 bg-slate-900 text-indigo-500">
                         <span>School transport</span>

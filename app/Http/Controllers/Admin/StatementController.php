@@ -165,6 +165,9 @@ class StatementController extends Controller
         }
 
         // Calculate running balance for current period
+        $scholarshipStatement = app(\App\Services\Finance\ScholarshipService::class)->legacyStatement($student, $events, (float) $openingBalance, (string) $academicYear, $term);
+        $events = $scholarshipStatement['events'];
+        $openingBalance = $scholarshipStatement['opening_balance'];
         $runningBalance = $openingBalance;
         $events = $events->map(function ($event) use (&$runningBalance, $openingBalance) {
             $runningBalance += $event['debit'] - $event['credit'];
@@ -316,6 +319,9 @@ class StatementController extends Controller
         }
 
         // Calculate running balance for current period
+        $scholarshipStatement = app(\App\Services\Finance\ScholarshipService::class)->legacyStatement($student, $events, (float) $openingBalance, (string) $academicYear, $term);
+        $events = $scholarshipStatement['events'];
+        $openingBalance = $scholarshipStatement['opening_balance'];
         $runningBalance = $openingBalance;
         $events = $events->map(function ($event) use (&$runningBalance, $openingBalance) {
             $runningBalance += $event['debit'] - $event['credit'];
@@ -455,6 +461,9 @@ class StatementController extends Controller
         }
 
         // Calculate running balance
+        $scholarshipStatement = app(\App\Services\Finance\ScholarshipService::class)->legacyStatement($student, $events, (float) $openingBalance, (string) $academicYear, $term);
+        $events = $scholarshipStatement['events'];
+        $openingBalance = $scholarshipStatement['opening_balance'];
         $runningBalance = $openingBalance;
         $events = $events->map(function ($event) use (&$runningBalance, $openingBalance) {
             $runningBalance += $event['debit'] - $event['credit'];
@@ -601,6 +610,9 @@ class StatementController extends Controller
         }
 
         // Calculate running balance
+        $scholarshipStatement = app(\App\Services\Finance\ScholarshipService::class)->legacyStatement($student, $events, (float) $openingBalance, (string) $academicYear, $term);
+        $events = $scholarshipStatement['events'];
+        $openingBalance = $scholarshipStatement['opening_balance'];
         $runningBalance = $openingBalance;
         $events = $events->map(function ($event) use (&$runningBalance, $openingBalance) {
             $runningBalance += $event['debit'] - $event['credit'];

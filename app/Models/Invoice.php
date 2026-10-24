@@ -82,6 +82,12 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function scholarshipApplications()
+    {
+        return $this->hasMany(ScholarshipApplication::class);
+    }
+    public function sponsorClaims() { return $this->hasMany(SponsorClaim::class); }
+
     public function ledgerEntries()
     {
         return $this->hasMany(LedgerEntry::class);

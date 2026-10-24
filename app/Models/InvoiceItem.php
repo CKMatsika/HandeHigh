@@ -67,6 +67,14 @@ class InvoiceItem extends Model
 
     public function getBalanceAttribute(): float
     {
-        return max(0.0, (float) $this->line_total - $this->paid_amount);
+        return max(0.0, (float) $this->line_total - $this->paid_amount - $this->scholarship_amount);
+    }
+
+    public function getScholarshipAmountAttribute(): float
+    {
+        $claims=$this->invoice->sponsorClaims()->where('status','posted')->get()->sum(fn($claim)=>collect($claim->allocated_lines??[])->where('invoice_item_id',$this->id)->sum('amount'));
+        return round($claims+$this->invoice->scholarshipApplications()->where('status', 'posted')->get()
+            ->sum(fn ($application) => collect($application->lines)
+                ->where('invoice_item_id', $this->id)->sum('amount')), 2);
     }
 }

@@ -197,6 +197,7 @@ class InvoiceController extends Controller
             ]);
 
             $this->accountingService->postInvoice($invoice);
+            app(\App\Services\Finance\ScholarshipService::class)->applyEligible($invoice);
 
             AuditLog::create([
                 'school_id' => $school->id,
@@ -234,6 +235,7 @@ class InvoiceController extends Controller
             abort(403);
         }
 
+        $this->protectScholarshipInvoice($invoice);
         $totalPaid = (float) $invoice->allocations->sum('amount');
 
         if ($totalPaid > 0) {
@@ -326,6 +328,7 @@ class InvoiceController extends Controller
             abort(403);
         }
 
+        $this->protectScholarshipInvoice($invoice);
         if ($invoice->status === 'cancelled') {
             return back()
                 ->with('status', 'Invoice is already cancelled.');
@@ -1011,6 +1014,7 @@ class InvoiceController extends Controller
                     }
 
                     $this->accountingService->postInvoice($invoice);
+            app(\App\Services\Finance\ScholarshipService::class)->applyEligible($invoice);
 
                     $createdInvoices[] = $invoice;
                     $totalGeneratedAmount += $studentTotal;
@@ -1163,6 +1167,7 @@ class InvoiceController extends Controller
                     ]);
 
                     $this->accountingService->postInvoice($invoice);
+            app(\App\Services\Finance\ScholarshipService::class)->applyEligible($invoice);
 
                     $createdInvoices[] = $invoice;
                 } catch (\Exception $e) {
@@ -1272,6 +1277,7 @@ class InvoiceController extends Controller
             abort(403);
         }
 
+        $this->protectScholarshipInvoice($invoice);
         if ($invoice->status === 'cancelled') {
             return redirect()
                 ->route('admin.invoices.show', $invoice)
@@ -1496,6 +1502,13 @@ class InvoiceController extends Controller
         return redirect()
             ->route('admin.invoices.show', $invoice)
             ->with('status', 'Invoice updated successfully.');
+    }
+
+    private function protectScholarshipInvoice(Invoice $invoice): void
+    {
+        if ($invoice->scholarshipApplications()->exists() || $invoice->sponsorClaims()->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => 'Invoices with scholarship history are preserved. Use scholarship reversals and a separate correcting invoice or credit note.']);
+        }
     }
 
     public function print(Invoice $invoice)

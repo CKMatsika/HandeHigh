@@ -103,34 +103,6 @@
                 </div>
             @endif
 
-            @if($bill->payments->count())
-                <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-800">
-                        <h2 class="text-sm font-medium text-slate-50">Payment History</h2>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead class="bg-slate-950/60 text-slate-300">
-                                <tr>
-                                    <th class="px-4 py-3 text-left font-medium">Date</th>
-                                    <th class="px-4 py-3 text-right font-medium">Amount</th>
-                                    <th class="px-4 py-3 text-left font-medium">Method</th>
-                                    <th class="px-4 py-3 text-left font-medium">Reference</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-800">
-                                @foreach($bill->payments as $payment)
-                                    <tr class="hover:bg-slate-800/40 transition">
-                                        <td class="px-4 py-3">{{ $payment->payment_date?->format('M d, Y') ?? '-' }}</td>
-                                        <td class="px-4 py-3 text-right text-emerald-400 font-medium">{{ number_format($payment->amount, 2) }}</td>
-                                        <td class="px-4 py-3">{{ ucfirst(str_replace('_', ' ', $payment->payment_method)) }}</td>
-                                        <td class="px-4 py-3 font-mono text-slate-400">{{ $payment->reference ?? '-' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             @if($bill->payments->count() > 0)
                 <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
                     <h2 class="text-sm font-medium text-slate-50 mb-4">Payment History</h2>

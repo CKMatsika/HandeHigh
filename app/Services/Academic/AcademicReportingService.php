@@ -238,7 +238,11 @@ class AcademicReportingService
     {
         $query = Student::query()
             ->where('school_id', $school->id)
-            ->with(['guardians']);
+            ->with(['guardians', 'scholarships']);
+
+        if (in_array($filters['funding_status'] ?? '', ['regular', 'scholarship'], true)) {
+            $query->where('funding_status', $filters['funding_status']);
+        }
 
         if (!empty($filters['grade'])) {
             $query->where('grade', $filters['grade']);
@@ -299,6 +303,16 @@ class AcademicReportingService
                 'grade' => $s->grade ?: 'N/A',
                 'class_name' => $s->class_name ?: 'N/A',
                 'is_boarding' => $s->is_boarding ? 'Boarding' : 'Day',
+                'funding_status' => $s->funding_status ?? 'regular',
+                'student_category' => $s->category_label,
+                'scholarship_references' => $s->scholarships->pluck('reference')->implode(', '),
+                'scholarship_sponsors' => $s->scholarships->pluck('sponsor')->filter()->unique()->implode(', '),
+                'scholarship_details' => $s->scholarships->map(fn ($award) => implode(' | ', [
+                    $award->reference, $award->name, $award->status,
+                    $award->coverage_value . ($award->coverage_basis === 'percentage' ? '%' : ' amount cap'),
+                    implode(',', $award->covered_votes), $award->starts_on->toDateString(), $award->ends_on->toDateString(),
+                    $award->accounting_treatment, $award->approval_reference ?? 'Pending approval',
+                ]))->implode('; '),
                 'status' => ucfirst($s->status ?: 'Active'),
                 'guardian_name' => $primaryGuardian ? "{$primaryGuardian->first_name} {$primaryGuardian->last_name}" : 'N/A',
                 'guardian_phone' => $primaryGuardian ? ($primaryGuardian->phone ?: 'N/A') : 'N/A',

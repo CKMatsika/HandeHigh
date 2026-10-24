@@ -24,6 +24,7 @@ class Student extends Model
         'class_name',
         'house_id',
         'is_boarding',
+        'funding_status',
         'has_transport',
         'status',
         'exit_type',
@@ -37,6 +38,18 @@ class Student extends Model
         'is_boarding' => 'boolean',
         'has_transport' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::updated(function (Student $student) {
+            if ($student->wasChanged('funding_status')) {
+                AuditLog::create(['school_id' => $student->school_id, 'user_id' => auth()->id(), 'action' => 'funding_status_changed',
+                    'model_type' => self::class, 'model_id' => $student->id, 'module' => 'scholarships',
+                    'old_values' => ['funding_status' => $student->getRawOriginal('funding_status')],
+                    'new_values' => ['funding_status' => $student->funding_status], 'description' => 'Student funding classification changed']);
+            }
+        });
+    }
 
     public function school()
     {
@@ -100,6 +113,23 @@ class Student extends Model
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    public function scholarships()
+    {
+        return $this->hasMany(StudentScholarship::class);
+    }
+    public function sponsorClaims() { return $this->hasMany(SponsorClaim::class); }
+
+    public function getCategoryLabelAttribute(): string
+    {
+        $residency = $this->isBoardingOn() ? 'Boarding' : 'Day';
+        return $this->funding_status === 'scholarship' ? 'Scholarship — ' . $residency : $residency;
+    }
+
+    public function scopeFundingStatus($query, string $status)
+    {
+        return $query->where('funding_status', $status);
     }
 
     public function payments()

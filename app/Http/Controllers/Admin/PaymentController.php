@@ -86,7 +86,7 @@ class PaymentController extends Controller
         $items = $invoice->items->map(function (InvoiceItem $item) {
             $paid = (float) $item->allocations()->sum('amount');
             $lineTotal = (float) $item->line_total;
-            $balance = max(0.0, $lineTotal - $paid);
+            $balance = (float) $item->balance;
             $voteCode = $item->effective_vote_code;
             $priority = (int) ($item->feeStructure?->allocation_priority
                 ?? HandeFeeVotesService::getStandardVotes()[$voteCode]['priority']
@@ -179,6 +179,8 @@ class PaymentController extends Controller
         }
 
         $payment = DB::transaction(function () use ($school, $invoice, $validated, $amount, $method, $accountId, $mopseReceipt, $filteredAllocations, $user) {
+            $invoice = Invoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            $filteredAllocations = app(\App\Services\Finance\ScholarshipService::class)->paymentAllocations($invoice, $filteredAllocations, $amount);
             $payment = Payment::create([
                 'school_id' => $school->id,
                 'student_id' => $invoice->student_id,
@@ -386,6 +388,8 @@ class PaymentController extends Controller
         }
 
         DB::transaction(function () use ($payment, $invoice, $applyAmount, $filteredAllocations) {
+            $invoice = Invoice::whereKey($invoice->id)->lockForUpdate()->firstOrFail();
+            $filteredAllocations = app(\App\Services\Finance\ScholarshipService::class)->paymentAllocations($invoice, $filteredAllocations, $applyAmount);
             // Deduct from advance balance
             $newAdvBalance = max(0.0, (float) $payment->advance_balance - $applyAmount);
             $payment->update(['advance_balance' => $newAdvBalance]);
