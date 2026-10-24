@@ -23,6 +23,20 @@
     </div>
 
     <!-- Filters -->
+    @if(\App\Http\Controllers\Admin\Term1ReconciliationExportController::permitted(auth()->user()))
+        <form method="POST" action="{{ route('admin.reports.student-register.reconciliation-export') }}" class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-wrap items-end gap-3">
+            @csrf
+            <div class="w-full">
+                <h2 class="font-semibold">Private Term 1 reconciliation export</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Includes student IDs and financial history for your school, including inactive students. Register filters do not limit this export. Save privately. Generation is audited.</p>
+            </div>
+            <label>Academic year
+                <input type="text" name="academic_year" value="2026" pattern="20[0-9]{2}" maxlength="4" required class="block rounded-lg dark:bg-gray-700">
+            </label>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Download reconciliation JSON</button>
+            @error('academic_year')<p class="w-full text-red-600">{{ $message }}</p>@enderror
+        </form>
+    @endif
     <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <form method="GET" action="{{ route('admin.reports.student-register') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <label>Funding<select name="funding_status" class="block rounded-lg dark:bg-gray-700"><option value="">All funding</option><option value="regular" @selected(request('funding_status') === 'regular')>Regular</option><option value="scholarship" @selected(request('funding_status') === 'scholarship')>Scholarship</option></select></label>

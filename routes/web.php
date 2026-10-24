@@ -353,6 +353,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/enrollment-by-class', [AcademicReportController::class, 'enrollmentByClass'])->name('reports.enrollment-by-class');
             Route::get('reports/student-register', [AcademicReportController::class, 'studentRegister'])->name('reports.student-register');
             Route::get('reports/student-register/export', [AcademicReportController::class, 'exportStudentRegister'])->name('reports.student-register.export');
+            Route::post('reports/student-register/reconciliation-export', \App\Http\Controllers\Admin\Term1ReconciliationExportController::class)
+                ->name('reports.student-register.reconciliation-export')
+                ->middleware(['role:super-admin|school-admin', 'throttle:2,1']);
             Route::get('reports/academic-performance', [AcademicReportController::class, 'academicPerformance'])->name('reports.academic-performance');
             Route::get('reports/subject-performance', [AcademicReportController::class, 'subjectPerformance'])->name('reports.subject-performance');
             Route::get('reports/subject-performance/export', [AcademicReportController::class, 'exportSubjectPerformance'])->name('reports.subject-performance.export');
