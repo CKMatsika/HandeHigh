@@ -131,6 +131,42 @@
                         </table>
                     </div>
                 </div>
+            @if($bill->payments->count() > 0)
+                <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
+                    <h2 class="text-sm font-medium text-slate-50 mb-4">Payment History</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left">
+                            <thead class="text-slate-400 border-b border-slate-800">
+                                <tr>
+                                    <th class="py-2">Date</th>
+                                    <th class="py-2">Method</th>
+                                    <th class="py-2">Account / Bank</th>
+                                    <th class="py-2">Reference</th>
+                                    <th class="py-2 text-right">Amount (USD)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800 text-slate-200">
+                                @foreach($bill->payments as $payment)
+                                    <tr>
+                                        <td class="py-2.5">{{ $payment->payment_date?->format('M d, Y') ?? '-' }}</td>
+                                        <td class="py-2.5 capitalize">{{ str_replace('_', ' ', $payment->payment_method) }}</td>
+                                        <td class="py-2.5">
+                                            @if($payment->account)
+                                                <span class="text-emerald-400">{{ $payment->account->code }} - {{ $payment->account->name }}</span>
+                                            @elseif($payment->bankAccount)
+                                                <span>{{ $payment->bankAccount->bank_name }}</span>
+                                            @else
+                                                <span class="text-slate-500">-</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2.5 font-mono text-slate-400">{{ $payment->reference ?? '-' }}</td>
+                                        <td class="py-2.5 text-right font-semibold text-emerald-400">${{ number_format($payment->amount, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             @endif
         </div>
 
@@ -153,16 +189,16 @@
                     <div class="border-t border-slate-800"></div>
                     <div class="flex justify-between">
                         <span class="text-slate-400">Total Amount</span>
-                        <span class="text-slate-100 font-medium">{{ number_format($bill->total_amount, 2) }}</span>
+                        <span class="text-slate-100 font-medium">${{ number_format($bill->total_amount, 2) }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-400">Paid Amount</span>
-                        <span class="text-emerald-400">{{ number_format($bill->paid_amount, 2) }}</span>
+                        <span class="text-emerald-400">${{ number_format($bill->paid_amount, 2) }}</span>
                     </div>
                     <div class="border-t border-slate-800"></div>
                     <div class="flex justify-between">
                         <span class="text-slate-400">Balance Due</span>
-                        <span class="text-lg font-bold {{ $bill->balance > 0 ? 'text-amber-400' : 'text-emerald-400' }}">{{ number_format($bill->balance, 2) }}</span>
+                        <span class="text-lg font-bold {{ $bill->balance > 0 ? 'text-amber-400' : 'text-emerald-400' }}">${{ number_format($bill->balance, 2) }}</span>
                     </div>
                 </div>
             </div>
@@ -170,6 +206,11 @@
             <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
                 <h2 class="text-sm font-medium text-slate-50 mb-3">Actions</h2>
                 <div class="space-y-2">
+                    @if($bill->balance > 0)
+                        <a href="{{ route('admin.bills.payments.create', $bill) }}" class="block w-full text-center rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 transition shadow-lg shadow-emerald-900/30">
+                            Record Payment
+                        </a>
+                    @endif
                     @unless($bill->procurementSupplierInvoice)
                         <a href="{{ route('admin.bills.edit', $bill) }}" class="block w-full text-center rounded-lg bg-slate-800 px-4 py-2 text-xs text-slate-200 hover:bg-slate-700 transition">Edit Bill</a>
                     @endunless

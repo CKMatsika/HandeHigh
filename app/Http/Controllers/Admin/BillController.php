@@ -119,17 +119,20 @@ class BillController extends Controller
             app(\App\Services\AccountingService::class)->postBill($bill);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to post bill to accounting: ' . $e->getMessage());
+            return redirect()
+                ->route('admin.bills.show', $bill)
+                ->withErrors(['error' => 'Bill created, but General Ledger posting failed: ' . $e->getMessage()]);
         }
 
         return redirect()
             ->route('admin.bills.index')
-            ->with('status', 'Bill created successfully');
+            ->with('status', 'Bill created and posted to general ledger successfully');
     }
 
     public function show(Bill $bill)
     {
         $this->authorizeSchoolAccess($bill);
-        
+
         $bill->load(['vendor', 'items', 'payments', 'expenseAccount', 'project', 'costCenter']);
         return view('admin.bills.show', compact('bill'));
     }
@@ -184,11 +187,14 @@ class BillController extends Controller
             app(\App\Services\AccountingService::class)->postBill($bill);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to update bill in accounting: ' . $e->getMessage());
+            return redirect()
+                ->route('admin.bills.show', $bill)
+                ->withErrors(['error' => 'Bill updated, but General Ledger sync failed: ' . $e->getMessage()]);
         }
 
         return redirect()
             ->route('admin.bills.index')
-            ->with('status', 'Bill updated successfully');
+            ->with('status', 'Bill updated and synced with general ledger successfully');
     }
 
     private function authorizeSchoolAccess($model)

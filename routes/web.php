@@ -374,6 +374,8 @@ Route::middleware(['auth'])->group(function () {
 
             // Bills & Vendors
             Route::resource('bills', BillController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+            Route::get('bills/{bill}/payments/create', [\App\Http\Controllers\Admin\BillPaymentController::class, 'create'])->name('bills.payments.create');
+            Route::post('bills/{bill}/payments', [\App\Http\Controllers\Admin\BillPaymentController::class, 'store'])->name('bills.payments.store');
             Route::resource('vendors', VendorController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
             // Projects & Implementation Tasks

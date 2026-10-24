@@ -11,6 +11,7 @@ class ReceiptItem extends Model
 
     protected $fillable = [
         'receipt_id',
+        'account_id',
         'description',
         'category',
         'quantity',
@@ -31,6 +32,11 @@ class ReceiptItem extends Model
     public function receipt()
     {
         return $this->belongsTo(Receipt::class);
+    }
+
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
     }
 
     public function project()

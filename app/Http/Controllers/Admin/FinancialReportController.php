@@ -388,7 +388,10 @@ class FinancialReportController extends Controller
 
         $accounts = Account::where('school_id', $school->id)
             ->with(['journalEntries' => function ($q) use ($asOf) {
-                $q->whereDate('created_at', '<=', $asOf);
+                $q->whereHas('batch', function ($bq) use ($asOf) {
+                    $bq->where('status', 'posted')
+                       ->whereDate('transaction_date', '<=', $asOf);
+                });
             }])
             ->orderBy('code')
             ->get();
@@ -452,7 +455,7 @@ class FinancialReportController extends Controller
         }
 
         $fiscalYear = (int) $request->input('fiscal_year', now()->year);
-        
+
         // Auto-sync Chart of Accounts and unposted transactions into General Ledger
         try {
             app(\App\Services\AccountingService::class)->ensureChartOfAccountsExist($school);
@@ -488,7 +491,7 @@ class FinancialReportController extends Controller
         foreach ($accounts as $account) {
             $isRevenue = ($account->type === 'revenue' || str_starts_with($account->code, '5'));
             $actualAmount = $this->getActualAccountBalance($school->id, $account->id, $fiscalYear, $isRevenue);
-            
+
             $lines = $budgetLinesByAccount->get($account->id, collect());
             $budgetedAmount = (float) $lines->sum('budgeted_amount');
             $budgetName = $lines->first()?->budget?->name ?? ($budgets->first()?->name ?? 'General Budget');
@@ -603,7 +606,7 @@ class FinancialReportController extends Controller
         }
 
         $fiscalYear = $request->input('fiscal_year', now()->year);
-        
+
         $departments = Department::where('school_id', $school->id)
             ->where('is_active', true)
             ->get();
@@ -617,7 +620,7 @@ class FinancialReportController extends Controller
             $budgetAmount = $department->budget ?? 0;
             $expenses = $this->getDepartmentExpenses($school->id, $department->id, $fiscalYear);
             $revenue = $this->getDepartmentRevenue($school->id, $department->id, $fiscalYear);
-            
+
             $budgetUtilization = $budgetAmount > 0 ? ($expenses / $budgetAmount) * 100 : 0;
             $netPerformance = $revenue - $expenses;
             $efficiencyRatio = $expenses > 0 ? ($revenue / $expenses) * 100 : 0;
@@ -702,7 +705,7 @@ class FinancialReportController extends Controller
                     $total = $categoryAccounts->sum(function ($account) {
                         return $account->journalEntries->where('entry_type', 'debit')->sum('amount');
                     });
-                    
+
                     return [
                         'total' => $total,
                         'count' => $categoryAccounts->count(),
@@ -735,7 +738,7 @@ class FinancialReportController extends Controller
         } else {
             $expenses = $expenseAccounts->map(function ($account) {
                 $total = $account->journalEntries->where('entry_type', 'debit')->sum('amount');
-                
+
                 return [
                     'account' => $account,
                     'total' => $total,
@@ -861,7 +864,7 @@ class FinancialReportController extends Controller
     protected function getCashFlowByCategory(int $schoolId, string $activity, string $flowType, string $startDate, string $endDate): float
     {
         $cashAccountCodes = ['1100', '1301', '1302', '1303'];
-        
+
         $query = JournalEntry::whereHas('account', function ($q) use ($schoolId, $cashAccountCodes) {
                 $q->where('school_id', $schoolId)
                   ->whereIn('code', $cashAccountCodes);
@@ -885,12 +888,15 @@ class FinancialReportController extends Controller
         return Account::where('school_id', $schoolId)
             ->where('type', $type)
             ->with(['journalEntries' => function ($q) use ($startDate, $endDate) {
-                if ($startDate) {
-                    $q->whereDate('created_at', '>=', $startDate);
-                }
-                if ($endDate) {
-                    $q->whereDate('created_at', '<=', $endDate);
-                }
+                $q->whereHas('batch', function ($bq) use ($startDate, $endDate) {
+                    $bq->where('status', 'posted');
+                    if ($startDate) {
+                        $bq->whereDate('transaction_date', '>=', $startDate);
+                    }
+                    if ($endDate) {
+                        $bq->whereDate('transaction_date', '<=', $endDate);
+                    }
+                });
             }])
             ->orderBy('code')
             ->get()

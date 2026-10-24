@@ -29,6 +29,11 @@ class JournalEntry extends Model
         return $this->belongsTo(JournalBatch::class, 'journal_batch_id');
     }
 
+    public function journalBatch()
+    {
+        return $this->batch();
+    }
+
     public function account()
     {
         return $this->belongsTo(Account::class);
