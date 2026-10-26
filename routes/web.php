@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AcademicReportController;
 use App\Http\Controllers\Admin\AccountController;
+use App\Http\Controllers\Admin\AccountMappingController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\BankReconciliationController;
 use App\Http\Controllers\Admin\BillController;
@@ -298,6 +299,10 @@ Route::middleware(['auth'])->group(function () {
             Route::post('accounting-periods/{accountingPeriod}/close', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'close'])->name('accounting-periods.close');
             Route::post('accounting-periods/{accountingPeriod}/reopen', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'reopen'])->name('accounting-periods.reopen');
             Route::get('accounting-periods/{accountingPeriod}/validate-trial-balance', [\App\Http\Controllers\Admin\AccountingPeriodController::class, 'validateTrialBalance'])->name('accounting-periods.validate-trial-balance');
+
+            // Audited, tenant-scoped receivable and Term 1 fee-vote account mappings.
+            Route::get('account-mappings', [AccountMappingController::class, 'index'])->name('account-mappings.index');
+            Route::post('account-mappings', [AccountMappingController::class, 'store'])->name('account-mappings.store');
 
             // Accounting - Chart of Accounts
             Route::get('accounts', [AccountController::class, 'index'])->name('accounts.index');

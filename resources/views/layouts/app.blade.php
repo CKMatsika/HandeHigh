@@ -398,6 +398,10 @@
                                     <span class="h-2 w-2 rounded-full bg-lime-400"></span>
                                     <span>Chart of Accounts</span>
                                 </a>
+                                <a href="{{ route('admin.account-mappings.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.account-mappings.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <span class="h-2 w-2 rounded-full bg-violet-400"></span>
+                                    <span>Account Mappings</span>
+                                </a>
                                 <a href="{{ route('admin.accounting-periods.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.accounting-periods.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <span class="h-2 w-2 rounded-full bg-yellow-400"></span>
                                     <span>Accounting Periods</span>
