@@ -8,16 +8,16 @@ use RuntimeException;
 
 class Term1ReconciliationExportService
 {
-    public function snapshot(int $schoolId, string $year): array
+    public function snapshot(int $schoolId, string $year, bool $readOnly = true): array
     {
         if ($schoolId < 1 || ! preg_match('/^20\d{2}$/D', $year)) {
             throw new RuntimeException('An explicit school and academic year are required.');
         }
 
-        return DB::transaction(function () use ($schoolId, $year) {
+        return DB::transaction(function () use ($schoolId, $year, $readOnly) {
             // PostgreSQL supplies a coherent snapshot and enforces read-only SQL.
             // No migration, seeder, Eloquent observer or posting service is invoked.
-            if (DB::getDriverName() === 'pgsql') {
+            if ($readOnly && DB::getDriverName() === 'pgsql') {
                 DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
             }
             $schools = DB::table('schools')->where('id', $schoolId)->get(['id', 'code', 'name', 'currency']);
@@ -87,7 +87,8 @@ class Term1ReconciliationExportService
                 'student_scholarships' => $read('student_scholarships', 'id school_id student_id reference name academic_year funding_source funding_sponsor_id coverage_type coverage_basis coverage_value covered_votes starts_on ends_on accounting_treatment status approved_at'),
                 'scholarship_applications' => $read('scholarship_applications', 'id school_id student_scholarship_id invoice_id amount lines accounting_date status journal_batch_id reversal_batch_id reversed_on'),
                 'sponsor_claims' => $read('sponsor_claims', 'id school_id funding_sponsor_id sponsor_claim_batch_id student_id invoice_id academic_year reference approved_amount recognised_amount received_before_cutover opening_outstanding disputed_amount rejected_amount classification opening_inclusion status accounting_date allocated_lines journal_batch_id opening_journal_batch_id reversed_on'),
-                'accounts' => $read('accounts', 'id school_id code name type currency is_active'),
+                'accounts' => $read('accounts', 'id school_id code name type currency is_active is_postable'),
+                'accounting_periods' => $read('accounting_periods', 'id school_id name start_date end_date status'),
                 'account_mappings' => $read('account_mappings', 'id school_id mapping_type source_key account_id is_active'),
                 'journal_batches' => $read('journal_batches', 'id school_id batch_number transaction_date source_type source_id status'),
                 'journal_entries' => $read('journal_entries', 'id journal_batch_id account_id entry_type amount reference', 'journal_batches', 'journal_batch_id'),
@@ -98,8 +99,10 @@ class Term1ReconciliationExportService
                 }
             }
 
+            $tables = array_map(fn (array $rows) => array_map(fn ($row) => (array) $row, $rows), $tables);
+
             return ['format' => 'hande-term1-reconciliation-v1', 'exported_at' => now()->toIso8601String(),
-                'database_driver' => DB::getDriverName(), 'school' => $school, 'academic_year' => $year,
+                'database_driver' => DB::getDriverName(), 'school' => (array) $school, 'academic_year' => $year,
                 'scope' => 'All tenant students including inactive; all available enrolment and invoice history. Filter target year/Term 1 during reconciliation.',
                 'missing_schema_fields' => $missing, 'counts' => array_map('count', $tables), 'data' => $tables];
         });
