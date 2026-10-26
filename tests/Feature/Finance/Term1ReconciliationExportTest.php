@@ -48,6 +48,12 @@ class Term1ReconciliationExportTest extends TestCase
         $batch = DB::table('journal_batches')->insertGetId(['school_id' => $school->id, 'batch_number' => 'SYN-OPENING', 'transaction_date' => '2026-01-01', 'description' => 'Synthetic opening', 'source_type' => 'opening_balance', 'status' => 'posted']);
         $account = DB::table('accounts')->insertGetId(['school_id' => $school->id, 'code' => 'SYN-AR', 'name' => 'Synthetic debtors', 'type' => 'asset', 'category' => 'receivable']);
         DB::table('journal_entries')->insert(['journal_batch_id' => $batch, 'account_id' => $account, 'entry_type' => 'debit', 'amount' => 100]);
+        $cashbook = DB::table('cashbook')->insertGetId(['school_id' => $school->id, 'account_id' => $account, 'transaction_type' => 'income',
+            'category' => 'fees', 'description' => 'Synthetic receipt line', 'amount' => 10, 'balance_after' => 10,
+            'transaction_date' => '2026-01-03', 'reference_number' => 'SYN-CASH-01']);
+        DB::table('cashbook_transactions')->insert(['school_id' => $school->id, 'account_id' => $account, 'transaction_date' => '2026-01-03',
+            'reference_number' => 'SYN-CASH-01', 'description' => 'Synthetic bank reconciliation line', 'amount' => 10,
+            'transaction_type' => 'debit', 'category' => 'income', 'status' => 'unmatched']);
         $writes = [];
         DB::listen(function (QueryExecuted $query) use (&$writes) {
             if (preg_match('/^\s*(insert|update|delete|replace|create|alter|drop|truncate)\b/i', $query->sql)) {
@@ -70,6 +76,9 @@ class Term1ReconciliationExportTest extends TestCase
         $this->assertSame(1, $data['counts']['enrollments']);
         $this->assertSame($batch, $data['data']['journal_entries'][0]['journal_batch_id']);
         $this->assertSame(1, $data['counts']['journal_entries']);
+        $this->assertSame(1, $data['counts']['cashbook']);
+        $this->assertSame(1, $data['counts']['cashbook_transactions']);
+        $this->assertSame($cashbook, $data['data']['cashbook'][0]['id']);
         $this->assertStringNotContainsString('PRIVATE-OTHER', $raw);
         $this->assertStringNotContainsString('DO-NOT-EXPORT', $raw);
         $this->assertStringNotContainsString('password', $raw);
