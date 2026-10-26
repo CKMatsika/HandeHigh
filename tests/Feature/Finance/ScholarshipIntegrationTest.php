@@ -216,7 +216,7 @@ class ScholarshipIntegrationTest extends TestCase
         $this->service->approve($award, 'Approval');
     }
 
-    public function test_existing_and_scholarship_imports_are_compatible_and_tenant_scoped(): void
+    public function test_bulk_import_skips_existing_student_without_changing_funding_or_enrollments(): void
     {
         $import = new EnrollmentsImport($this->school->id);
         $row = ['student_name' => 'Import Synthetic', 'email' => 'synthetic@example.test', 'class_name' => 'A', 'grade' => 'Form 1',
@@ -225,12 +225,11 @@ class ScholarshipIntegrationTest extends TestCase
         $student = $enrollment->student;
         $this->assertSame('regular', $student->funding_status);
         $this->assertTrue($student->isBoardingOn());
+        $originalEnrollmentCount = $student->enrollments()->count();
         $row['student_category'] = 'scholarship'; $row['funding_status'] = 'scholarship'; $row['residency'] = 'boarding';
-        $import->model($row)->save();
-        $this->assertSame('scholarship', $student->fresh()->funding_status);
-        unset($row['student_category'], $row['funding_status'], $row['residency']);
-        $import->model($row)->save();
-        $this->assertSame('scholarship', $student->fresh()->funding_status);
+        $this->assertNull($import->model($row));
+        $this->assertSame('regular', $student->fresh()->funding_status);
+        $this->assertSame($originalEnrollmentCount, $student->enrollments()->count());
     }
 
     public function test_scholarship_fee_selection_uses_normal_boarding_and_day_packages(): void

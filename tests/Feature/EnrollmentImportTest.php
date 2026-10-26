@@ -109,7 +109,8 @@ class EnrollmentImportTest extends TestCase
             ->post(route('admin.enrollments.bulk-store'), [
                 'file' => UploadedFile::fake()->createWithContent('enrollments.csv', $csv),
             ])
-            ->assertRedirectToRoute('admin.enrollments.index');
+            ->assertRedirectToRoute('admin.enrollments.index')
+            ->assertSessionHas('import_summary.new_students_created', 1);
 
         $student = Student::where('email', 'learner@example.test')->firstOrFail();
         $this->assertSame($this->school->id, $student->school_id);
@@ -138,7 +139,8 @@ class EnrollmentImportTest extends TestCase
                 ->post(route('admin.enrollments.bulk-store'), [
                     'file' => new UploadedFile($path, 'enrollments.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true),
                 ])
-                ->assertRedirectToRoute('admin.enrollments.index');
+                ->assertRedirectToRoute('admin.enrollments.index')
+                ->assertSessionHas('import_summary.new_students_created', 1);
         } finally {
             @unlink($path);
         }
@@ -177,23 +179,155 @@ class EnrollmentImportTest extends TestCase
         $this->assertSame(2, Student::where('email', 'shared@example.test')->count());
     }
 
-    public function test_failed_import_rolls_back_records(): void
+    public function test_invalid_rows_are_reported_with_excel_row_numbers_while_valid_rows_import(): void
     {
         $csv = implode("\n", [
             'student_name,email,class_name,academic_year,term,grade,is_boarding,has_transport,status',
             'First Learner,first@example.test,Form 1A,2026,First Term,Form 1,no,no,active',
-            'Second Learner,second@example.test,Missing Class,2026,First Term,Form 1,no,no,active',
+            'Second Learner,second@example.test,Form 1A,2026,Fourth Term,Form 1,no,no,active',
         ]);
 
         $this->actingAs($this->admin)
             ->post(route('admin.enrollments.bulk-store'), [
                 'file' => UploadedFile::fake()->createWithContent('enrollments.csv', $csv),
             ])
-            ->assertRedirect();
+            ->assertRedirectToRoute('admin.enrollments.index')
+            ->assertSessionHas('import_summary.invalid_rows', 1)
+            ->assertSessionHas('import_summary.rows.1.row_number', 3);
 
-        $this->assertDatabaseMissing('students', ['email' => 'first@example.test']);
+        $this->assertDatabaseHas('students', ['email' => 'first@example.test']);
         $this->assertDatabaseMissing('students', ['email' => 'second@example.test']);
+        $this->assertSame(1, Enrollment::count());
+    }
+
+    public function test_existing_student_and_enrollment_are_completely_unchanged(): void
+    {
+        $student = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Existing', 'last_name' => 'Learner',
+            'email' => 'existing@example.test', 'admission_number' => 'HH-100',
+            'date_of_birth' => '2010-01-02', 'grade' => 'Form 2', 'class_name' => 'Old Class',
+            'is_boarding' => true, 'has_transport' => false, 'funding_status' => 'scholarship', 'status' => 'inactive',
+        ]);
+        $enrollment = Enrollment::create([
+            'school_id' => $this->school->id, 'student_id' => $student->id,
+            'academic_year' => '2025', 'term' => 'Third Term', 'grade' => 'Form 2', 'class_name' => 'Old Class',
+            'is_boarding' => true, 'has_transport' => false, 'enrollment_date' => '2025-09-01', 'status' => 'inactive',
+        ]);
+
+        $csv = implode("\n", [
+            'student_name,email,admission_number,date_of_birth,class_name,academic_year,term,grade,is_boarding,has_transport,funding_status,status',
+            'Existing Learner,existing@example.test,HH-100,2010-01-02,Form 1A,2026,First Term,Form 1,no,yes,regular,active',
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.enrollments.bulk-store'), [
+            'file' => UploadedFile::fake()->createWithContent('existing.csv', $csv),
+        ])->assertSessionHas('import_summary.existing_students_skipped', 1);
+
+        $student->refresh();
+        $enrollment->refresh();
+        $this->assertSame('Form 2', $student->getRawOriginal('grade'));
+        $this->assertSame('Old Class', $student->getRawOriginal('class_name'));
+        $this->assertTrue((bool) $student->is_boarding);
+        $this->assertFalse((bool) $student->has_transport);
+        $this->assertSame('scholarship', $student->funding_status);
+        $this->assertSame('inactive', $student->status);
+        $this->assertSame('Old Class', $enrollment->class_name);
+        $this->assertSame(1, Enrollment::where('student_id', $student->id)->count());
+    }
+
+    public function test_duplicate_rows_with_different_emails_are_both_skipped(): void
+    {
+        $csv = implode("\n", [
+            'student_name,email,date_of_birth,class_name,academic_year,term,grade',
+            'Same Person,one@example.test,2010-01-02,Form 1A,2026,First Term,Form 1',
+            'Same Person,two@example.test,2010-01-02,Form 1A,2026,First Term,Form 1',
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.enrollments.bulk-store'), [
+            'file' => UploadedFile::fake()->createWithContent('duplicates.csv', $csv),
+        ])->assertSessionHas('import_summary.ambiguous_students_skipped', 2);
+
+        $this->assertSame(0, Student::where('school_id', $this->school->id)->count());
         $this->assertSame(0, Enrollment::count());
+    }
+
+    public function test_reupload_is_idempotent_and_blank_or_shared_email_rows_are_held(): void
+    {
+        $csv = implode("\n", [
+            'student_name,email,admission_number,date_of_birth,class_name,academic_year,term,grade',
+            'New Learner,new@example.test,HH-NEW-1,2010-02-03,Form 1A,2026,First Term,Form 1',
+            'No Identity,, ,2010-04-05,Form 1A,2026,First Term,Form 1',
+            'Shared One,shared@example.test,,2010-06-01,Form 1A,2026,First Term,Form 1',
+            'Shared Two,shared@example.test,,2010-07-01,Form 1A,2026,First Term,Form 1',
+        ]);
+        $file = fn () => UploadedFile::fake()->createWithContent('safe.csv', $csv);
+
+        $this->actingAs($this->admin)->post(route('admin.enrollments.bulk-store'), ['file' => $file()])
+            ->assertSessionHas('import_summary.new_students_created', 1)
+            ->assertSessionHas('import_summary.ambiguous_students_skipped', 2)
+            ->assertSessionHas('import_summary.invalid_rows', 1);
+        $this->assertSame(1, Student::where('school_id', $this->school->id)->count());
+        $this->assertSame(1, Enrollment::count());
+
+        $this->actingAs($this->admin)->post(route('admin.enrollments.bulk-store'), ['file' => $file()])
+            ->assertSessionHas('import_summary.new_students_created', 0)
+            ->assertSessionHas('import_summary.existing_students_skipped', 1)
+            ->assertSessionHas('import_summary.ambiguous_students_skipped', 2)
+            ->assertSessionHas('import_summary.invalid_rows', 1);
+        $this->assertSame(1, Student::where('school_id', $this->school->id)->count());
+        $this->assertSame(1, Enrollment::count());
+    }
+
+    public function test_email_shared_by_existing_students_is_ambiguous_and_never_creates_or_updates(): void
+    {
+        $first = Student::create([
+            'school_id' => $this->school->id, 'first_name' => 'First', 'last_name' => 'Sibling',
+            'email' => 'family@example.test', 'grade' => 'Form 2', 'class_name' => 'Old A', 'status' => 'inactive',
+        ]);
+        $second = Student::create([
+            'school_id' => $this->school->id, 'first_name' => 'Second', 'last_name' => 'Sibling',
+            'email' => 'family@example.test', 'grade' => 'Form 3', 'class_name' => 'Old B', 'status' => 'active',
+        ]);
+        $csv = implode("\n", [
+            'student_name,email,class_name,academic_year,term,grade,status',
+            'New Possible Match,family@example.test,Form 1A,2026,First Term,Form 1,active',
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.enrollments.bulk-store'), [
+            'file' => UploadedFile::fake()->createWithContent('shared-existing-email.csv', $csv),
+        ])->assertSessionHas('import_summary.ambiguous_students_skipped', 1);
+
+        $this->assertSame(2, Student::where('school_id', $this->school->id)->count());
+        $this->assertSame('Form 2', $first->fresh()->getRawOriginal('grade'));
+        $this->assertSame('Form 3', $second->fresh()->getRawOriginal('grade'));
+        $this->assertSame(0, Enrollment::count());
+    }
+
+    public function test_another_schools_student_is_not_loaded_or_modified(): void
+    {
+        $otherSchool = School::create(['name' => 'Other Synthetic School', 'code' => 'OTH']);
+        $otherStudent = Student::create([
+            'school_id' => $otherSchool->id, 'first_name' => 'Other', 'last_name' => 'Learner',
+            'email' => 'other@example.test', 'admission_number' => 'SHARED-ID', 'grade' => 'Form 4',
+            'class_name' => 'Other Class', 'is_boarding' => true, 'status' => 'inactive',
+        ]);
+
+        $csv = implode("\n", [
+            'student_name,email,admission_number,date_of_birth,class_name,academic_year,term,grade,is_boarding,status',
+            'Local Learner,local@example.test,SHARED-ID,2010-08-01,Form 1A,2026,First Term,Form 1,no,active',
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.enrollments.bulk-store'), [
+            'file' => UploadedFile::fake()->createWithContent('tenant.csv', $csv),
+        ])->assertSessionHas('import_summary.new_students_created', 1);
+
+        $otherStudent->refresh();
+        $this->assertSame('Form 4', $otherStudent->getRawOriginal('grade'));
+        $this->assertSame('Other Class', $otherStudent->getRawOriginal('class_name'));
+        $this->assertTrue((bool) $otherStudent->is_boarding);
+        $this->assertSame(1, Student::where('school_id', $otherSchool->id)->count());
+        $this->assertSame(1, Student::where('school_id', $this->school->id)->count());
     }
 
     public function test_template_generation_returns_an_xlsx_download(): void
