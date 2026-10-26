@@ -462,14 +462,15 @@ class EnrollmentController extends Controller
         try {
             $file = $request->file('file');
             $schoolId = $school->id;
+            $import = new EnrollmentsImport($schoolId);
 
-            DB::transaction(function () use ($file, $schoolId) {
-                Excel::import(new EnrollmentsImport($schoolId), $file);
+            DB::transaction(function () use ($file, $import) {
+                Excel::import($import, $file);
             });
 
             return redirect()
                 ->route('admin.enrollments.index')
-                ->with('success', 'Students enrolled successfully!');
+                ->with('import_summary', $import->summary());
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             $failures = $e->failures();
             

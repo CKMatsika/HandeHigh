@@ -16,6 +16,31 @@
         </div>
     </div>
 
+    @if (session('import_summary'))
+        @php($summary = session('import_summary'))
+        <div class="mb-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-4" role="status">
+            <h2 class="mb-2 text-sm font-semibold text-slate-100">Bulk enrolment import summary</h2>
+            <dl class="grid grid-cols-2 gap-2 text-xs text-slate-300 sm:grid-cols-4">
+                <div><dt>New students created</dt><dd class="font-semibold">{{ $summary['new_students_created'] ?? 0 }}</dd></div>
+                <div><dt>Existing students skipped</dt><dd class="font-semibold">{{ $summary['existing_students_skipped'] ?? 0 }}</dd></div>
+                <div><dt>Ambiguous students skipped</dt><dd class="font-semibold">{{ $summary['ambiguous_students_skipped'] ?? 0 }}</dd></div>
+                <div><dt>Invalid rows</dt><dd class="font-semibold">{{ $summary['invalid_rows'] ?? 0 }}</dd></div>
+            </dl>
+            @if (!empty($summary['rows']))
+                <div class="mt-3 max-h-64 overflow-auto">
+                    <table class="min-w-full text-xs text-slate-300">
+                        <thead><tr class="border-b border-slate-700 text-left text-slate-400"><th class="py-1 pr-3">Excel row</th><th class="py-1 pr-3">Result</th><th class="py-1">Reason</th></tr></thead>
+                        <tbody>
+                            @foreach ($summary['rows'] as $result)
+                                <tr class="border-b border-slate-800"><td class="py-1 pr-3">{{ $result['row_number'] ?? '—' }}</td><td class="py-1 pr-3">{{ str_replace('_', ' ', $result['outcome'] ?? '') }}</td><td class="py-1">{{ $result['reason'] ?? '' }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    @endif
+
     <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">
         @if($enrollments->count())
             <table class="min-w-full text-xs text-slate-100">
