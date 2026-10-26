@@ -123,32 +123,105 @@ class EnrollmentImportTest extends TestCase
         ]);
     }
 
-    public function test_valid_xlsx_import_is_supported(): void
+    public function test_exact_template_xlsx_handles_new_existing_duplicate_ambiguous_and_repeat_rows(): void
     {
-        $spreadsheet = new Spreadsheet();
-        $spreadsheet->getActiveSheet()->fromArray([
-            ['student_name', 'email', 'class_name', 'academic_year', 'term', 'grade', 'is_boarding', 'has_transport', 'status'],
-            ['Synthetic XLSX Learner', 'xlsx@example.test', 'Form 1A', '2026-2027', 'First Term', 'Form 1', 'no', 'no', 'active'],
+        $existing = Student::create([
+            'school_id' => $this->school->id, 'first_name' => 'Existing', 'last_name' => 'XLSX Learner',
+            'email' => 'existing.xlsx@example.test', 'date_of_birth' => '2010-03-03',
+            'grade' => 'Form 3', 'class_name' => 'Existing Class', 'is_boarding' => true,
+            'has_transport' => false, 'status' => 'inactive',
+        ]);
+        Enrollment::create([
+            'school_id' => $this->school->id, 'student_id' => $existing->id,
+            'academic_year' => '2025-2026', 'term' => 'Third Term', 'grade' => 'Form 3',
+            'class_name' => 'Existing Class', 'is_boarding' => true, 'has_transport' => false,
+            'enrollment_date' => '2025-09-01', 'status' => 'inactive',
         ]);
 
-        $path = tempnam(sys_get_temp_dir(), 'hande-xlsx-');
-        (new Xlsx($spreadsheet))->save($path);
+        // Keep this heading row identical to EnrollmentController::downloadTemplate().
+        $headers = [
+            'student_name', 'email', 'phone', 'address', 'date_of_birth', 'gender',
+            'class_name', 'academic_year', 'term', 'grade', 'is_boarding', 'has_transport', 'status',
+            'student_category', 'residency', 'funding_status', 'scholarship_reference', 'scholarship_name',
+            'scholarship_sponsor', 'scholarship_coverage_type', 'scholarship_coverage_basis',
+            'scholarship_coverage_value', 'scholarship_covered_votes', 'scholarship_starts_on',
+            'scholarship_ends_on', 'scholarship_accounting_treatment', 'scholarship_supporting_reference',
+            'scholarship_academic_year', 'scholarship_funding_source', 'scholarship_sponsor_code', 'scholarship_recognition_evidence',
+        ];
+        $row = function (string $name, string $email, string $dateOfBirth) use ($headers): array {
+            $data = array_fill_keys($headers, null);
+            $data['student_name'] = $name;
+            $data['email'] = $email;
+            $data['date_of_birth'] = $dateOfBirth;
+            $data['gender'] = 'other';
+            $data['class_name'] = 'Form 1A';
+            $data['academic_year'] = '2026-2027';
+            $data['term'] = 'First Term';
+            $data['grade'] = 'Form 1';
+            $data['is_boarding'] = 'no';
+            $data['has_transport'] = 'no';
+            $data['status'] = 'active';
+            $data['student_category'] = 'day';
+            $data['residency'] = 'day';
+            $data['funding_status'] = 'regular';
+
+            return array_values($data);
+        };
+        $xlsxRows = [
+            $row('Synthetic XLSX First', 'first.placeholder@example.test', '2010-01-01'),
+            $row('Synthetic XLSX Second', 'second.placeholder@example.test', '2010-02-02'),
+            $row('Existing XLSX Learner', 'existing.xlsx@example.test', '2010-03-03'),
+            $row('Shared Email First', 'shared.placeholder@example.test', '2010-04-04'),
+            $row('Shared Email Second', 'shared.placeholder@example.test', '2010-05-05'),
+            $row('Repeated Name', 'name-one.placeholder@example.test', '2010-06-06'),
+            $row('Repeated Name', 'name-two.placeholder@example.test', '2010-06-06'),
+        ];
+        $paths = [];
+        $upload = function () use ($headers, $xlsxRows, &$paths): UploadedFile {
+            $spreadsheet = new Spreadsheet();
+            $spreadsheet->getActiveSheet()->fromArray([$headers, ...$xlsxRows]);
+            $path = tempnam(sys_get_temp_dir(), 'hande-xlsx-');
+            (new Xlsx($spreadsheet))->save($path);
+            $paths[] = $path;
+
+            return new UploadedFile($path, 'enrollments.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+        };
 
         try {
             $this->actingAs($this->admin)
                 ->post(route('admin.enrollments.bulk-store'), [
-                    'file' => new UploadedFile($path, 'enrollments.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true),
+                    'file' => $upload(),
                 ])
                 ->assertRedirectToRoute('admin.enrollments.index')
-                ->assertSessionHas('import_summary.new_students_created', 1);
+                ->assertSessionHas('import_summary.new_students_created', 2)
+                ->assertSessionHas('import_summary.existing_students_skipped', 1)
+                ->assertSessionHas('import_summary.ambiguous_students_skipped', 4)
+                ->assertSessionHas('import_summary.invalid_rows', 0);
+
+            $this->assertSame(3, Student::where('school_id', $this->school->id)->count());
+            $this->assertSame(3, Enrollment::where('school_id', $this->school->id)->count());
+            $this->assertSame('Form 3', $existing->fresh()->getRawOriginal('grade'));
+            $this->assertSame('Existing Class', $existing->fresh()->getRawOriginal('class_name'));
+            $this->assertSame(1, Enrollment::where('student_id', $existing->id)->count());
+
+            $this->actingAs($this->admin)
+                ->post(route('admin.enrollments.bulk-store'), [
+                    'file' => $upload(),
+                ])
+                ->assertRedirectToRoute('admin.enrollments.index')
+                ->assertSessionHas('import_summary.new_students_created', 0)
+                ->assertSessionHas('import_summary.existing_students_skipped', 3)
+                ->assertSessionHas('import_summary.ambiguous_students_skipped', 4);
         } finally {
-            @unlink($path);
+            foreach ($paths as $path) {
+                @unlink($path);
+            }
         }
 
-        $this->assertDatabaseHas('students', [
-            'school_id' => $this->school->id,
-            'email' => 'xlsx@example.test',
-        ]);
+        $this->assertSame(3, Student::where('school_id', $this->school->id)->count());
+        $this->assertSame(3, Enrollment::where('school_id', $this->school->id)->count());
+        $this->assertDatabaseHas('students', ['school_id' => $this->school->id, 'email' => 'first.placeholder@example.test']);
+        $this->assertDatabaseHas('students', ['school_id' => $this->school->id, 'email' => 'second.placeholder@example.test']);
     }
 
     public function test_cross_school_email_does_not_reuse_another_school_student(): void

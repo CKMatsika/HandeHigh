@@ -251,7 +251,9 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow
         ]);
         if ($persistEnrollment) {
             $enrollment->save();
-            $existingStudents->push($student->only(['id', 'school_id', 'admission_number', 'registration_number', 'email', 'first_name', 'last_name', 'date_of_birth']));
+            // Keep this collection homogeneous: its initial contents are Student
+            // models and duplicate detection reads model attributes as properties.
+            $existingStudents->push($student);
             $this->record('new_students_created', $rowNumber, 'Student and enrolment created.');
         }
 
