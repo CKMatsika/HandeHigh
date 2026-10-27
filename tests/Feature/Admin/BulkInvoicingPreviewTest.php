@@ -836,6 +836,46 @@ class BulkInvoicingPreviewTest extends TestCase
         $this->assertSame($formThreeFee->id, $invoice->items->first()->fee_structure_id);
     }
 
+    public function test_bulk_invoice_chunk_endpoint_reports_saved_and_duplicate_rows_idempotently(): void
+    {
+        $fee = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'category' => 'tuition',
+            'code' => 'F2-TUI-CHUNK',
+            'label' => 'Tuition - Form 2',
+            'amount' => 135.00,
+            'revenue_account_id' => $this->tuitionRevenueAccount->id,
+        ]);
+        $record = $this->createStudentEnrollment(false);
+        $payload = [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'enrollment_ids' => [$record['enrollment']->id],
+            'fee_structure_ids' => [$fee->id],
+            'fee_selection_submitted' => '1',
+            'match_fee_grade' => '1',
+            'issued_at' => now()->toDateString(),
+        ];
+
+        $headers = ['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest'];
+        $first = $this->actingAs($this->adminUser)->post(route('admin.invoices.bulk.store'), $payload, $headers);
+        $first->assertOk()
+            ->assertJsonPath('created_count', 1)
+            ->assertJsonPath('created_total', 135)
+            ->assertJsonPath('skipped_count', 0);
+
+        $retry = $this->actingAs($this->adminUser)->post(route('admin.invoices.bulk.store'), $payload, $headers);
+        $retry->assertOk()
+            ->assertJsonPath('created_count', 0)
+            ->assertJsonPath('skipped_count', 1);
+
+        $this->assertSame(1, Invoice::where('student_id', $record['student']->id)->count());
+    }
+
     public function test_single_invoicing_create_view_renders_manual_fee_checkboxes(): void
     {
         FeeStructure::create([

@@ -495,6 +495,8 @@
             </div>
         </div>
 
+        <div id="bulk-progress" class="hidden rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-sm text-indigo-100" role="status" aria-live="polite"></div>
+
         {{-- Sticky Bottom Action Controls --}}
         <div class="sticky bottom-4 rounded-2xl border border-slate-700/80 bg-slate-900/95 backdrop-blur-xl p-4 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -538,6 +540,8 @@
             const submitBtn = document.getElementById('submit-btn');
             const customItemsContainer = document.getElementById('custom-fee-items');
             const customItemTemplate = document.getElementById('custom-fee-item-template');
+            const bulkForm = document.getElementById('bulk-invoice-form');
+            const progressPanel = document.getElementById('bulk-progress');
             let customItemIndex = 0;
 
             function escapeHtml(str) {
@@ -757,6 +761,83 @@
             // Student checkboxes change
             studentCheckboxes.forEach(cb => {
                 cb.addEventListener('change', updateMetrics);
+            });
+
+            // Send bounded requests so a large cohort does not hold one web
+            // request and database transaction open until the proxy times out.
+            bulkForm?.addEventListener('submit', async event => {
+                event.preventDefault();
+
+                const selectedIds = Array.from(studentCheckboxes)
+                    .filter(cb => cb.checked && cb.dataset.already !== '1')
+                    .map(cb => cb.value);
+
+                if (!selectedIds.length) {
+                    progressPanel.textContent = 'Select at least one student who is not already invoiced.';
+                    progressPanel.classList.remove('hidden');
+                    return;
+                }
+
+                const batchSize = 5;
+                const chunks = [];
+                for (let index = 0; index < selectedIds.length; index += batchSize) {
+                    chunks.push(selectedIds.slice(index, index + batchSize));
+                }
+
+                const commonFields = Array.from(new FormData(bulkForm).entries())
+                    .filter(([name]) => name !== 'enrollment_ids[]' && !name.startsWith('enrollment_ids['));
+                let createdCount = 0;
+                let skippedCount = 0;
+                let createdTotal = 0;
+
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.querySelector('span').textContent = 'Preparing batch…';
+                }
+                progressPanel.classList.remove('hidden');
+                progressPanel.className = 'rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-sm text-indigo-100';
+                bulkForm.querySelectorAll('input, select, button').forEach(control => { control.disabled = true; });
+
+                for (let index = 0; index < chunks.length; index++) {
+                    progressPanel.textContent = `Saving batch ${index + 1} of ${chunks.length} (${chunks[index].length} students). Previously completed batches are saved independently.`;
+
+                    const payload = new FormData();
+                    commonFields.forEach(([name, value]) => payload.append(name, value));
+                    chunks[index].forEach(id => payload.append('enrollment_ids[]', id));
+
+                    try {
+                        const response = await fetch(bulkForm.action, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: payload,
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || `Request failed with status ${response.status}.`);
+                        }
+
+                        createdCount += Number(result.created_count || 0);
+                        skippedCount += Number(result.skipped_count || 0);
+                        createdTotal += Number(result.created_total || 0);
+
+                        if (result.errors?.length) {
+                            throw new Error(result.errors.join(' '));
+                        }
+                    } catch (error) {
+                        progressPanel.className = 'rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100';
+                        progressPanel.textContent = `Stopped at batch ${index + 1} of ${chunks.length}. Confirmed saved in completed batches: ${createdCount} invoices ($${createdTotal.toFixed(2)}); skipped as already invoiced: ${skippedCount}. This batch may have completed if the connection timed out. Refresh the preview and invoice list before retrying. Details: ${error.message}`;
+                        if (submitBtn) submitBtn.querySelector('span').textContent = 'Batch stopped';
+                        return;
+                    }
+                }
+
+                progressPanel.className = 'rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100';
+                progressPanel.innerHTML = `Complete: ${createdCount} invoices saved ($${createdTotal.toFixed(2)}); ${skippedCount} already-invoiced students skipped. <a class="ml-2 font-semibold underline" href="${@json(route('admin.invoices.index'))}">View invoices</a>`;
+                if (submitBtn) submitBtn.querySelector('span').textContent = 'Invoices saved';
             });
 
             // Initial calculation

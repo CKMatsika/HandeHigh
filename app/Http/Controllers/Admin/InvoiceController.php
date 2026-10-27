@@ -907,10 +907,26 @@ class InvoiceController extends Controller
         ) {
             foreach ($enrollments as $enrollment) {
                 try {
-                    $student = $enrollment->student;
-                    if (! $student) {
-                        continue;
-                    }
+                    DB::transaction(function () use (
+                        $enrollment,
+                        $school,
+                        $academicYear,
+                        $term,
+                        $issuedAt,
+                        $dueDate,
+                        $feeStructures,
+                        $customItems,
+                        $includeOptional,
+                        $selectedFeeIds,
+                        $matchFeeGrade,
+                        &$createdInvoices,
+                        &$skippedCount,
+                        &$totalGeneratedAmount
+                    ) {
+                        $student = $enrollment->student;
+                        if (! $student) {
+                            return;
+                        }
 
                     // Check if invoice already exists for this student, year, and term
                     $existingInvoice = Invoice::where('school_id', $school->id)
@@ -922,7 +938,7 @@ class InvoiceController extends Controller
 
                     if ($existingInvoice) {
                         $skippedCount++;
-                        continue;
+                        return;
                     }
 
                     $isBoarder = $enrollment->isBoarder() || (bool) $student->is_boarding;
@@ -987,7 +1003,7 @@ class InvoiceController extends Controller
                     }
 
                     if (empty($itemsToCreate)) {
-                        continue;
+                        return;
                     }
 
                     $invoiceNumber = Invoice::generateNextNumber($school->id, $academicYear);
@@ -1028,8 +1044,9 @@ class InvoiceController extends Controller
                     $this->accountingService->postInvoice($invoice);
             app(\App\Services\Finance\ScholarshipService::class)->applyEligible($invoice);
 
-                    $createdInvoices[] = $invoice;
-                    $totalGeneratedAmount += $studentTotal;
+                        $createdInvoices[] = $invoice;
+                        $totalGeneratedAmount += $studentTotal;
+                    });
                 } catch (\Exception $e) {
                     Log::error('Bulk invoice creation error for enrollment ' . $enrollment->id . ': ' . $e->getMessage());
                     $errors[] = "Error for {$enrollment->student?->first_name} {$enrollment->student?->last_name}: " . $e->getMessage();
@@ -1043,6 +1060,17 @@ class InvoiceController extends Controller
         }
         if (count($errors) > 0) {
             $message .= ' ' . implode('; ', array_slice($errors, 0, 3));
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'created_count' => count($createdInvoices),
+                'created_total' => round($totalGeneratedAmount, 2),
+                'skipped_count' => $skippedCount,
+                'errors' => $errors,
+                'redirect_url' => route('admin.invoices.index'),
+            ]);
         }
 
         return redirect()
