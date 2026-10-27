@@ -16,6 +16,7 @@ class InvoiceFeeSelectionService
         ?array $selectedIds = null,
         bool $includeBoarding = true,
         bool $includeTransport = true,
+        bool $matchGrade = true,
     ): Collection {
         $selectedIds ??= $feeStructures->pluck('id')->all();
         $selectedIds = array_fill_keys(array_map('intval', $selectedIds), true);
@@ -30,7 +31,7 @@ class InvoiceFeeSelectionService
             if ($subVotes->isNotEmpty()) {
                 if ($this->residencyMatches($fee, $isBoarder)) {
                     foreach ($subVotes as $subVote) {
-                        if ($this->isApplicable($subVote, $studentGrade, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport)) {
+                        if ($this->isApplicable($subVote, $studentGrade, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
                             $result->put($subVote->id, $subVote);
                         }
                     }
@@ -39,7 +40,7 @@ class InvoiceFeeSelectionService
                 continue;
             }
 
-            if ($this->isApplicable($fee, $studentGrade, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport)) {
+            if ($this->isApplicable($fee, $studentGrade, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
                 $result->put($fee->id, $fee);
             }
         }
@@ -55,8 +56,9 @@ class InvoiceFeeSelectionService
         bool $includeOptional,
         bool $includeBoarding,
         bool $includeTransport,
+        bool $matchGrade,
     ): bool {
-        if (! $this->gradeMatches($fee->grade, $studentGrade) || ! $this->residencyMatches($fee, $isBoarder)) {
+        if (($matchGrade && ! $this->gradeMatches($fee->grade, $studentGrade)) || ! $this->residencyMatches($fee, $isBoarder)) {
             return false;
         }
 

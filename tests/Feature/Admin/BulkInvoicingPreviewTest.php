@@ -768,6 +768,74 @@ class BulkInvoicingPreviewTest extends TestCase
         $this->assertEquals('Boarding Fee', $invoice->items->first()->description);
     }
 
+    public function test_bulk_manual_fee_selection_applies_selected_schedule_across_filtered_grades(): void
+    {
+        $formThreeFee = FeeStructure::create([
+            'school_id' => $this->school->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 3',
+            'category' => 'tuition',
+            'code' => 'F3-TUI',
+            'label' => 'Tuition - Form 3 Schedule',
+            'amount' => 215.00,
+            'revenue_account_id' => $this->tuitionRevenueAccount->id,
+        ]);
+
+        $student = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Test',
+            'last_name' => 'Form Two',
+            'grade' => 'Form 2',
+            'class_name' => 'East',
+            'is_boarding' => false,
+            'status' => 'active',
+        ]);
+
+        $enrollment = Enrollment::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'class_name' => 'East',
+            'is_boarding' => false,
+            'student_type' => 'day',
+            'enrollment_date' => now(),
+            'status' => 'active',
+        ]);
+
+        $preview = $this->actingAs($this->adminUser)->get(route('admin.invoices.bulk.create', [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'residency' => 'day',
+            'fee_structure_ids' => [$formThreeFee->id],
+        ]));
+
+        $preview->assertOk();
+        $previews = $preview->viewData('studentPreviews');
+        $this->assertCount(1, $previews);
+        $this->assertSame(215.0, (float) $previews[0]['total_amount']);
+        $this->assertSame($formThreeFee->id, $previews[0]['applied_items'][0]['id']);
+
+        $response = $this->actingAs($this->adminUser)->post(route('admin.invoices.bulk.store'), [
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'grade' => 'Form 2',
+            'enrollment_ids' => [$enrollment->id],
+            'fee_structure_ids' => [$formThreeFee->id],
+            'fee_selection_submitted' => '1',
+            'match_fee_grade' => '0',
+            'issued_at' => now()->toDateString(),
+        ]);
+
+        $response->assertRedirect(route('admin.invoices.index'));
+        $invoice = Invoice::where('student_id', $student->id)->firstOrFail();
+        $this->assertSame(215.0, (float) $invoice->total_amount);
+        $this->assertSame($formThreeFee->id, $invoice->items->first()->fee_structure_id);
+    }
+
     public function test_single_invoicing_create_view_renders_manual_fee_checkboxes(): void
     {
         FeeStructure::create([

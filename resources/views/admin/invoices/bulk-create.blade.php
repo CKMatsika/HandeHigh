@@ -126,6 +126,8 @@
     {{-- 2. Batch Invoicing POST Form --}}
     <form id="bulk-invoice-form" method="POST" action="{{ route('admin.invoices.bulk.store') }}" class="space-y-6">
         @csrf
+        <input type="hidden" name="fee_selection_submitted" value="1">
+        <input type="hidden" name="match_fee_grade" value="{{ blank($selectedGrade) ? '1' : '0' }}">
         <input type="hidden" name="academic_year" value="{{ $selectedYear }}">
         <input type="hidden" name="term" value="{{ $selectedTerm }}">
         <input type="hidden" name="grade" value="{{ $selectedGrade }}">
@@ -138,7 +140,7 @@
                     <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 font-semibold text-xs">2</span>
                     <div>
                         <h2 class="text-sm font-semibold text-slate-100">Select Fee Structures to Invoice (Tick to Include)</h2>
-                        <p class="text-[11px] text-slate-400">Manually select which saved fee structures to bill. The student preview below recalculates immediately.</p>
+                        <p class="text-[11px] text-slate-400">Select saved fee structures to bill to the filtered cohort. With a specific form selected, the chosen schedule applies across that form and its classes, even if its saved grade label differs. All Forms keeps grade-specific schedules matched to each student.</p>
                     </div>
                 </div>
                 
@@ -163,7 +165,7 @@
             @if($feeStructures->isNotEmpty())
                 <div class="space-y-3">
                     <p class="text-xs text-slate-300">
-                        Tick the fee structures you want to include on this invoice run. Unchecked items will be completely omitted:
+                        Tick the fee structures you want to include on this invoice run. The grade on each card identifies its configured schedule. Unchecked items are omitted:
                     </p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         @foreach($feeStructures as $fee)
@@ -222,7 +224,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <span>
-                            <strong>Manual Selection Active:</strong> Only fee structures ticked above will be billed. Boarding fees still strictly apply only to boarders. Ticking/unticking recalculates student totals in the preview table below in real time.
+                            <strong>Manual Selection Active:</strong> Only ticked structures will be billed to students matched by the filters. A selected fee applies across the selected form cohort; All Forms keeps grade-specific schedules matched to each student's form. Boarding and transport fees still apply only to eligible students. Preview totals recalculate when selections change.
                         </span>
                     </div>
                 </div>
@@ -235,7 +237,7 @@
                         No Fee Structure Configured for {{ $selectedYear }} {{ $selectedTerm }} {{ $selectedGrade ? "({$selectedGrade})" : "" }}
                     </div>
                     <p>
-                        We could not find active fee structure entries for this selection. You can either <a href="{{ route('admin.fees.index') }}" class="underline font-semibold text-amber-200 hover:text-white">configure fee structures under Finance &gt; Fees</a>, or manually define custom fee items below for this batch.
+                        We could not find fee structures for this academic period. You can either <a href="{{ route('admin.fees.index') }}" class="underline font-semibold text-amber-200 hover:text-white">configure fee structures under Finance &gt; Fees</a> or manually define custom fee items below for this batch.
                     </p>
                 </div>
             @endif
@@ -606,6 +608,7 @@
                 });
 
                 const studentRows = document.querySelectorAll('tr[data-student-row]');
+                const matchFeeGrade = document.querySelector('[name="match_fee_grade"]')?.value === '1';
                 studentRows.forEach(row => {
                     const isBoarder = row.dataset.isBoarder === '1';
                     const hasTransport = row.dataset.hasTransport === '1';
@@ -626,7 +629,7 @@
                         const gradeMatches = !fee.grade || (studentGrade && normalizedFeeGrade === normalizedStudentGrade);
                         const residencyMatches = fee.residency === 'all' || fee.residency === (isBoarder ? 'boarding' : 'day');
                         const includeOptional = document.querySelector('[name="include_optional"]')?.value === '1';
-                        if (!gradeMatches || !residencyMatches || (fee.isOptional && !includeOptional)) return;
+                        if ((matchFeeGrade && !gradeMatches) || !residencyMatches || (fee.isOptional && !includeOptional)) return;
                         if (fee.isBoarding && !isBoarder) return;
                         if (fee.isTransport && !hasTransport) return;
                         applicableFees.set(fee.id, fee);

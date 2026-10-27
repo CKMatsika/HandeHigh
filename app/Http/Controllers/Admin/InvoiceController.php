@@ -518,24 +518,22 @@ class InvoiceController extends Controller
         $feeStructureQuery = FeeStructure::where('school_id', $school->id)
             ->where('academic_year', $academicYear)
             ->where('term', $term);
-
-        if ($grade) {
-            $gradeVars = $this->getGradeVariations($grade);
-            $feeStructureQuery->where(function ($q) use ($gradeVars) {
-                $q->whereIn('grade', $gradeVars)
-                  ->orWhereNull('grade')
-                  ->orWhere('grade', '');
-            });
-        }
-
         $feeStructures = $feeStructureQuery->orderBy('category')->orderBy('code')->get();
 
         // Selected fee structures (manual selection by ticking)
         if ($request->has('fee_structure_ids')) {
             $selectedFeeStructureIds = array_map('intval', (array) $request->input('fee_structure_ids', []));
         } else {
-            // Default to all matching fees on first visit/filter
-            $selectedFeeStructureIds = $feeStructures->pluck('id')->toArray();
+            // On first visit/filter, default to fee structures matching the
+            // selected grade. Structures from other grades remain available
+            // for deliberate selection and apply to the filtered cohort.
+            $gradeVars = $grade ? $this->getGradeVariations($grade) : [];
+            $selectedFeeStructureIds = $feeStructures
+                ->filter(fn (FeeStructure $fee) => blank($grade)
+                    || blank($fee->grade)
+                    || in_array($fee->grade, $gradeVars, true))
+                ->pluck('id')
+                ->all();
         }
 
         // 3. Query matching active enrollments & students
@@ -738,6 +736,10 @@ class InvoiceController extends Controller
                 $hasTransport,
                 $includeOptional,
                 $selectedFeeStructureIds,
+                // A specific form filter defines the target cohort and allows
+                // a deliberately selected schedule to apply to that cohort.
+                // With All Forms, retain per-student grade-specific schedules.
+                matchGrade: blank($grade),
             );
 
             foreach ($applicableFees as $fee) {
@@ -814,6 +816,8 @@ class InvoiceController extends Controller
             'enrollment_ids.*' => ['integer', TenantExists::make('enrollments')],
             'fee_structure_ids' => ['nullable', 'array'],
             'fee_structure_ids.*' => ['integer', TenantExists::make('fee_structures')],
+            'fee_selection_submitted' => ['nullable', 'boolean'],
+            'match_fee_grade' => ['nullable', 'boolean'],
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
             'grade' => ['nullable', 'string'],
@@ -835,6 +839,9 @@ class InvoiceController extends Controller
         $issuedAt = $validated['issued_at'];
         $dueDate = $validated['due_date'] ?? null;
         $includeOptional = $request->boolean('include_optional');
+        $matchFeeGrade = $request->has('match_fee_grade')
+            ? $request->boolean('match_fee_grade')
+            : true;
 
         // Fetch enrollments and deduplicate by student_id to ensure single invoice per student
         $enrollments = Enrollment::with(['student.guardians', 'class'])
@@ -848,21 +855,18 @@ class InvoiceController extends Controller
         $feeStructureQuery = FeeStructure::where('school_id', $school->id)
             ->where('academic_year', $academicYear)
             ->where('term', $term);
-
-        if ($grade) {
-            $gradeVars = $this->getGradeVariations($grade);
-            $feeStructureQuery->where(function ($q) use ($gradeVars) {
-                $q->whereIn('grade', $gradeVars)
-                  ->orWhereNull('grade')
-                  ->orWhere('grade', '');
-            });
-        }
         $feeStructures = $feeStructureQuery->get();
 
         // Keep sibling vote rows available so selecting a package parent can expand to its sub-votes.
         $selectedFeeIds = null;
-        if ($request->has('fee_structure_ids')) {
+        if ($request->boolean('fee_selection_submitted')) {
             $selectedFeeIds = array_map('intval', (array) $request->input('fee_structure_ids', []));
+        } elseif ($request->has('fee_structure_ids')) {
+            $selectedFeeIds = array_map('intval', (array) $request->input('fee_structure_ids', []));
+        } else {
+            // Preserve compatibility for existing callers that omit the
+            // manual-selection fields entirely.
+            $selectedFeeIds = null;
         }
 
         $customItems = $validated['custom_fee_items'] ?? $validated['fee_items'] ?? [];
@@ -870,6 +874,12 @@ class InvoiceController extends Controller
         if ($feeStructures->isEmpty() && empty($customItems)) {
             return back()
                 ->withErrors(['fee_structure_ids' => 'Please select at least one fee structure or enter custom fee items to generate invoices.'])
+                ->withInput();
+        }
+
+        if ($selectedFeeIds === [] && empty($customItems)) {
+            return back()
+                ->withErrors(['fee_structure_ids' => 'Select at least one fee structure or enter custom fee items before generating invoices.'])
                 ->withInput();
         }
 
@@ -889,6 +899,7 @@ class InvoiceController extends Controller
             $customItems,
             $includeOptional,
             $selectedFeeIds,
+            $matchFeeGrade,
             &$createdInvoices,
             &$skippedCount,
             &$errors,
@@ -930,6 +941,7 @@ class InvoiceController extends Controller
                         $hasTransport,
                         $includeOptional,
                         $selectedFeeIds,
+                        matchGrade: $matchFeeGrade,
                     );
 
                     foreach ($applicableFees as $fee) {
