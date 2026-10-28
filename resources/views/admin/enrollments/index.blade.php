@@ -17,7 +17,9 @@
     </div>
 
     @if (session('import_summary'))
-        @php($summary = session('import_summary'))
+        @php
+            $summary = session('import_summary');
+        @endphp
         <div class="mb-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-4" role="status">
             <h2 class="mb-2 text-sm font-semibold text-slate-100">Bulk enrolment import summary</h2>
             <dl class="grid grid-cols-2 gap-2 text-xs text-slate-300 sm:grid-cols-4">
