@@ -26,6 +26,9 @@
             <a href="{{ route('admin.invoices.bulk.create') }}" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
                 Bulk Create
             </a>
+            <a href="{{ route('admin.invoices.bulk-print') }}" class="inline-flex items-center rounded-full bg-violet-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-violet-500 transition">
+                Bulk Print Invoices & Statements
+            </a>
             <a href="{{ route('admin.invoices.auto-generate') }}" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 transition">
                 Auto Generate
             </a>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AccountMappingController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\BankReconciliationController;
 use App\Http\Controllers\Admin\BillController;
+use App\Http\Controllers\Admin\BulkDocumentPrintController;
 use App\Http\Controllers\Admin\BudgetController;
 use App\Http\Controllers\Admin\CommunicationController;
 use App\Http\Controllers\Admin\CreditNoteController;
@@ -166,6 +167,8 @@ Route::middleware(['auth'])->group(function () {
                 ->middlewareFor(['update'], 'can:update,fee')
                 ->middlewareFor('destroy', 'can:delete,fee');
 
+            Route::get('invoices/bulk-print', [BulkDocumentPrintController::class, 'index'])->name('invoices.bulk-print');
+            Route::get('invoices/bulk-print/output', [BulkDocumentPrintController::class, 'print'])->name('invoices.bulk-print.output');
             Route::get('invoices/bulk-create', [InvoiceController::class, 'bulkCreate'])->name('invoices.bulk.create');
             Route::post('invoices/bulk-store', [InvoiceController::class, 'bulkStore'])->name('invoices.bulk.store');
             Route::get('invoices/auto-generate', [InvoiceController::class, 'autoGenerate'])->name('invoices.auto-generate');
