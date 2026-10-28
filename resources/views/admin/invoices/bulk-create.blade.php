@@ -778,7 +778,7 @@
                     return;
                 }
 
-                const batchSize = 5;
+                const batchSize = 3;
                 const chunks = [];
                 for (let index = 0; index < selectedIds.length; index += batchSize) {
                     chunks.push(selectedIds.slice(index, index + batchSize));
