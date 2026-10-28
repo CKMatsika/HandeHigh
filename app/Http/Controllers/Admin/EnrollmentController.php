@@ -28,7 +28,7 @@ class EnrollmentController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
-        $query = Enrollment::with(['student.guardians', 'invoices', 'class'])
+        $query = Enrollment::with(['student.guardians', 'student.currentEnrollment.class', 'invoices', 'class'])
             ->where('school_id', $school->id);
 
         if ($request->filled('search')) {
@@ -40,20 +40,41 @@ class EnrollmentController extends Controller
                 foreach ($terms as $term) {
                     $sq->where(function ($termQuery) use ($term) {
                         $termQuery->where('first_name', 'like', "%{$term}%")
+                            ->orWhere('other_names', 'like', "%{$term}%")
                             ->orWhere('last_name', 'like', "%{$term}%")
+                            ->orWhere('email', 'like', "%{$term}%")
                             ->orWhere('admission_number', 'like', "%{$term}%")
                             ->orWhere('registration_number', 'like', "%{$term}%");
+                        if (ctype_digit($term)) {
+                            $termQuery->orWhere('id', (int) $term);
+                        }
                     });
                 }
             });
         }
 
         if ($request->filled('grade')) {
-            $grade = $request->input('grade');
-            $query->where(function ($q) use ($grade, $school) {
-                $q->where('grade', $grade)
-                    ->orWhereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('grade', $grade))
-                    ->orWhereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('grade', $grade));
+            $classMapping = app(\App\Services\StudentClassMappingService::class);
+            $grade = $classMapping->canonicalGrade($school->id, $request->input('grade'), $request->input('grade'), (string) now()->year)
+                ?? $request->input('grade');
+            $gradeAliases = $classMapping->gradeAliases($grade);
+            $classAliases = $classMapping->gradeAliasesForSchool($school->id, $grade);
+            $query->where(function ($q) use ($gradeAliases, $classAliases, $school) {
+                $q->whereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->whereIn('grade', $gradeAliases))
+                    ->orWhere(function ($legacy) use ($school, $gradeAliases, $classAliases) {
+                        $legacy->whereDoesntHave('class')
+                            ->where(function ($placement) use ($school, $gradeAliases, $classAliases) {
+                                $placement->whereIn('grade', $gradeAliases)
+                                    ->orWhereIn('class_name', $classAliases)
+                                    ->orWhereHas('student', function ($sq) use ($school, $gradeAliases, $classAliases) {
+                                        $sq->where('school_id', $school->id)
+                                            ->where(function ($studentQuery) use ($gradeAliases, $classAliases) {
+                                                $studentQuery->whereIn('grade', $gradeAliases)
+                                                    ->orWhereIn('class_name', $classAliases);
+                                            });
+                                    });
+                            });
+                    });
             });
         }
 
@@ -68,8 +89,14 @@ class EnrollmentController extends Controller
         if ($request->filled('stream') || $request->filled('class_name')) {
             $stream = $request->input('stream') ?: $request->input('class_name');
             $query->where(function ($q) use ($stream, $school) {
-                $q->where('class_name', $stream)
-                  ->orWhereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('name', $stream));
+                $q->whereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('name', $stream))
+                    ->orWhere(function ($legacy) use ($stream, $school) {
+                        $legacy->whereDoesntHave('class')
+                            ->where(function ($placement) use ($stream, $school) {
+                                $placement->where('class_name', $stream)
+                                    ->orWhereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('class_name', $stream));
+                            });
+                    });
             });
         }
 
@@ -139,6 +166,26 @@ class EnrollmentController extends Controller
             ->paginate(15)
             ->appends($request->query());
 
+        $pageStudentIds = $enrollments->getCollection()->pluck('student_id')->filter()->unique()->values();
+        $pageAcademicYears = $enrollments->getCollection()->pluck('academic_year')->filter()->unique()->values();
+        $duplicateEnrollmentKeys = collect();
+
+        if ($pageStudentIds->isNotEmpty() && $pageAcademicYears->isNotEmpty()) {
+            $duplicateEnrollmentKeys = Enrollment::where('school_id', $school->id)
+                ->whereIn('student_id', $pageStudentIds)
+                ->whereIn('academic_year', $pageAcademicYears)
+                ->get(['student_id', 'academic_year', 'term'])
+                ->groupBy(fn (Enrollment $row) => $this->enrollmentDuplicateKey($row->student_id, $row->academic_year, $row->term))
+                ->filter(fn ($rows) => $rows->count() > 1)
+                ->keys()
+                ->flip();
+        }
+
+        $enrollments->getCollection()->each(function (Enrollment $enrollment) use ($duplicateEnrollmentKeys) {
+            $key = $this->enrollmentDuplicateKey($enrollment->student_id, $enrollment->academic_year, $enrollment->term);
+            $enrollment->setAttribute('possible_duplicate', $duplicateEnrollmentKeys->has($key));
+        });
+
         return view('admin.enrollments.index', [
             'school' => $school,
             'enrollments' => $enrollments,
@@ -148,6 +195,26 @@ class EnrollmentController extends Controller
             'termOptions' => $termOptions,
             'statusOptions' => $statusOptions,
         ]);
+    }
+
+    private function enrollmentDuplicateKey(int|string $studentId, ?string $academicYear, ?string $term): string
+    {
+        $termLabels = $this->equivalentTermLabels((string) $term);
+        $normalizedTerm = preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim((string) ($termLabels[0] ?? $term))));
+
+        return implode('|', [$studentId, trim((string) $academicYear), $normalizedTerm]);
+    }
+
+    private function equivalentTermLabels(string $term): array
+    {
+        $normalized = preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim($term)));
+
+        return match ($normalized) {
+            '1', 'term1', 'firstterm' => ['1', 'Term 1', 'Term1', 'First Term'],
+            '2', 'term2', 'secondterm' => ['2', 'Term 2', 'Term2', 'Second Term'],
+            '3', 'term3', 'thirdterm' => ['3', 'Term 3', 'Term3', 'Third Term'],
+            default => [$term],
+        };
     }
 
     public function show(Enrollment $enrollment)
@@ -177,11 +244,17 @@ class EnrollmentController extends Controller
         }
 
         $terms = ['Term 1', 'Term 2', 'Term 3'];
+        $classes = SchoolClass::where('school_id', $school->id)
+            ->where(function ($query) use ($enrollment) {
+                $query->where('academic_year', $enrollment->academic_year)->orWhereNull('academic_year');
+            })
+            ->orderBy('grade')->orderBy('name')->get();
 
         return view('admin.enrollments.edit', [
             'school' => $school,
             'enrollment' => $enrollment,
             'terms' => $terms,
+            'classes' => $classes,
         ]);
     }
 
@@ -205,18 +278,35 @@ class EnrollmentController extends Controller
             'status' => ['required', 'string', 'max:20'],
         ]);
 
-        $resolvedClass = null;
-        if (! empty($validated['class_name'])) {
-            $resolvedClass = SchoolClass::where('school_id', $school->id)
-                ->where('name', $validated['class_name'])
-                ->where(function ($q) use ($validated) {
-                    $q->where('grade', $validated['grade'])
-                      ->orWhere('grade', 'like', "%{$validated['grade']}%");
-                })
-                ->first()
-                ?? SchoolClass::where('school_id', $school->id)
-                ->where('name', $validated['class_name'])
-                ->first();
+        $duplicateTermExists = $validated['status'] === 'active'
+            && Enrollment::where('school_id', $school->id)
+                ->where('student_id', $enrollment->student_id)
+                ->where('academic_year', $validated['academic_year'])
+                ->whereIn('term', $this->equivalentTermLabels($validated['term']))
+                ->where('id', '!=', $enrollment->id)
+                ->exists();
+
+        if ($duplicateTermExists) {
+            return back()->withInput()->withErrors([
+                'term' => 'This student already has an enrollment for that academic year and term. Review the existing enrollment before changing this record.',
+            ]);
+        }
+
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $resolvedClass = $classMapping->resolveClass(
+            $school->id,
+            $validated['class_name'] ?? null,
+            $validated['grade'] ?? null,
+            $validated['academic_year'],
+        );
+        if (filled($validated['class_name'] ?? null) && ! $resolvedClass) {
+            return back()->withInput()->withErrors([
+                'class_name' => 'This class could not be matched unambiguously to a class in the school register. Check the grade and class combination.',
+            ]);
+        }
+        if ($resolvedClass) {
+            $validated['grade'] = $resolvedClass->grade;
+            $validated['class_name'] = $resolvedClass->name;
         }
 
         $classification = app(\App\Services\StudentCategoryService::class)->fromRequest($request, $enrollment->student);
@@ -233,11 +323,27 @@ class EnrollmentController extends Controller
             'status' => $validated['status'],
         ]);
 
-        $enrollment->student?->update(array_merge($classification, [
-            'grade' => $validated['grade'],
-            'class_name' => $validated['class_name'] ?? null,
-            'has_transport' => $request->boolean('has_transport'),
-        ]));
+        $student = $enrollment->student;
+        $currentEnrollment = $student?->currentEnrollment;
+
+        if ($student && $currentEnrollment) {
+            if ($currentEnrollment->is($enrollment)) {
+                $student->update(array_merge($classification, [
+                    'grade' => $validated['grade'],
+                    'class_name' => $validated['class_name'] ?? null,
+                    'has_transport' => $request->boolean('has_transport'),
+                ]));
+            } else {
+                // Editing an older or duplicate enrollment must not roll the
+                // student's current master profile back to historical values.
+                $student->update([
+                    'grade' => $currentEnrollment->grade,
+                    'class_name' => $currentEnrollment->class_name,
+                    'is_boarding' => $currentEnrollment->isBoarder(),
+                    'has_transport' => (bool) $currentEnrollment->has_transport,
+                ]);
+            }
+        }
 
         return redirect()
             ->route('admin.enrollments.show', $enrollment)
@@ -273,11 +379,17 @@ class EnrollmentController extends Controller
         $currentYear = now()->format('Y');
         $defaultAcademicYear = $currentYear;
         $terms = ['Term 1', 'Term 2', 'Term 3'];
+        $classes = SchoolClass::where('school_id', $school->id)
+            ->where(function ($query) use ($currentYear) {
+                $query->where('academic_year', $currentYear)->orWhereNull('academic_year');
+            })
+            ->orderBy('grade')->orderBy('name')->get();
 
         return view('admin.enrollments.create', [
             'school' => $school,
             'defaultAcademicYear' => $defaultAcademicYear,
             'terms' => $terms,
+            'classes' => $classes,
         ]);
     }
 
@@ -314,11 +426,28 @@ class EnrollmentController extends Controller
             'enrollment_date' => ['required', 'date'],
         ]);
 
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $resolvedClass = $classMapping->resolveClass(
+            $school->id,
+            $validated['class_name'] ?? null,
+            $validated['grade'] ?? null,
+            $validated['academic_year'],
+        );
+        if (filled($validated['class_name'] ?? null) && ! $resolvedClass) {
+            return back()->withInput()->withErrors([
+                'class_name' => 'This class could not be matched unambiguously to a class in the school register. Check the grade and class combination.',
+            ]);
+        }
+        if ($resolvedClass) {
+            $validated['grade'] = $resolvedClass->grade;
+            $validated['class_name'] = $resolvedClass->name;
+        }
+
         $classification = app(\App\Services\StudentCategoryService::class)->fromRequest($request);
         $isBoarding = $classification['is_boarding'];
         $hasTransport = $request->boolean('has_transport');
 
-        $enrollment = DB::transaction(function () use ($validated, $school, $isBoarding, $hasTransport, $classification) {
+        $enrollment = DB::transaction(function () use ($validated, $school, $isBoarding, $hasTransport, $classification, $resolvedClass, $classMapping) {
             $guardianQuery = Guardian::where('school_id', $school->id);
 
             if (! empty($validated['guardian_email'])) {
@@ -371,20 +500,6 @@ class EnrollmentController extends Controller
                 ],
             ]);
 
-            $resolvedClass = null;
-            if (! empty($validated['class_name'])) {
-                $resolvedClass = SchoolClass::where('school_id', $school->id)
-                    ->where('name', $validated['class_name'])
-                    ->where(function ($q) use ($validated) {
-                        $q->where('grade', $validated['grade'])
-                          ->orWhere('grade', 'like', "%{$validated['grade']}%");
-                    })
-                    ->first()
-                    ?? SchoolClass::where('school_id', $school->id)
-                    ->where('name', $validated['class_name'])
-                    ->first();
-            }
-
             $enrollment = Enrollment::create([
                 'school_id' => $school->id,
                 'student_id' => $student->id,
@@ -400,17 +515,22 @@ class EnrollmentController extends Controller
                 'status' => 'active',
             ]);
 
+            $feeGradeAliases = $classMapping->gradeAliasesForSchool($school->id, $validated['grade']);
             $feeStructures = FeeStructure::where('school_id', $school->id)
                 ->where('academic_year', $validated['academic_year'])
                 ->where('term', $validated['term'])
-                ->where(function ($q) use ($validated) {
-                    $q->whereNull('grade')
-                        ->orWhere('grade', $validated['grade']);
-                })
+            ->where(function ($q) use ($feeGradeAliases) {
+                $q->whereNull('grade')->orWhereIn('grade', $feeGradeAliases);
+            })
                 ->get();
 
             $selectedFees = app(\App\Services\Finance\InvoiceFeeSelectionService::class)->select(
-                $feeStructures, $validated['grade'], $isBoarding, $hasTransport, false
+                $feeStructures,
+                $validated['grade'],
+                $isBoarding,
+                $hasTransport,
+                false,
+                studentClassName: $resolvedClass?->name ?? $validated['class_name'] ?? null,
             );
 
             $invoiceTotal = 0;

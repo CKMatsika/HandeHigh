@@ -7,6 +7,8 @@ use App\Models\Account;
 use App\Models\Department;
 use App\Models\FeeStructure;
 use App\Models\Project;
+use App\Models\SchoolClass;
+use App\Services\StudentClassMappingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -57,6 +59,13 @@ class FeeStructureController extends Controller
             ->get();
         $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
         $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
+        $classGradeOptions = SchoolClass::where('school_id', $school->id)
+            ->where(function ($query) use ($academicYear) {
+                $query->where('academic_year', $academicYear)->orWhereNull('academic_year');
+            })
+            ->get(['name', 'grade'])
+            ->flatMap(fn (SchoolClass $class) => [$class->grade, $class->name])
+            ->filter()->unique()->sort()->values();
 
         return view('admin.fees.index', [
             'school' => $school,
@@ -70,6 +79,7 @@ class FeeStructureController extends Controller
             'revenueAccounts' => $revenueAccounts,
             'projects' => $projects,
             'costCenters' => $costCenters,
+            'classGradeOptions' => $classGradeOptions,
         ]);
     }
 
@@ -191,12 +201,13 @@ class FeeStructureController extends Controller
         ]);
 
         $isOptional = $request->boolean('is_optional');
+        $gradeScope = $this->normalizeGradeScope($school->id, $validated['grade'] ?? null, $validated['academic_year']);
 
         FeeStructure::create([
             'school_id' => $school->id,
             'academic_year' => $validated['academic_year'],
             'term' => $validated['term'],
-            'grade' => $validated['grade'] ?? null,
+            'grade' => $gradeScope,
             'parent_id' => $validated['parent_id'] ?? null,
             'residency_type' => $validated['residency_type'] ?? 'all',
             'vote_code' => $validated['vote_code'] ?? null,
@@ -265,11 +276,12 @@ class FeeStructureController extends Controller
         ]);
 
         $isOptional = $request->boolean('is_optional');
+        $gradeScope = $this->normalizeGradeScope($school->id, $validated['grade'] ?? null, $validated['academic_year']);
 
         $fee->update([
             'academic_year' => $validated['academic_year'],
             'term' => $validated['term'],
-            'grade' => $validated['grade'] ?? null,
+            'grade' => $gradeScope,
             'parent_id' => $validated['parent_id'] ?? null,
             'residency_type' => $validated['residency_type'] ?? ($fee->residency_type ?? 'all'),
             'vote_code' => $validated['vote_code'] ?? null,
@@ -317,5 +329,19 @@ class FeeStructureController extends Controller
                 'term' => $term,
             ])
             ->with('status', 'Fee item deleted successfully.');
+    }
+
+    private function normalizeGradeScope(int $schoolId, ?string $grade, string $academicYear): ?string
+    {
+        if (blank($grade)) {
+            return null;
+        }
+
+        $grade = trim($grade);
+        $class = app(StudentClassMappingService::class)->resolveClass($schoolId, $grade, null, $academicYear);
+
+        // Stream-specific fee structures keep the exact registered class name;
+        // ordinary grade/form scopes retain their configured grade label.
+        return $class?->name ?? $grade;
     }
 }

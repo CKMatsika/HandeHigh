@@ -495,10 +495,13 @@ class InvoiceController extends Controller
 
         $terms = ['Term 1', 'Term 2', 'Term 3'];
 
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
         $grades = SchoolClass::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade')
             ->merge(Student::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
             ->merge(FeeStructure::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
-            ->filter()->unique()->values();
+            ->filter()
+            ->map(fn ($option) => $classMapping->canonicalGrade($school->id, $option, $option, $academicYear) ?? trim($option))
+            ->unique()->sort()->values();
 
         if ($grades->isEmpty()) {
             $grades = collect(['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6']);
@@ -506,7 +509,8 @@ class InvoiceController extends Controller
 
         $classesQuery = SchoolClass::where('school_id', $school->id);
         if ($grade) {
-            $gradeVars = $this->getGradeVariations($grade);
+            $canonicalFilterGrade = $classMapping->canonicalGrade($school->id, $grade, $grade, $academicYear) ?? $grade;
+            $gradeVars = $classMapping->gradeAliases($canonicalFilterGrade);
             $classesQuery->whereIn('grade', $gradeVars);
         }
         $classes = $classesQuery->distinct()->pluck('name')->filter()->unique()->values();
@@ -527,11 +531,12 @@ class InvoiceController extends Controller
             // On first visit/filter, default to fee structures matching the
             // selected grade. Structures from other grades remain available
             // for deliberate selection and apply to the filtered cohort.
-            $gradeVars = $grade ? $this->getGradeVariations($grade) : [];
+            $canonicalFilterGrade = $grade ? ($classMapping->canonicalGrade($school->id, $grade, $grade, $academicYear) ?? $grade) : null;
+            $gradeVars = $canonicalFilterGrade ? $classMapping->gradeAliasesForSchool($school->id, $canonicalFilterGrade) : [];
             $selectedFeeStructureIds = $feeStructures
                 ->filter(fn (FeeStructure $fee) => blank($grade)
                     || blank($fee->grade)
-                    || in_array($fee->grade, $gradeVars, true))
+                    || in_array(mb_strtolower(trim($fee->grade)), $gradeVars, true))
                 ->pluck('id')
                 ->all();
         }
@@ -572,43 +577,38 @@ class InvoiceController extends Controller
         }
 
         if ($grade) {
-            $gradeVars = $this->getGradeVariations($grade);
-            $enrollmentQuery->where(function ($q) use ($gradeVars) {
-                // Hierarchical matching: enrollment grade > student grade > class grade
-                $q->where(function ($sub) use ($gradeVars) {
-                    $sub->whereNotNull('grade')
-                        ->where('grade', '!=', '')
-                        ->whereIn('grade', $gradeVars);
-                })->orWhere(function ($sub) use ($gradeVars) {
-                    $sub->where(function ($nullGrade) {
-                        $nullGrade->whereNull('grade')->orWhere('grade', '');
-                    })->whereHas('student', fn ($sq) => $sq->whereIn('grade', $gradeVars));
-                })->orWhere(function ($sub) use ($gradeVars) {
-                    $sub->where(function ($nullGrade) {
-                        $nullGrade->whereNull('grade')->orWhere('grade', '');
-                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('grade')->where('grade', '!=', ''))
-                      ->whereHas('class', fn ($cq) => $cq->whereIn('grade', $gradeVars));
-                });
+            $canonicalFilterGrade = $classMapping->canonicalGrade($school->id, $grade, $grade, $academicYear) ?? $grade;
+            $gradeVars = $classMapping->gradeAliases($canonicalFilterGrade);
+            $gradeClassNames = $classMapping->gradeAliasesForSchool($school->id, $canonicalFilterGrade);
+            $enrollmentQuery->where(function ($q) use ($gradeVars, $gradeClassNames, $school) {
+                $q->whereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->whereIn('grade', $gradeVars))
+                    ->orWhere(function ($legacy) use ($gradeVars, $gradeClassNames, $school) {
+                        $legacy->whereDoesntHave('class')
+                            ->where(function ($placement) use ($gradeVars, $gradeClassNames, $school) {
+                                $placement->whereIn('enrollments.grade', $gradeVars)
+                                    ->orWhereIn('enrollments.class_name', $gradeClassNames)
+                                    ->orWhereHas('student', function ($sq) use ($gradeVars, $gradeClassNames, $school) {
+                                        $sq->where('school_id', $school->id)
+                                            ->where(function ($studentQuery) use ($gradeVars, $gradeClassNames) {
+                                                $studentQuery->whereIn('grade', $gradeVars)
+                                                    ->orWhereIn('class_name', $gradeClassNames);
+                                            });
+                                    });
+                            });
+                    });
             });
         }
 
         if ($className) {
-            $enrollmentQuery->where(function ($q) use ($className) {
-                // Hierarchical matching: enrollment class_name > student class_name > class name
-                $q->where(function ($sub) use ($className) {
-                    $sub->whereNotNull('class_name')
-                        ->where('class_name', '!=', '')
-                        ->where('class_name', $className);
-                })->orWhere(function ($sub) use ($className) {
-                    $sub->where(function ($nullClass) {
-                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
-                    })->whereHas('student', fn ($sq) => $sq->where('class_name', $className));
-                })->orWhere(function ($sub) use ($className) {
-                    $sub->where(function ($nullClass) {
-                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
-                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('class_name')->where('class_name', '!=', ''))
-                      ->whereHas('class', fn ($cq) => $cq->where('name', $className));
-                });
+            $enrollmentQuery->where(function ($q) use ($className, $school) {
+                $q->whereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('name', $className))
+                    ->orWhere(function ($legacy) use ($className, $school) {
+                        $legacy->whereDoesntHave('class')
+                            ->where(function ($placement) use ($className, $school) {
+                                $placement->where('enrollments.class_name', $className)
+                                    ->orWhereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('class_name', $className));
+                            });
+                    });
             });
         }
 
@@ -691,9 +691,8 @@ class InvoiceController extends Controller
             $appliedItems = [];
             $studentTotal = 0.0;
 
-            $studentGrade = $enrollment->grade
-                ?: $student->getRawOriginal('grade')
-                ?: $enrollment->class?->grade;
+            $studentGrade = $enrollment->class?->grade
+                ?: $classMapping->canonicalGrade($school->id, $enrollment->grade ?: $student->getRawOriginal('grade'), $enrollment->class_name ?: $student->class_name, $academicYear);
             $applicableFees = $this->feeSelectionService->select(
                 $feeStructures,
                 $studentGrade,
@@ -705,6 +704,7 @@ class InvoiceController extends Controller
                 // a deliberately selected schedule to apply to that cohort.
                 // With All Forms, retain per-student grade-specific schedules.
                 matchGrade: blank($grade),
+                studentClassName: $enrollment->class?->name ?: $enrollment->class_name ?: $student->class_name,
             );
 
             foreach ($applicableFees as $fee) {
@@ -917,7 +917,13 @@ class InvoiceController extends Controller
                     $studentTotal = 0.0;
 
                     // 1. From Fee Structures
-                    $studentGrade = $enrollment->grade ?? $student->grade ?? $enrollment->class?->grade;
+                    $studentGrade = $enrollment->class?->grade
+                        ?: app(\App\Services\StudentClassMappingService::class)->canonicalGrade(
+                            $school->id,
+                            $enrollment->grade ?: $student->getRawOriginal('grade'),
+                            $enrollment->class_name ?: $student->class_name,
+                            $academicYear,
+                        );
                     $applicableFees = $this->feeSelectionService->select(
                         $feeStructures,
                         $studentGrade,
@@ -926,6 +932,7 @@ class InvoiceController extends Controller
                         $includeOptional,
                         $selectedFeeIds,
                         matchGrade: $matchFeeGrade,
+                        studentClassName: $enrollment->class?->name ?: $enrollment->class_name ?: $student->class_name,
                     );
 
                     foreach ($applicableFees as $fee) {
@@ -1117,13 +1124,21 @@ class InvoiceController extends Controller
                     $hasTransport = (bool) $enrollment->has_transport || (bool) $student?->has_transport;
                     $applicableFees = $this->feeSelectionService->select(
                         $feeStructures,
-                        $enrollment->grade ?? $student?->grade ?? $enrollment->class?->grade,
+                        $enrollment->class?->grade
+                            ?: app(\App\Services\StudentClassMappingService::class)->canonicalGrade(
+                                $enrollment->school_id,
+                                $enrollment->grade ?: $student?->getRawOriginal('grade'),
+                                $enrollment->class_name ?: $student?->class_name,
+                                $targetYear,
+                            ),
                         $isBoarder,
                         $hasTransport,
                         (bool) ($validated['include_optional_fees'] ?? false),
                         null,
                         (bool) ($validated['include_boarding'] ?? false),
                         (bool) ($validated['include_transport'] ?? false),
+                        true,
+                        $enrollment->class?->name ?: $enrollment->class_name ?: $student?->class_name,
                     );
 
                     if ($applicableFees->isEmpty()) {

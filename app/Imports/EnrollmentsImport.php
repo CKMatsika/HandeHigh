@@ -149,15 +149,20 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow
         $canonicalGrade = $this->canonicalGrade($rawGrade);
 
         $class = null;
-        if ($canonicalGrade !== '' && $rawClassName !== '') {
-            $class = SchoolClass::where('school_id', $this->schoolId)
-                ->where('name', $rawClassName)
-                ->where(function ($query) use ($canonicalGrade, $rawGrade): void {
-                    $query->where('grade', $canonicalGrade)
-                        ->orWhere('grade', $rawGrade)
-                        ->orWhere('grade', 'like', "%{$canonicalGrade}%");
-                })
-                ->first();
+        if ($rawClassName !== '') {
+            $classMapping = app(\App\Services\StudentClassMappingService::class);
+            $class = $classMapping->resolveClass(
+                $this->schoolId,
+                $rawClassName,
+                $rawGrade !== '' ? $rawGrade : $canonicalGrade,
+                (string) ($row['academic_year'] ?? '2026'),
+            );
+
+            if (! $class && SchoolClass::where('school_id', $this->schoolId)->where('name', $rawClassName)->exists()) {
+                throw ValidationException::withMessages([
+                    'class_name' => 'The uploaded class name matches multiple school classes and could not be resolved from the supplied grade. Review this row instead of creating a duplicate class.',
+                ]);
+            }
 
             if (! $class) {
                 $class = SchoolClass::firstOrCreate(
@@ -171,7 +176,7 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow
             }
         }
 
-        $effectiveGrade = $canonicalGrade !== '' ? $canonicalGrade : ($class?->grade ?? 'Form 1');
+        $effectiveGrade = $class?->grade ?: ($canonicalGrade !== '' ? $canonicalGrade : 'Form 1');
         $effectiveClassName = $rawClassName !== '' ? $rawClassName : ($class?->name ?? 'General');
         $category = ($row['student_category'] ?? null) ?: null;
         $funding = ($row['funding_status'] ?? null) ?: ($category ? ($category === 'scholarship' ? 'scholarship' : 'regular') : 'regular');
@@ -228,7 +233,7 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow
         if (Enrollment::where('school_id', $this->schoolId)
             ->where('student_id', $student->id)
             ->where('academic_year', $academicYear)
-            ->where('term', $term)
+            ->whereIn('term', $this->equivalentTermLabels($term))
             ->exists()) {
             // Defensive check: a newly-created student should have no prior enrolment.
             // Throwing rolls back this row (and the encompassing workbook transaction).
@@ -359,6 +364,18 @@ class EnrollmentsImport implements ToCollection, WithHeadingRow
         }
 
         return $ids;
+    }
+
+    private function equivalentTermLabels(string $term): array
+    {
+        $normalized = preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim($term)));
+
+        return match ($normalized) {
+            '1', 'term1', 'firstterm' => ['1', 'Term 1', 'Term1', 'First Term'],
+            '2', 'term2', 'secondterm' => ['2', 'Term 2', 'Term2', 'Second Term'],
+            '3', 'term3', 'thirdterm' => ['3', 'Term 3', 'Term3', 'Third Term'],
+            default => [$term],
+        };
     }
 
     private function validateClassification(array $row): void

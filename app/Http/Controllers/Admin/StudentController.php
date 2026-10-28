@@ -40,30 +40,69 @@ class StudentController extends Controller
         if (!$school) abort(403);
 
         $query = Student::where('school_id', $school->id)
-            ->with(['house', 'currentBedAssignment.bed.dormitory']);
+            ->with(['house', 'currentBedAssignment.bed.dormitory', 'currentEnrollment.class']);
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('other_names', 'like', "%{$search}%")
                   ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('admission_number', 'like', "%{$search}%")
                   ->orWhere('registration_number', 'like', "%{$search}%");
+                if (ctype_digit((string) $search)) {
+                    $q->orWhere('id', (int) $search);
+                }
             });
         }
 
         if ($request->filled('grade')) {
-            $query->where('grade', $request->grade);
+            $grade = $classMapping->canonicalGrade($school->id, $request->input('grade'), $request->input('grade'), (string) now()->year)
+                ?? $request->input('grade');
+            $gradeAliases = $classMapping->gradeAliases($grade);
+            $classAliases = $classMapping->gradeAliasesForSchool($school->id, $grade);
+            $query->where(function ($q) use ($gradeAliases, $classAliases, $school) {
+                // A linked class record is authoritative. Only fall back to
+                // legacy profile/enrollment text when no linked current class
+                // exists, so stale profile grades cannot place a student in
+                // the wrong form.
+                $q->whereHas('currentEnrollment.class', fn ($cq) => $cq
+                    ->where('school_id', $school->id)
+                    ->whereIn('grade', $gradeAliases))
+                    ->orWhere(function ($legacy) use ($gradeAliases, $classAliases, $school) {
+                        $legacy->whereDoesntHave('currentEnrollment', fn ($eq) => $eq->whereNotNull('class_id'))
+                            ->where(function ($placement) use ($gradeAliases, $classAliases, $school) {
+                                $placement->whereIn('students.grade', $gradeAliases)
+                                    ->orWhereIn('students.class_name', $classAliases)
+                                    ->orWhereHas('enrollments', function ($eq) use ($gradeAliases, $classAliases, $school) {
+                                        $eq->where('school_id', $school->id)
+                                            ->whereNull('class_id')
+                                            ->where(function ($enrollmentQuery) use ($gradeAliases, $classAliases) {
+                                                $enrollmentQuery->whereIn('grade', $gradeAliases)
+                                                    ->orWhereIn('class_name', $classAliases);
+                                            });
+                                    });
+                            });
+                    });
+            });
         }
 
         if ($request->filled('stream') || $request->filled('class_name')) {
             $stream = $request->input('stream') ?: $request->input('class_name');
-            $query->where(function ($q) use ($stream) {
-                $q->where('class_name', $stream)
-                  ->orWhereHas('enrollments', function ($eq) use ($stream) {
-                      $eq->where('class_name', $stream)
-                         ->orWhereHas('class', fn ($cq) => $cq->where('name', $stream));
-                  });
+            $query->where(function ($q) use ($stream, $school) {
+                $q->whereHas('currentEnrollment.class', fn ($cq) => $cq->where('school_id', $school->id)->where('name', $stream))
+                    ->orWhere(function ($legacy) use ($stream, $school) {
+                        $legacy->whereDoesntHave('currentEnrollment', fn ($eq) => $eq->whereNotNull('class_id'))
+                            ->where(function ($placement) use ($stream, $school) {
+                                $placement->where('students.class_name', $stream)
+                                    ->orWhereHas('enrollments', fn ($eq) => $eq
+                                        ->where('school_id', $school->id)
+                                        ->whereNull('class_id')
+                                        ->where('class_name', $stream));
+                            });
+                    });
             });
         }
 
@@ -71,12 +110,20 @@ class StudentController extends Controller
             $query->where('gender', $request->gender);
         }
 
-        if ($request->filled('status')) {
-            if ($request->status !== 'all') {
+        if ($request->filled('status') && $request->status !== 'all') {
+            if ($request->status === 'active') {
+                $query->where(function ($statusQuery) use ($school) {
+                    $statusQuery->where('status', 'active')
+                        ->orWhereHas('enrollments', fn ($eq) => $eq->where('school_id', $school->id)->where('status', 'active'));
+                });
+            } else {
                 $query->where('status', $request->status);
             }
-        } else {
-            $query->where('status', 'active');
+        } elseif (! $request->has('status') && ! $request->filled('search')) {
+            $query->where(function ($statusQuery) use ($school) {
+                $statusQuery->where('status', 'active')
+                    ->orWhereHas('enrollments', fn ($eq) => $eq->where('school_id', $school->id)->where('status', 'active'));
+            });
         }
 
         if ($request->filled('boarding')) {
@@ -91,9 +138,14 @@ class StudentController extends Controller
             $query->where('funding_status', $request->funding_status);
         }
 
+        $gradeOptions = Student::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade')
+            ->merge(SchoolClass::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
+            ->map(fn ($option) => $classMapping->canonicalGrade($school->id, $option, $option, (string) now()->year) ?? trim($option))
+            ->filter()->unique()->sort()->values();
+
         $students = $query->latest()->paginate(20)->appends($request->query());
 
-        return view('admin.students.index', compact('school', 'students'));
+        return view('admin.students.index', compact('school', 'students', 'gradeOptions'));
     }
 
     public function show(Student $student)
@@ -103,7 +155,7 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $student->load([
-            'house', 'guardians', 'enrollments',
+            'house', 'guardians', 'enrollments.class', 'currentEnrollment.class',
             'currentPositions', 'currentClubs', 'currentSports',
             'allocatedAssets.schoolAsset', 'libraryAccess',
             'currentBedAssignment.bed.dormitory',
@@ -111,6 +163,12 @@ class StudentController extends Controller
 
         $activeTab = request('tab', 'overview');
         $currentYear = date('Y');
+        $placementYear = (string) ($student->currentEnrollment?->academic_year ?: $currentYear);
+        $classes = SchoolClass::where('school_id', $school->id)
+            ->where(function ($query) use ($placementYear) {
+                $query->where('academic_year', $placementYear)->orWhereNull('academic_year');
+            })
+            ->orderBy('grade')->orderBy('name')->get();
         $currentTerm = '1';
         $allSubjects = Subject::where('school_id', $school->id)->get();
         $dormitories = Dormitory::where('school_id', $school->id)->where('is_active', true)->get();
@@ -358,7 +416,7 @@ class StudentController extends Controller
 
         return view('admin.students.show', compact(
             'school', 'student', 'activeTab', 'currentYear', 'currentTerm', 
-            'allSubjects', 'dormitories', 'schoolAssets',
+            'allSubjects', 'dormitories', 'schoolAssets', 'classes',
             'financeSummary', 'invoices', 'payments', 'creditNotes', 
             'statementData', 'statementYears', 'glEntries', 'studentLedgerEntries'
         ));
@@ -371,10 +429,16 @@ class StudentController extends Controller
         if (!$school) abort(403);
 
         $guardians = Guardian::where('school_id', $school->id)->get();
-        $classes = SchoolClass::where('school_id', $school->id)->where('academic_year', date('Y'))->get();
+        $classes = SchoolClass::where('school_id', $school->id)
+            ->where(function ($query) {
+                $query->where('academic_year', (string) now()->year)->orWhereNull('academic_year');
+            })
+            ->orderBy('grade')->orderBy('name')->get();
+        $gradeChoices = collect(['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Form 1','Form 2','Form 3','Form 4','Form 5','Form 6'])
+            ->merge($classes->pluck('grade'))->filter()->unique()->values();
         $houses = SchoolHouse::where('school_id', $school->id)->where('is_active', true)->get();
 
-        return view('admin.students.create', compact('school', 'guardians', 'classes', 'houses'));
+        return view('admin.students.create', compact('school', 'guardians', 'classes', 'gradeChoices', 'houses'));
     }
 
     public function store(Request $request)
@@ -399,6 +463,23 @@ class StudentController extends Controller
             'guardian_ids' => 'nullable|array',
             'guardian_ids.*' => [TenantExists::make('guardians')],
         ]);
+
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $resolvedClass = $classMapping->resolveClass(
+            $school->id,
+            $validated['class_name'] ?? null,
+            $validated['grade'] ?? null,
+            (string) now()->year,
+        );
+        if (filled($validated['class_name'] ?? null) && ! $resolvedClass) {
+            return back()->withInput()->withErrors([
+                'class_name' => 'This class could not be matched unambiguously to a class in the school register. Select a valid class and grade combination.',
+            ]);
+        }
+        if ($resolvedClass) {
+            $validated['grade'] = $resolvedClass->grade;
+            $validated['class_name'] = $resolvedClass->name;
+        }
 
         $guardianIds = $validated['guardian_ids'] ?? [];
         unset($validated['guardian_ids']);
@@ -428,10 +509,16 @@ class StudentController extends Controller
         if (!$school || $student->school_id !== $school->id) abort(403);
 
         $guardians = Guardian::where('school_id', $school->id)->get();
-        $classes = SchoolClass::where('school_id', $school->id)->where('academic_year', date('Y'))->get();
+        $classes = SchoolClass::where('school_id', $school->id)
+            ->where(function ($query) {
+                $query->where('academic_year', (string) now()->year)->orWhereNull('academic_year');
+            })
+            ->orderBy('grade')->orderBy('name')->get();
+        $gradeChoices = collect(['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Form 1','Form 2','Form 3','Form 4','Form 5','Form 6'])
+            ->merge($classes->pluck('grade'))->filter()->unique()->values();
         $houses = SchoolHouse::where('school_id', $school->id)->where('is_active', true)->get();
 
-        return view('admin.students.edit', compact('school', 'student', 'guardians', 'classes', 'houses'));
+        return view('admin.students.edit', compact('school', 'student', 'guardians', 'classes', 'gradeChoices', 'houses'));
     }
 
     public function update(Request $request, Student $student)
@@ -458,39 +545,40 @@ class StudentController extends Controller
             'guardian_ids.*' => [TenantExists::make('guardians')],
         ]);
 
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $resolvedClass = $classMapping->resolveClass(
+            $school->id,
+            $validated['class_name'] ?? null,
+            $validated['grade'] ?? null,
+            (string) now()->year,
+        );
+        if (filled($validated['class_name'] ?? null) && ! $resolvedClass) {
+            return back()->withInput()->withErrors([
+                'class_name' => 'This class could not be matched unambiguously to a class in the school register. Select a valid class and grade combination.',
+            ]);
+        }
+        if ($resolvedClass) {
+            $validated['grade'] = $resolvedClass->grade;
+            $validated['class_name'] = $resolvedClass->name;
+        }
+
         $guardianIds = $validated['guardian_ids'] ?? [];
         unset($validated['guardian_ids']);
 
         $validated = $this->studentCategory($request, $validated, $student);
         $validated['has_transport'] = $request->boolean('has_transport');
 
-        DB::transaction(function () use ($student, $validated, $guardianIds) {
+        DB::transaction(function () use ($student, $validated, $guardianIds, $resolvedClass) {
             $student->update($validated);
             $student->guardians()->sync($guardianIds);
 
             // Sync with active or latest enrollment
             $activeEnrollment = $student->currentEnrollment ?? $student->latestEnrollment;
             if ($activeEnrollment) {
-                $targetClass = null;
-                if (! empty($validated['class_name'])) {
-                    $targetClass = SchoolClass::where('school_id', $student->school_id)
-                        ->where('name', $validated['class_name'])
-                        ->where(function ($q) use ($validated) {
-                            if (! empty($validated['grade'])) {
-                                $q->where('grade', $validated['grade'])
-                                  ->orWhere('grade', 'like', "%{$validated['grade']}%");
-                            }
-                        })
-                        ->first()
-                        ?? SchoolClass::where('school_id', $student->school_id)
-                        ->where('name', $validated['class_name'])
-                        ->first();
-                }
-
                 $activeEnrollment->update(array_filter([
                     'grade' => $validated['grade'] ?? $activeEnrollment->grade,
                     'class_name' => $validated['class_name'] ?? $activeEnrollment->class_name,
-                    'class_id' => $targetClass?->id ?? $activeEnrollment->class_id,
+                    'class_id' => $resolvedClass?->id ?? $activeEnrollment->class_id,
                     'is_boarding' => $validated['is_boarding'],
                     'student_type' => $validated['is_boarding'] ? 'boarding' : 'day',
                     'has_transport' => $validated['has_transport'],
@@ -580,47 +668,57 @@ class StudentController extends Controller
         $oldGrade = $student->grade;
         $oldClass = $student->class_name;
 
-        $targetClass = SchoolClass::where('school_id', $school->id)
-            ->where('name', $validated['class_name'])
-            ->where(function ($q) use ($validated) {
-                $q->where('grade', $validated['grade'])
-                  ->orWhere('grade', 'like', "%{$validated['grade']}%");
-            })
-            ->first()
-            ?? SchoolClass::where('school_id', $school->id)
-            ->where('name', $validated['class_name'])
-            ->first();
+        $activeEnrollment = $student->currentEnrollment;
+        $academicYear = (string) ($activeEnrollment?->academic_year ?: now()->year);
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $targetClass = $classMapping->resolveClass(
+            $school->id,
+            $validated['class_name'],
+            $validated['grade'],
+            $academicYear,
+        );
 
-        $student->update([
-            'grade' => $validated['grade'],
-            'class_name' => $validated['class_name'],
-        ]);
-
-        $activeEnrollment = $student->currentEnrollment ?? $student->latestEnrollment;
-        if ($activeEnrollment) {
-            $activeEnrollment->update([
-                'grade' => $validated['grade'],
-                'class_name' => $validated['class_name'],
-                'class_id' => $targetClass?->id ?? $activeEnrollment->class_id,
-            ]);
-        } else {
-            Enrollment::create([
-                'school_id' => $school->id,
-                'student_id' => $student->id,
-                'class_id' => $targetClass?->id,
-                'academic_year' => date('Y'),
-                'term' => 'Term 1',
-                'grade' => $validated['grade'],
-                'class_name' => $validated['class_name'],
-                'is_boarding' => (bool)$student->is_boarding,
-                'has_transport' => (bool)$student->has_transport,
-                'enrollment_date' => now(),
-                'status' => 'active',
+        if (! $targetClass) {
+            return back()->withInput()->withErrors([
+                'class_name' => 'Select a class from this school’s class register. Its registered grade will be used automatically.',
             ]);
         }
 
+        $canonicalGrade = $targetClass->grade;
+        $canonicalClassName = $targetClass->name;
+
+        DB::transaction(function () use ($student, $school, $activeEnrollment, $targetClass, $academicYear, $canonicalGrade, $canonicalClassName) {
+            $student->update([
+                'grade' => $canonicalGrade,
+                'class_name' => $canonicalClassName,
+            ]);
+
+            if ($activeEnrollment) {
+                $activeEnrollment->update([
+                    'grade' => $canonicalGrade,
+                    'class_name' => $canonicalClassName,
+                    'class_id' => $targetClass->id,
+                ]);
+            } else {
+                Enrollment::create([
+                    'school_id' => $school->id,
+                    'student_id' => $student->id,
+                    'class_id' => $targetClass->id,
+                    'academic_year' => $academicYear,
+                    'term' => 'Term 1',
+                    'grade' => $canonicalGrade,
+                    'class_name' => $canonicalClassName,
+                    'is_boarding' => (bool) $student->is_boarding,
+                    'student_type' => $student->is_boarding ? 'boarding' : 'day',
+                    'has_transport' => (bool) $student->has_transport,
+                    'enrollment_date' => now(),
+                    'status' => 'active',
+                ]);
+            }
+        });
+
         return redirect()->route('admin.students.show', $student)
-            ->with('success', "Student moved from {$oldGrade} {$oldClass} to {$validated['grade']} {$validated['class_name']}.");
+            ->with('success', "Student moved from {$oldGrade} {$oldClass} to {$canonicalGrade} {$canonicalClassName}.");
     }
 
     public function promote(Student $student)

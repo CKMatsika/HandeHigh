@@ -68,7 +68,7 @@
                         <label class="text-xs text-slate-400 mb-1 block">Grade</label>
                         <select name="grade" class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
                             <option value="">Select grade...</option>
-                            @foreach(['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Form 1','Form 2','Form 3','Form 4','Form 5','Form 6'] as $g)
+                            @foreach($gradeChoices as $g)
                                 <option value="{{ $g }}" {{ old('grade', $student->grade) == $g ? 'selected' : '' }}>{{ $g }}</option>
                             @endforeach
                         </select>
@@ -78,7 +78,7 @@
                         <select name="class_name" class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
                             <option value="">Select class...</option>
                             @foreach($classes as $class)
-                                <option value="{{ $class->name }}" {{ old('class_name', $student->class_name) == $class->name ? 'selected' : '' }}>{{ $class->name }}</option>
+                                <option value="{{ $class->name }}" data-grade="{{ $class->grade }}" {{ old('class_name', $student->class_name) == $class->name ? 'selected' : '' }}>{{ $class->name }} ({{ $class->grade }})</option>
                             @endforeach
                         </select>
                     </div>
@@ -125,3 +125,21 @@
     </form>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const classSelect = document.querySelector('[name="class_name"]');
+        const gradeField = document.querySelector('[name="grade"]');
+        if (!classSelect || !gradeField) return;
+
+        const syncGradeFromClass = () => {
+            const classGrade = classSelect.selectedOptions[0]?.dataset.grade;
+            if (classGrade) gradeField.value = classGrade;
+        };
+
+        classSelect.addEventListener('change', syncGradeFromClass);
+        if (classSelect.value) syncGradeFromClass();
+    });
+</script>
+@endpush

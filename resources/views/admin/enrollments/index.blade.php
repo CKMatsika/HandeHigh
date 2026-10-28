@@ -142,11 +142,16 @@
                             $student = $enrollment->student;
                             $primaryGuardian = $student?->guardians?->firstWhere('pivot.is_primary', true) ?? $student?->guardians?->first();
                             $invoice = $enrollment->invoices->sortByDesc('issued_at')->first();
+                            $placementGrade = $enrollment->class?->grade ?? $enrollment->grade;
+                            $placementClass = $enrollment->class?->name ?? $enrollment->class_name;
+                            $studentPlacementGrade = $student?->currentEnrollment?->class?->grade ?? $student?->currentEnrollment?->grade ?? $student?->grade;
+                            $studentPlacementClass = $student?->currentEnrollment?->class?->name ?? $student?->currentEnrollment?->class_name ?? $student?->class_name;
                         @endphp
                         <tr class="border-b border-slate-800/70">
                             <td class="py-2 align-middle">
                                 <div class="font-medium">{{ $student?->first_name }} {{ $student?->last_name }}</div>
-                                <div class="text-[11px] text-slate-400">{{ $student?->grade }} {{ $student?->class_name }}</div>
+                                <div class="text-[11px] text-slate-400">{{ $studentPlacementGrade }} {{ $studentPlacementClass }}</div>
+                                <div class="text-[10px] text-slate-500">Admission # {{ $student?->admission_number ?: '—' }} · ERP ID {{ $student?->id ?: '—' }}</div>
                             </td>
                             <td class="py-2 align-middle">
                                 @if($primaryGuardian)
@@ -161,8 +166,8 @@
                                 <div class="text-[11px] text-slate-400">{{ $enrollment->term }}</div>
                             </td>
                             <td class="py-2 align-middle">
-                                <div>{{ $enrollment->grade }}</div>
-                                <div class="text-[11px] text-slate-400">{{ $enrollment->class_name }}</div>
+                                <div>{{ $placementGrade }}</div>
+                                <div class="text-[11px] text-slate-400">{{ $placementClass }}</div>
                             </td>
                             <td class="py-2 align-middle">
                                 @if($invoice)
@@ -176,6 +181,9 @@
                                 <span class="inline-flex items-center rounded-full border border-slate-700 bg-slate-950/70 px-2 py-0.5 text-[11px] capitalize">
                                     {{ $enrollment->status }}
                                 </span>
+                                @if($enrollment->possible_duplicate)
+                                    <div class="mt-1"><span class="inline-flex rounded-full border border-amber-700/70 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-300">Possible duplicate · verify</span></div>
+                                @endif
                             </td>
                             <td class="py-2 align-middle">
                                 <div class="flex flex-wrap gap-2">

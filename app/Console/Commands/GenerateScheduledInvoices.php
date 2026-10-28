@@ -174,10 +174,17 @@ class GenerateScheduledInvoices extends Command
                     $student = $enrollment->student;
                     $applicableFees = $feeSelectionService->select(
                         $feeStructures,
-                        $enrollment->grade ?? $student->grade ?? $enrollment->class?->grade,
+                        $enrollment->class?->grade
+                            ?: app(\App\Services\StudentClassMappingService::class)->canonicalGrade(
+                                $enrollment->school_id,
+                                $enrollment->grade ?: $student->getRawOriginal('grade'),
+                                $enrollment->class_name ?: $student->class_name,
+                                $academicYear,
+                            ),
                         $enrollment->isBoarder() || (bool) $student->is_boarding,
                         (bool) $enrollment->has_transport || (bool) $student->has_transport,
                         false,
+                        studentClassName: $enrollment->class?->name ?: $enrollment->class_name ?: $student->class_name,
                     );
 
                     if ($applicableFees->isEmpty()) {

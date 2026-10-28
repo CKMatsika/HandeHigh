@@ -45,13 +45,15 @@
                 @csrf
                 <p class="text-xs text-slate-400 mb-2">Move to another class</p>
                 <div class="space-y-2">
-                    <select name="grade" required class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-1.5 text-xs">
-                        @foreach(['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Form 1','Form 2','Form 3','Form 4','Form 5','Form 6'] as $g)
-                            <option value="{{ $g }}" {{ $student->grade == $g ? 'selected' : '' }}>{{ $g }}</option>
+                    <input type="hidden" name="grade" value="{{ $student->currentEnrollment?->class?->grade ?? $student->currentEnrollment?->grade ?? $student->grade }}">
+                    <select name="class_name" required class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-1.5 text-xs">
+                        <option value="">Select class / stream...</option>
+                        @foreach($classes as $class)
+                            <option value="{{ $class->name }}" data-grade="{{ $class->grade }}" @selected(old('class_name', $student->currentEnrollment?->class?->name ?? $student->currentEnrollment?->class_name ?? $student->class_name) === $class->name)>
+                                {{ $class->name }} ({{ $class->grade }})
+                            </option>
                         @endforeach
                     </select>
-                    <input type="text" name="class_name" value="{{ $student->class_name }}" placeholder="e.g. Form 3 B"
-                        class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-1.5 text-xs" required>
                     <button type="submit" class="w-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg px-3 py-1.5 text-xs hover:bg-cyan-500/20 transition"
                         onclick="return confirm('Move {{ $student->full_name }} to this class?')">
                         Move Class
@@ -163,3 +165,18 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const classSelect = document.querySelector('form[action="{{ route('admin.students.move-class', $student) }}"] [name="class_name"]');
+        const gradeField = document.querySelector('form[action="{{ route('admin.students.move-class', $student) }}"] [name="grade"]');
+        if (!classSelect || !gradeField) return;
+
+        classSelect.addEventListener('change', () => {
+            const grade = classSelect.selectedOptions[0]?.dataset.grade;
+            if (grade) gradeField.value = grade;
+        });
+    });
+</script>
+@endpush

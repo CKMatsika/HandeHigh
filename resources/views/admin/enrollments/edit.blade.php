@@ -37,7 +37,12 @@
 
             <div>
                 <label class="block text-[11px] font-medium mb-1 text-slate-300" for="class_name">Class</label>
-                <input id="class_name" type="text" name="class_name" value="{{ old('class_name', $enrollment->class_name) }}" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                <select id="class_name" name="class_name" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">Select class / stream...</option>
+                    @foreach($classes as $class)
+                        <option value="{{ $class->name }}" data-grade="{{ $class->grade }}" @selected(old('class_name', $enrollment->class_name) === $class->name)>{{ $class->name }} ({{ $class->grade }})</option>
+                    @endforeach
+                </select>
             </div>
 
             <div>
@@ -72,3 +77,21 @@
         </form>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const classSelect = document.querySelector('[name="class_name"]');
+        const gradeField = document.querySelector('[name="grade"]');
+        if (!classSelect || !gradeField) return;
+
+        const syncGradeFromClass = () => {
+            const classGrade = classSelect.selectedOptions[0]?.dataset.grade;
+            if (classGrade) gradeField.value = classGrade;
+        };
+
+        classSelect.addEventListener('change', syncGradeFromClass);
+        if (classSelect.value) syncGradeFromClass();
+    });
+</script>
+@endpush

@@ -39,7 +39,7 @@
                 <label class="text-xs text-slate-400 mb-1 block">Grade</label>
                 <select name="grade" class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
                     <option value="">All Grades</option>
-                    @foreach(['Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Form 1','Form 2','Form 3','Form 4','Form 5','Form 6'] as $g)
+                    @foreach($gradeOptions as $g)
                         <option value="{{ $g }}" {{ request('grade') == $g ? 'selected' : '' }}>{{ $g }}</option>
                     @endforeach
                 </select>
@@ -47,8 +47,8 @@
             <div class="min-w-[120px]">
                 <label class="text-xs text-slate-400 mb-1 block">Status</label>
                 <select name="status" class="w-full rounded-lg border border-slate-700 bg-slate-800 text-slate-100 px-3 py-2 text-sm">
-                    <option value="">Active</option>
-                    <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="active" @selected((!request()->has('status') && !request()->filled('search')) || request('status') === 'active')>Active</option>
+                    <option value="all" @selected(request('status') === 'all' || (request()->filled('search') && !request()->filled('status')))>All statuses</option>
                     <option value="inactive" {{ request('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
                     <option value="graduated" {{ request('status') == 'graduated' ? 'selected' : '' }}>Graduated</option>
                     <option value="transferred" {{ request('status') == 'transferred' ? 'selected' : '' }}>Transferred</option>
@@ -83,6 +83,11 @@
                 </thead>
                 <tbody class="divide-y divide-slate-800">
                     @forelse($students as $student)
+                    @php
+                        $activePlacement = $student->currentEnrollment;
+                        $displayGrade = $activePlacement?->class?->grade ?? $activePlacement?->grade ?? $student->grade;
+                        $displayClass = $activePlacement?->class?->name ?? $activePlacement?->class_name ?? $student->class_name;
+                    @endphp
                     <tr class="hover:bg-slate-800/50 transition">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
@@ -98,7 +103,7 @@
                             </div>
                         </td>
                         <td class="px-4 py-3 text-slate-300">{{ $student->admission_number ?? '—' }}</td>
-                        <td class="px-4 py-3 text-slate-300">{{ $student->grade ?? '—' }} / {{ $student->class_name ?? '—' }}</td>
+                        <td class="px-4 py-3 text-slate-300">{{ $displayGrade ?? '—' }} / {{ $displayClass ?? '—' }}</td>
                         <td class="px-4 py-3">
                             @if($student->house)
                                 <span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style="background: {{ $student->house->color }}20; color: {{ $student->house->color }}">
@@ -124,6 +129,9 @@
                                 $color = $statusColors[$student->status] ?? 'slate';
                             @endphp
                             <span class="text-xs px-2 py-1 rounded-full bg-{{ $color }}-500/20 text-{{ $color }}-400">{{ ucfirst($student->status) }}</span>
+                            @if($student->currentEnrollment && $student->status !== 'active')
+                                <div class="mt-1 text-[10px] text-amber-300">Active enrollment — profile status needs review</div>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-right">
                             <a href="{{ route('admin.students.show', $student) }}" class="text-slate-400 hover:text-indigo-400 transition text-xs">View</a>

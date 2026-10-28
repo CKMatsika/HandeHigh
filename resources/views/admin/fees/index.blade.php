@@ -93,7 +93,13 @@
             </div>
             <div>
                 <label class="block text-[11px] font-medium mb-1 text-slate-400" for="new_grade">Grade / Form</label>
-                <input id="new_grade" type="text" name="grade" value="{{ old('grade') }}" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs" placeholder="Blank = All Grades">
+                <input id="new_grade" type="text" name="grade" list="fee-grade-options" value="{{ old('grade') }}" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs" placeholder="Blank = All Grades">
+                <datalist id="fee-grade-options">
+                    @foreach($classGradeOptions as $gradeOption)
+                        <option value="{{ $gradeOption }}"></option>
+                    @endforeach
+                </datalist>
+                <p class="mt-1 text-[10px] text-slate-500">Use a registered grade/form, or an exact class name to scope this fee to that stream.</p>
             </div>
             <div>
                 <label class="block text-[11px] font-medium mb-1 text-slate-400" for="new_category">Category</label>

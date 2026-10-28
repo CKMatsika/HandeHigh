@@ -3,10 +3,15 @@
 namespace App\Services\Finance;
 
 use App\Models\FeeStructure;
+use App\Services\StudentClassMappingService;
 use Illuminate\Support\Collection;
 
 class InvoiceFeeSelectionService
 {
+    public function __construct(private readonly StudentClassMappingService $classMapping)
+    {
+    }
+
     public function select(
         Collection $feeStructures,
         ?string $studentGrade,
@@ -17,6 +22,7 @@ class InvoiceFeeSelectionService
         bool $includeBoarding = true,
         bool $includeTransport = true,
         bool $matchGrade = true,
+        ?string $studentClassName = null,
     ): Collection {
         $selectedIds ??= $feeStructures->pluck('id')->all();
         $selectedIds = array_fill_keys(array_map('intval', $selectedIds), true);
@@ -29,9 +35,9 @@ class InvoiceFeeSelectionService
         foreach ($selectedFees as $fee) {
             $subVotes = $subVotesByParent->get($fee->id, collect());
             if ($subVotes->isNotEmpty()) {
-                if ($this->residencyMatches($fee, $isBoarder)) {
+                if ($this->isApplicable($fee, $studentGrade, $studentClassName, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
                     foreach ($subVotes as $subVote) {
-                        if ($this->isApplicable($subVote, $studentGrade, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
+                        if ($this->isApplicable($subVote, $studentGrade, $studentClassName, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
                             $result->put($subVote->id, $subVote);
                         }
                     }
@@ -40,7 +46,7 @@ class InvoiceFeeSelectionService
                 continue;
             }
 
-            if ($this->isApplicable($fee, $studentGrade, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
+            if ($this->isApplicable($fee, $studentGrade, $studentClassName, $isBoarder, $hasTransport, $includeOptional, $includeBoarding, $includeTransport, $matchGrade)) {
                 $result->put($fee->id, $fee);
             }
         }
@@ -51,6 +57,7 @@ class InvoiceFeeSelectionService
     private function isApplicable(
         FeeStructure $fee,
         ?string $studentGrade,
+        ?string $studentClassName,
         bool $isBoarder,
         bool $hasTransport,
         bool $includeOptional,
@@ -58,7 +65,14 @@ class InvoiceFeeSelectionService
         bool $includeTransport,
         bool $matchGrade,
     ): bool {
-        if (($matchGrade && ! $this->gradeMatches($fee->grade, $studentGrade)) || ! $this->residencyMatches($fee, $isBoarder)) {
+        $feeClass = filled($fee->grade)
+            ? $this->classMapping->resolveClass($fee->school_id, $fee->grade, $studentGrade, $fee->academic_year)
+            : null;
+        $feeIsStreamSpecific = $feeClass
+            && mb_strtolower(trim($feeClass->name), 'UTF-8') === mb_strtolower(trim($fee->grade), 'UTF-8');
+
+        if ((($matchGrade || $feeIsStreamSpecific) && ! $this->gradeMatches($fee, $studentGrade, $studentClassName))
+            || ! $this->residencyMatches($fee, $isBoarder)) {
             return false;
         }
 
@@ -77,9 +91,9 @@ class InvoiceFeeSelectionService
         return true;
     }
 
-    private function gradeMatches(?string $feeGrade, ?string $studentGrade): bool
+    private function gradeMatches(FeeStructure $fee, ?string $studentGrade, ?string $studentClassName): bool
     {
-        if (blank($feeGrade)) {
+        if (blank($fee->grade)) {
             return true;
         }
 
@@ -87,29 +101,20 @@ class InvoiceFeeSelectionService
             return false;
         }
 
-        $feeGrade = mb_strtolower(trim($feeGrade));
-        foreach ($this->gradeVariations($studentGrade) as $grade) {
-            if ($feeGrade === mb_strtolower($grade)) {
-                return true;
-            }
+        $feeClass = $this->classMapping->resolveClass($fee->school_id, $fee->grade, $studentGrade, $fee->academic_year);
+        if ($feeClass && mb_strtolower(trim($feeClass->name), 'UTF-8') === mb_strtolower(trim($fee->grade), 'UTF-8')) {
+            return filled($studentClassName)
+                && mb_strtolower(trim($studentClassName), 'UTF-8') === mb_strtolower(trim($feeClass->name), 'UTF-8')
+                && $this->classMapping->gradesMatch($feeClass->grade, $studentGrade);
         }
 
-        return false;
-    }
+        $feeGrade = $feeClass?->grade
+            ?: ($this->classMapping->canonicalGrade($fee->school_id, $fee->grade, $fee->grade, $fee->academic_year) ?? $fee->grade);
 
-    private function gradeVariations(string $grade): array
-    {
-        $cleaned = trim($grade);
-        $variations = [$cleaned];
-
-        if (preg_match('/^form\s*(\d+)/i', $cleaned, $matches)) {
-            $number = $matches[1];
-            $variations = array_merge($variations, [$number, "Form {$number}", "Form{$number}", "Grade {$number}"]);
-        } elseif (is_numeric($cleaned)) {
-            $variations = array_merge($variations, ["Form {$cleaned}", "Form{$cleaned}", "Grade {$cleaned}"]);
-        }
-
-        return array_unique($variations);
+        return count(array_intersect(
+            $this->classMapping->gradeAliases($feeGrade),
+            $this->classMapping->gradeAliases($studentGrade),
+        )) > 0;
     }
 
     private function residencyMatches(FeeStructure $fee, bool $isBoarder): bool
