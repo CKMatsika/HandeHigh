@@ -113,15 +113,16 @@
                 </div>
                 <div class="mt-6 space-y-2">
                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">Update Student</button>
-                    <form method="POST" action="{{ route('admin.students.destroy', $student) }}" class="inline w-full">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="w-full bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg px-4 py-2 text-sm hover:bg-red-500/20 transition" onclick="return confirm('Deactivate this student?')">
-                            Deactivate Student
-                        </button>
-                    </form>
                 </div>
             </div>
         </div>
+    </form>
+    <form method="POST" action="{{ route('admin.students.destroy', $student) }}" class="mt-3">
+        @csrf
+        @method('DELETE')
+        <button type="submit" class="w-full bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg px-4 py-2 text-sm hover:bg-red-500/20 transition" onclick="return confirm('Deactivate this student?')">
+            Deactivate Student
+        </button>
     </form>
 </div>
 @endsection

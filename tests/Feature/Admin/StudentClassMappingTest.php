@@ -42,6 +42,22 @@ class StudentClassMappingTest extends TestCase
             'is_boarding' => true,
         ]);
 
+        $editPage = $this->get(route('admin.students.edit', $student))->assertOk();
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($editPage->getContent());
+        $xpath = new \DOMXPath($dom);
+        $forms = $xpath->query('//form');
+        foreach ($forms as $form) {
+            $this->assertSame(0, $xpath->query('ancestor::form', $form)->length, 'Student update and deactivate forms must not nest.');
+        }
+        $updateForm = $xpath->query('//form[.//button[contains(normalize-space(.), "Update Student")]]')->item(0);
+        $deactivateForm = $xpath->query('//form[.//button[contains(normalize-space(.), "Deactivate Student")]]')->item(0);
+        $this->assertNotNull($updateForm);
+        $this->assertNotNull($deactivateForm);
+        $this->assertSame('PUT', $xpath->query('./input[@name="_method"]', $updateForm)->item(0)?->getAttribute('value'));
+        $this->assertSame(0, $xpath->query('./input[@name="_method" and @value="DELETE"]', $updateForm)->length);
+        $this->assertSame('DELETE', $xpath->query('./input[@name="_method"]', $deactivateForm)->item(0)?->getAttribute('value'));
+
         $this->put(route('admin.students.update', $student), [
             'first_name' => 'Leonita',
             'last_name' => 'Baloyi',
@@ -59,6 +75,7 @@ class StudentClassMappingTest extends TestCase
             'school_id' => $school->id,
             'grade' => '5',
             'class_name' => 'Lower 6 Arts',
+            'status' => 'active',
         ]);
     }
 

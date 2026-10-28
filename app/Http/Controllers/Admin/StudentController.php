@@ -546,18 +546,23 @@ class StudentController extends Controller
         ]);
 
         $classMapping = app(\App\Services\StudentClassMappingService::class);
-        $resolvedClass = $classMapping->resolveClass(
-            $school->id,
-            $validated['class_name'] ?? null,
-            $validated['grade'] ?? null,
-            (string) now()->year,
-        );
-        if (filled($validated['class_name'] ?? null) && ! $resolvedClass) {
-            return back()->withInput()->withErrors([
-                'class_name' => 'This class could not be matched unambiguously to a class in the school register. Select a valid class and grade combination.',
-            ]);
-        }
-        if ($resolvedClass) {
+        $resolvedClass = null;
+        if (blank($validated['class_name'] ?? null)) {
+            // Legacy class labels may no longer exist in the class register.
+            // Allow non-placement edits without clearing or guessing placement.
+            unset($validated['grade'], $validated['class_name']);
+        } else {
+            $resolvedClass = $classMapping->resolveClass(
+                $school->id,
+                $validated['class_name'],
+                $validated['grade'] ?? null,
+                (string) now()->year,
+            );
+            if (! $resolvedClass) {
+                return back()->withInput()->withErrors([
+                    'class_name' => 'This class could not be matched unambiguously to a class in the school register. Select a valid class and grade combination.',
+                ]);
+            }
             $validated['grade'] = $resolvedClass->grade;
             $validated['class_name'] = $resolvedClass->name;
         }
