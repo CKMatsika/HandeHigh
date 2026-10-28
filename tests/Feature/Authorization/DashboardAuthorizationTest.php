@@ -4,6 +4,7 @@ namespace Tests\Feature\Authorization;
 
 use App\Models\School;
 use App\Models\User;
+use App\Services\DataPrivacyService;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,6 +85,36 @@ class DashboardAuthorizationTest extends TestCase
         }
 
         $this->actingAs($user)->get(route('dashboard'))->assertOk();
+    }
+
+    public function test_privacy_overview_avoids_unverified_security_claims_and_remains_super_admin_only(): void
+    {
+        config(['app.debug' => false]);
+
+        $privacyReport = (new DataPrivacyService($this->school))->generatePrivacyReport();
+        $this->assertSame('Not assessed', $privacyReport['compliance_status']['gdpr_compliance']['status']);
+        $this->assertSame('Not verified', $privacyReport['security_measures']['technical_measures']['multi_factor_authentication']['status']);
+        $this->assertSame('Not assessed', $privacyReport['data_retention_policies']['status']);
+        $this->assertNull($privacyReport['data_subject_requests']['access_requests']['total']);
+
+        $superAdminResponse = $this->actingAs($this->userWithRole('super-admin'))
+            ->get(route('dashboard'));
+
+        $superAdminResponse->assertOk()
+            ->assertSee('Data Privacy & Compliance', false)
+            ->assertSee('Privacy Assessment')
+            ->assertSee('Not assessed')
+            ->assertSee('Controls not fully verified')
+            ->assertSee('not a legal compliance certification')
+            ->assertDontSee('GDPR Status')
+            ->assertDontSee('Security Level');
+
+        $schoolAdminResponse = $this->actingAs($this->userWithRole('school-admin'))
+            ->get(route('dashboard'));
+
+        $schoolAdminResponse->assertOk()
+            ->assertDontSee('Data Privacy & Compliance', false)
+            ->assertDontSee('School Data Records');
     }
 
     public function test_each_role_can_reach_only_its_intended_admin_dashboard(): void

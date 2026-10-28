@@ -171,19 +171,16 @@ class DataPrivacyService
                 'count' => $this->school->students()->count(),
                 'data_types' => ['personal_info', 'academic_records', 'financial_data', 'attendance'],
                 'storage_location' => 'database',
-                'retention_period' => '7 years after graduation',
             ],
             'teachers' => [
                 'count' => $this->school->teachers()->count(),
                 'data_types' => ['personal_info', 'employment_records', 'qualifications'],
                 'storage_location' => 'database',
-                'retention_period' => '6 years after employment ends',
             ],
             'parents' => [
                 'count' => $this->school->parents()->count(),
                 'data_types' => ['personal_info', 'contact_details'],
                 'storage_location' => 'database',
-                'retention_period' => '7 years after last child graduates',
             ],
         ];
     }
@@ -191,68 +188,42 @@ class DataPrivacyService
     protected function getProcessingActivities(): array
     {
         return [
-            'academic_management' => [
-                'purpose' => 'Education administration',
-                'legal_basis' => 'Educational necessity',
-                'data_categories' => ['Student records', 'Academic performance'],
-                'recipients' => ['Teachers', 'Administrators', 'Parents'],
-            ],
-            'financial_management' => [
-                'purpose' => 'Fee collection and financial administration',
-                'legal_basis' => 'Contractual obligation',
-                'data_categories' => ['Payment information', 'Financial records'],
-                'recipients' => ['Finance staff', 'Parents'],
-            ],
-            'communication' => [
-                'purpose' => 'School communication and notifications',
-                'legal_basis' => 'Legitimate interest',
-                'data_categories' => ['Contact information'],
-                'recipients' => ['School staff', 'Parents', 'Students'],
-            ],
+            'status' => 'Not assessed',
+            'activities' => [],
+            'note' => 'Processing purposes, legal bases, and recipient lists require documented review.',
         ];
     }
 
     protected function getRetentionPolicies(): array
     {
         return [
-            'student_records' => [
-                'retention_period' => '7 years post-graduation',
-                'deletion_method' => 'Secure anonymization',
-                'exceptions' => ['Legal requirements', 'Historical archives'],
-            ],
-            'financial_records' => [
-                'retention_period' => '7 years',
-                'deletion_method' => 'Secure deletion',
-                'exceptions' => ['Tax requirements', 'Audit purposes'],
-            ],
-            'communication_logs' => [
-                'retention_period' => '2 years',
-                'deletion_method' => 'Automatic deletion',
-                'exceptions' => ['Legal proceedings'],
-            ],
+            'status' => 'Not assessed',
+            'policies' => [],
+            'note' => 'Retention periods and deletion procedures require documented review.',
         ];
     }
 
     protected function getSubjectRequests(): array
     {
         return [
+            'status' => 'Not tracked in this report',
             'access_requests' => [
-                'total' => 0, // Would query actual data
-                'pending' => 0,
-                'completed' => 0,
-                'average_response_time' => '14 days',
+                'total' => null,
+                'pending' => null,
+                'completed' => null,
+                'average_response_time' => null,
             ],
             'deletion_requests' => [
-                'total' => 0,
-                'pending' => 0,
-                'completed' => 0,
-                'average_response_time' => '30 days',
+                'total' => null,
+                'pending' => null,
+                'completed' => null,
+                'average_response_time' => null,
             ],
             'correction_requests' => [
-                'total' => 0,
-                'pending' => 0,
-                'completed' => 0,
-                'average_response_time' => '7 days',
+                'total' => null,
+                'pending' => null,
+                'completed' => null,
+                'average_response_time' => null,
             ],
         ];
     }
@@ -261,16 +232,32 @@ class DataPrivacyService
     {
         return [
             'technical_measures' => [
-                'encryption' => 'AES-256 for sensitive data',
-                'access_control' => 'Role-based permissions',
-                'authentication' => 'Multi-factor authentication',
-                'backup_security' => 'Encrypted backups',
+                'admin_dashboard_access' => [
+                    'status' => 'Verified',
+                    'evidence' => 'The privacy dashboard data is generated only for users with the super-admin role.',
+                ],
+                'application_debug' => [
+                    'status' => config('app.debug') ? 'Needs attention' : 'Verified disabled',
+                    'evidence' => 'Checked against the running application debug configuration.',
+                ],
+                'multi_factor_authentication' => [
+                    'status' => 'Not verified',
+                    'evidence' => 'This report does not verify whether MFA is enforced for privileged accounts.',
+                ],
+                'database_encryption' => [
+                    'status' => 'Not verified',
+                    'evidence' => 'Database encryption at rest is not verifiable from this application report.',
+                ],
+                'backup_encryption_and_restore' => [
+                    'status' => 'Not verified',
+                    'evidence' => 'Backup encryption and restore testing require independent operational evidence.',
+                ],
             ],
             'organizational_measures' => [
-                'staff_training' => 'Annual privacy training',
-                'data_protection_officer' => 'Designated DPO',
-                'privacy_policy' => 'Published and updated annually',
-                'incident_response' => '24-hour breach notification',
+                'staff_training' => ['status' => 'Not verified'],
+                'data_protection_officer' => ['status' => 'Not verified'],
+                'privacy_policy' => ['status' => 'Not verified'],
+                'incident_response' => ['status' => 'Not verified'],
             ],
         ];
     }
@@ -279,19 +266,19 @@ class DataPrivacyService
     {
         return [
             'gdpr_compliance' => [
-                'status' => 'Compliant',
-                'last_audit' => now()->subMonths(6)->toDateString(),
-                'next_audit' => now()->addMonths(6)->toDateString(),
+                'status' => 'Not assessed',
+                'last_audit' => null,
+                'next_audit' => null,
             ],
             'local_regulations' => [
-                'status' => 'Compliant',
-                'certifications' => ['Data Protection Certificate'],
-                'last_review' => now()->subMonths(3)->toDateString(),
+                'status' => 'Not assessed',
+                'certifications' => [],
+                'last_review' => null,
             ],
             'risk_assessment' => [
-                'overall_risk' => 'Low',
-                'identified_risks' => [],
-                'mitigation_measures' => 'Implemented',
+                'overall_risk' => 'Not assessed',
+                'identified_risks' => ['Security controls require evidence-based review.'],
+                'mitigation_measures' => 'Not verified by this application report.',
             ],
         ];
     }

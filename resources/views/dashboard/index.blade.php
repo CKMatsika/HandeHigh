@@ -242,20 +242,26 @@
                 <h3 class="text-sm font-semibold text-slate-50 mb-3">Data Privacy & Compliance</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <div class="text-xs text-slate-400 mb-1">GDPR Status</div>
-                        <div class="text-sm font-medium text-emerald-500">{{ $privacy_report['compliance_status']['gdpr_compliance']['status'] }}</div>
+                        <div class="text-xs text-slate-400 mb-1">Privacy Assessment</div>
+                        <div class="text-sm font-medium text-amber-400">{{ $privacy_report['compliance_status']['gdpr_compliance']['status'] }}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-slate-400 mb-1">Data Records</div>
+                        <div class="text-xs text-slate-400 mb-1">School Data Records</div>
                         <div class="text-sm font-medium text-slate-50">
                             {{ $privacy_report['data_inventory']['students']['count'] }} Students
                         </div>
                     </div>
                     <div>
-                        <div class="text-xs text-slate-400 mb-1">Security Level</div>
-                        <div class="text-sm font-medium text-emerald-500">{{ $privacy_report['compliance_status']['risk_assessment']['overall_risk'] }}</div>
+                        <div class="text-xs text-slate-400 mb-1">Security Review</div>
+                        <div class="text-sm font-medium {{ config('app.debug') ? 'text-rose-400' : 'text-amber-400' }}">
+                            {{ config('app.debug') ? 'Needs attention' : 'Controls not fully verified' }}
+                        </div>
                     </div>
                 </div>
+                <p class="mt-3 text-xs text-slate-400">
+                    This summary is not a legal compliance certification. MFA, database and backup encryption,
+                    restore testing, and organisational privacy controls have not been verified here.
+                </p>
             </div>
         @endif
 
