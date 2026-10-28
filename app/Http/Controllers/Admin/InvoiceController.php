@@ -394,28 +394,89 @@ class InvoiceController extends Controller
             abort(400, 'No school context available for this user.');
         }
 
+        $statusOptions = ['unpaid', 'partial', 'paid', 'cancelled'];
+        $search = trim((string) $request->input('search', ''));
         $status = $request->input('status');
+        $academicYear = trim((string) $request->input('academic_year', ''));
+        $term = trim((string) $request->input('term', ''));
 
         $query = Invoice::with(['student', 'guardian', 'enrollment', 'allocations'])
             ->where('school_id', $school->id);
 
-        if ($status) {
+        if ($search !== '') {
+            $searchTerms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            foreach ($searchTerms as $searchTerm) {
+                $like = '%' . $searchTerm . '%';
+                $query->where(function ($match) use ($searchTerm, $like, $school) {
+                    $match->where('number', 'like', $like)
+                        ->orWhereHas('student', function ($studentQuery) use ($like, $searchTerm, $school) {
+                            $studentQuery->where('school_id', $school->id)
+                                ->where(function ($nameQuery) use ($like, $searchTerm) {
+                                    $nameQuery->where('first_name', 'like', $like)
+                                        ->orWhere('other_names', 'like', $like)
+                                        ->orWhere('last_name', 'like', $like)
+                                        ->orWhere('admission_number', 'like', $like)
+                                        ->orWhere('registration_number', 'like', $like);
+
+                                    if (ctype_digit($searchTerm)) {
+                                        $nameQuery->orWhere('id', (int) $searchTerm);
+                                    }
+                                });
+                        })
+                        ->orWhereHas('guardian', function ($guardianQuery) use ($like, $school) {
+                            $guardianQuery->where('school_id', $school->id)
+                                ->where(function ($nameQuery) use ($like) {
+                                    $nameQuery->where('first_name', 'like', $like)
+                                        ->orWhere('last_name', 'like', $like)
+                                        ->orWhere('email', 'like', $like)
+                                        ->orWhere('phone', 'like', $like);
+                                });
+                        });
+
+                    if (ctype_digit($searchTerm)) {
+                        $match->orWhere('id', (int) $searchTerm)
+                            ->orWhere('student_id', (int) $searchTerm);
+                    }
+                });
+            }
+        }
+
+        if (in_array($status, $statusOptions, true)) {
             $query->where('status', $status);
+        }
+
+        if ($academicYear !== '') {
+            $query->where('academic_year', $academicYear);
+        }
+
+        if ($term !== '') {
+            $query->where('term', $term);
         }
 
         $invoices = $query
             ->orderByDesc('issued_at')
             ->orderByDesc('created_at')
             ->paginate(20)
-            ->appends($request->only('status'));
+            ->appends($request->only(['search', 'status', 'academic_year', 'term']));
 
-        $statusOptions = ['unpaid', 'partial', 'paid', 'cancelled'];
+        $academicYearOptions = Invoice::where('school_id', $school->id)
+            ->whereNotNull('academic_year')->where('academic_year', '!=', '')
+            ->distinct()->orderByDesc('academic_year')->pluck('academic_year');
+        $termOptions = Invoice::where('school_id', $school->id)
+            ->whereNotNull('term')->where('term', '!=', '')
+            ->distinct()->orderBy('term')->pluck('term');
 
         return view('admin.invoices.index', [
             'school' => $school,
             'invoices' => $invoices,
+            'search' => $search,
             'status' => $status,
             'statusOptions' => $statusOptions,
+            'academicYear' => $academicYear,
+            'academicYearOptions' => $academicYearOptions,
+            'term' => $term,
+            'termOptions' => $termOptions,
         ]);
     }
 

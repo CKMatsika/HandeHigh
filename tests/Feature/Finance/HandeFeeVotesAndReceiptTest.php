@@ -428,6 +428,85 @@ class HandeFeeVotesAndReceiptTest extends TestCase
         $response->assertSee(route('admin.payments.advance.create'));
     }
 
+    public function test_invoice_list_can_search_student_and_filter_year_term_and_status_within_school(): void
+    {
+        $student = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Leonita',
+            'last_name' => 'Baloyi',
+            'admission_number' => 'ADM-LEO-2026',
+            'status' => 'active',
+        ]);
+        $otherStudent = Student::create([
+            'school_id' => $this->school->id,
+            'first_name' => 'Tavonga',
+            'last_name' => 'Chamuze',
+            'admission_number' => 'ADM-TAV-2026',
+            'status' => 'active',
+        ]);
+
+        Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'number' => 'INV-LEONITA-T1',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'issued_at' => '2026-01-01',
+            'total_amount' => 470,
+            'balance' => 470,
+            'status' => 'unpaid',
+        ]);
+        Invoice::create([
+            'school_id' => $this->school->id,
+            'student_id' => $otherStudent->id,
+            'number' => 'INV-TAVONGA-T1',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'issued_at' => '2026-01-01',
+            'total_amount' => 135,
+            'balance' => 0,
+            'status' => 'paid',
+        ]);
+
+        $foreignSchool = School::create(['name' => 'Other School', 'code' => 'OTHER-SCHOOL']);
+        $foreignStudent = Student::create([
+            'school_id' => $foreignSchool->id,
+            'first_name' => 'Leonita',
+            'last_name' => 'Baloyi',
+            'admission_number' => 'FOREIGN-LEO',
+            'status' => 'active',
+        ]);
+        Invoice::create([
+            'school_id' => $foreignSchool->id,
+            'student_id' => $foreignStudent->id,
+            'number' => 'INV-FOREIGN-LEONITA',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'issued_at' => '2026-01-01',
+            'total_amount' => 999,
+            'balance' => 999,
+            'status' => 'unpaid',
+        ]);
+
+        $response = $this->actingAs($this->adminUser)->get(route('admin.invoices.index', [
+            'search' => 'Leonita Baloyi',
+            'academic_year' => '2026',
+            'term' => 'Term 1',
+            'status' => 'unpaid',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('INV-LEONITA-T1')
+            ->assertDontSee('INV-TAVONGA-T1')
+            ->assertDontSee('INV-FOREIGN-LEONITA')
+            ->assertSee('Search invoices')
+            ->assertSee('2026');
+
+        $this->actingAs($this->adminUser)
+            ->get(route('admin.invoices.index', ['search' => 'ADM-LEO-2026']))
+            ->assertOk()->assertSee('INV-LEONITA-T1');
+    }
+
     public function test_super_admin_without_school_id_can_access_invoices_index(): void
     {
         $superAdmin = User::factory()->create([

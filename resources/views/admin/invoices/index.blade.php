@@ -51,20 +51,50 @@
         </div>
     @endif
 
-    <form method="GET" action="{{ route('admin.invoices.index') }}" class="mb-4 flex flex-wrap gap-3 text-xs text-slate-100">
-        <div>
-            <label class="block text-[11px] font-medium mb-1 text-slate-300" for="status">Status</label>
-            <select id="status" name="status" class="w-40 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
-                <option value="">All</option>
-                @foreach($statusOptions as $s)
-                    <option value="{{ $s }}" {{ $status === $s ? 'selected' : '' }}>{{ ucfirst($s) }}</option>
-                @endforeach
-            </select>
+    <form method="GET" action="{{ route('admin.invoices.index') }}" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-xs text-slate-100">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="lg:col-span-2">
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="invoice-search">Search invoices</label>
+                <input id="invoice-search" type="search" name="search" value="{{ $search }}"
+                    placeholder="Student name, admission number, invoice number or guardian"
+                    class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500">
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="invoice-academic-year">Academic year</label>
+                <select id="invoice-academic-year" name="academic_year" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">All years</option>
+                    @foreach($academicYearOptions as $year)
+                        <option value="{{ $year }}" @selected($academicYear === (string) $year)>{{ $year }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="invoice-term">Term</label>
+                <select id="invoice-term" name="term" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">All terms</option>
+                    @foreach($termOptions as $termOption)
+                        <option value="{{ $termOption }}" @selected($term === (string) $termOption)>{{ $termOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium mb-1 text-slate-300" for="invoice-status">Status</label>
+                <select id="invoice-status" name="status" class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs">
+                    <option value="">All statuses</option>
+                    @foreach($statusOptions as $s)
+                        <option value="{{ $s }}" @selected($status === $s)>{{ ucfirst($s) }}</option>
+                    @endforeach
+                </select>
+            </div>
         </div>
-        <div class="flex items-end">
-            <button type="submit" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
-                Filter
-            </button>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
+            <p class="text-[11px] text-slate-400">{{ number_format($invoices->total()) }} invoice{{ $invoices->total() === 1 ? '' : 's' }} found</p>
+            <div class="flex gap-2">
+                <a href="{{ route('admin.invoices.index') }}" class="rounded-full border border-slate-700 px-4 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 transition">Clear filters</a>
+                <button type="submit" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
+                    Search / Filter
+                </button>
+            </div>
         </div>
     </form>
 
