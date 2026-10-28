@@ -32,29 +32,49 @@ class EnrollmentController extends Controller
             ->where('school_id', $school->id);
 
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('student', function ($sq) use ($search) {
-                $sq->where('first_name', 'like', "%{$search}%")
-                   ->orWhere('last_name', 'like', "%{$search}%")
-                   ->orWhere('admission_number', 'like', "%{$search}%")
-                   ->orWhere('registration_number', 'like', "%{$search}%");
+            $search = trim((string) $request->input('search'));
+            $query->whereHas('student', function ($sq) use ($search, $school) {
+                $sq->where('school_id', $school->id);
+                $terms = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+                foreach ($terms as $term) {
+                    $sq->where(function ($termQuery) use ($term) {
+                        $termQuery->where('first_name', 'like', "%{$term}%")
+                            ->orWhere('last_name', 'like', "%{$term}%")
+                            ->orWhere('admission_number', 'like', "%{$term}%")
+                            ->orWhere('registration_number', 'like', "%{$term}%");
+                    });
+                }
             });
         }
 
         if ($request->filled('grade')) {
-            $query->where('grade', $request->grade);
+            $grade = $request->input('grade');
+            $query->where(function ($q) use ($grade, $school) {
+                $q->where('grade', $grade)
+                    ->orWhereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('grade', $grade))
+                    ->orWhereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('grade', $grade));
+            });
+        }
+
+        if ($request->filled('academic_year')) {
+            $query->where('academic_year', $request->input('academic_year'));
+        }
+
+        if ($request->filled('term')) {
+            $query->where('term', $request->input('term'));
         }
 
         if ($request->filled('stream') || $request->filled('class_name')) {
             $stream = $request->input('stream') ?: $request->input('class_name');
-            $query->where(function ($q) use ($stream) {
+            $query->where(function ($q) use ($stream, $school) {
                 $q->where('class_name', $stream)
-                  ->orWhereHas('class', fn ($cq) => $cq->where('name', $stream));
+                  ->orWhereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('name', $stream));
             });
         }
 
         if ($request->filled('gender')) {
-            $query->whereHas('student', fn ($sq) => $sq->where('gender', $request->gender));
+            $query->whereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('gender', $request->gender));
         }
 
         if ($request->filled('status')) {
@@ -67,6 +87,54 @@ class EnrollmentController extends Controller
             $query->where('student_type', $request->student_type);
         }
 
+        if ($request->input('residency') === 'boarding') {
+            $query->where(function ($q) use ($school) {
+                $q->where('is_boarding', true)
+                    ->orWhere('student_type', 'boarding')
+                    ->orWhereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('is_boarding', true));
+            });
+        } elseif ($request->input('residency') === 'day') {
+            $query->where(function ($q) use ($school) {
+                $q->where(function ($enrollmentQuery) {
+                    $enrollmentQuery->where('is_boarding', false)->orWhereNull('is_boarding');
+                })->where(function ($typeQuery) {
+                    $typeQuery->where('student_type', '!=', 'boarding')->orWhereNull('student_type');
+                })->whereHas('student', function ($studentQuery) use ($school) {
+                    $studentQuery->where('school_id', $school->id)
+                        ->where(function ($boardingQuery) {
+                            $boardingQuery->where('is_boarding', false)->orWhereNull('is_boarding');
+                        });
+                });
+            });
+        }
+
+        // Keep filter choices scoped to this school's enrolments and classes.
+        $gradeOptions = Enrollment::where('school_id', $school->id)
+            ->whereNotNull('grade')->where('grade', '!=', '')
+            ->distinct()->orderBy('grade')->pluck('grade')
+            ->merge(SchoolClass::where('school_id', $school->id)
+                ->whereNotNull('grade')->where('grade', '!=', '')
+                ->distinct()->orderBy('grade')->pluck('grade'))
+            ->unique()->sort()->values();
+
+        $classOptions = Enrollment::where('school_id', $school->id)
+            ->whereNotNull('class_name')->where('class_name', '!=', '')
+            ->distinct()->orderBy('class_name')->pluck('class_name')
+            ->merge(SchoolClass::where('school_id', $school->id)
+                ->whereNotNull('name')->where('name', '!=', '')
+                ->distinct()->orderBy('name')->pluck('name'))
+            ->unique()->sort()->values();
+
+        $academicYearOptions = Enrollment::where('school_id', $school->id)
+            ->whereNotNull('academic_year')->where('academic_year', '!=', '')
+            ->distinct()->orderByDesc('academic_year')->pluck('academic_year');
+        $termOptions = Enrollment::where('school_id', $school->id)
+            ->whereNotNull('term')->where('term', '!=', '')
+            ->distinct()->orderBy('term')->pluck('term');
+        $statusOptions = Enrollment::where('school_id', $school->id)
+            ->whereNotNull('status')->where('status', '!=', '')
+            ->distinct()->orderBy('status')->pluck('status');
+
         $enrollments = $query->orderByDesc('enrollment_date')
             ->paginate(15)
             ->appends($request->query());
@@ -74,6 +142,11 @@ class EnrollmentController extends Controller
         return view('admin.enrollments.index', [
             'school' => $school,
             'enrollments' => $enrollments,
+            'gradeOptions' => $gradeOptions,
+            'classOptions' => $classOptions,
+            'academicYearOptions' => $academicYearOptions,
+            'termOptions' => $termOptions,
+            'statusOptions' => $statusOptions,
         ]);
     }
 

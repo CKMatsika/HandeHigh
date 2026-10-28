@@ -16,6 +16,85 @@
         </div>
     </div>
 
+    <form method="GET" action="{{ route('admin.enrollments.index') }}" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="lg:col-span-2">
+                <label for="enrollment-search" class="mb-1 block text-[11px] font-medium text-slate-400">Search student</label>
+                <input id="enrollment-search" type="search" name="search" value="{{ request('search') }}"
+                    placeholder="Name, admission number or registration number"
+                    class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label for="enrollment-year" class="mb-1 block text-[11px] font-medium text-slate-400">Academic year</label>
+                <select id="enrollment-year" name="academic_year" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All years</option>
+                    @foreach($academicYearOptions as $year)
+                        <option value="{{ $year }}" @selected(request('academic_year') === (string) $year)>{{ $year }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="enrollment-term" class="mb-1 block text-[11px] font-medium text-slate-400">Term</label>
+                <select id="enrollment-term" name="term" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All terms</option>
+                    @foreach($termOptions as $termOption)
+                        <option value="{{ $termOption }}" @selected(request('term') === (string) $termOption)>{{ $termOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="enrollment-grade" class="mb-1 block text-[11px] font-medium text-slate-400">Grade / Form</label>
+                <select id="enrollment-grade" name="grade" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All grades</option>
+                    @foreach($gradeOptions as $gradeOption)
+                        <option value="{{ $gradeOption }}" @selected(request('grade') === (string) $gradeOption)>{{ $gradeOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="enrollment-class" class="mb-1 block text-[11px] font-medium text-slate-400">Class / Stream</label>
+                <select id="enrollment-class" name="class_name" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All classes</option>
+                    @foreach($classOptions as $classOption)
+                        <option value="{{ $classOption }}" @selected(request('class_name', request('stream')) === (string) $classOption)>{{ $classOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="enrollment-residency" class="mb-1 block text-[11px] font-medium text-slate-400">Residency</label>
+                <select id="enrollment-residency" name="residency" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All students</option>
+                    <option value="boarding" @selected(request('residency') === 'boarding')>Boarding</option>
+                    <option value="day" @selected(request('residency') === 'day')>Day scholar</option>
+                </select>
+            </div>
+            <div>
+                <label for="enrollment-gender" class="mb-1 block text-[11px] font-medium text-slate-400">Gender</label>
+                <select id="enrollment-gender" name="gender" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All genders</option>
+                    <option value="female" @selected(request('gender') === 'female')>Female</option>
+                    <option value="male" @selected(request('gender') === 'male')>Male</option>
+                </select>
+            </div>
+            <div>
+                <label for="enrollment-status" class="mb-1 block text-[11px] font-medium text-slate-400">Status</label>
+                <select id="enrollment-status" name="status" class="w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100">
+                    <option value="">All statuses</option>
+                    @foreach($statusOptions as $statusOption)
+                        <option value="{{ $statusOption }}" @selected(request('status') === (string) $statusOption)>{{ ucfirst($statusOption) }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
+            <p class="text-[11px] text-slate-400">{{ number_format($enrollments->total()) }} enrolment{{ $enrollments->total() === 1 ? '' : 's' }} found</p>
+            <div class="flex gap-2">
+                <a href="{{ route('admin.enrollments.index') }}" class="rounded-xl border border-slate-700 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800">Clear filters</a>
+                <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500">Search / Filter</button>
+            </div>
+        </div>
+    </form>
+
     @if (session('import_summary'))
         @php
             $summary = session('import_summary');
@@ -114,7 +193,7 @@
                 {{ $enrollments->links() }}
             </div>
         @else
-            <p class="text-xs text-slate-400">No enrollments have been captured yet.</p>
+            <p class="text-xs text-slate-400">{{ request()->hasAny(['search', 'academic_year', 'term', 'grade', 'class_name', 'stream', 'residency', 'gender', 'status']) ? 'No enrolments match these search filters.' : 'No enrollments have been captured yet.' }}</p>
         @endif
     </div>
 @endsection
