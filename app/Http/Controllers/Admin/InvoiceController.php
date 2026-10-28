@@ -537,14 +537,20 @@ class InvoiceController extends Controller
         }
 
         // 3. Query matching active enrollments & students
-        $enrollmentQuery = Enrollment::with([
-            'student.guardians',
+        $enrollmentQuery = Enrollment::query()
+        ->select([
+            'id', 'school_id', 'student_id', 'class_id', 'academic_year', 'term',
+            'grade', 'class_name', 'is_boarding', 'has_transport', 'student_type', 'status',
+        ])
+        ->with([
+            'student:id,school_id,first_name,last_name,admission_number,grade,class_name,is_boarding,has_transport',
             'student.invoices' => function ($q) use ($academicYear, $term) {
                 $q->where('academic_year', $academicYear)
                   ->where('term', $term)
-                  ->where('status', '!=', 'cancelled');
+                  ->where('status', '!=', 'cancelled')
+                  ->select('id', 'school_id', 'student_id', 'number', 'academic_year', 'term', 'status');
             },
-            'class',
+            'class:id,school_id,grade,name',
         ])
         ->where('school_id', $school->id)
         ->where('status', 'active');
@@ -606,6 +612,26 @@ class InvoiceController extends Controller
             });
         }
 
+        // Calculate the residency summary in SQL rather than loading a second
+        // full Eloquent cohort (including Student models) into PHP memory.
+        $cohortRows = (clone $enrollmentQuery)
+            ->select('enrollments.student_id')
+            ->selectRaw(
+                'MAX(CASE WHEN enrollments.is_boarding = 1 OR enrollments.student_type = ? OR EXISTS (SELECT 1 FROM students AS cohort_students WHERE cohort_students.id = enrollments.student_id AND cohort_students.is_boarding = 1) THEN 1 ELSE 0 END) AS is_boarder',
+                ['boarding']
+            )
+            ->groupBy('enrollments.student_id')
+            ->toBase();
+
+        $cohortSummary = DB::query()
+            ->fromSub($cohortRows, 'cohort')
+            ->selectRaw('COUNT(*) AS total_count, COALESCE(SUM(is_boarder), 0) AS boarder_count')
+            ->first();
+
+        $cohortTotalCount = (int) ($cohortSummary->total_count ?? 0);
+        $cohortBoarderCount = (int) ($cohortSummary->boarder_count ?? 0);
+        $cohortDayCount = $cohortTotalCount - $cohortBoarderCount;
+
         if ($residency === 'boarding') {
             $enrollmentQuery->where(function ($q) {
                 $q->where('is_boarding', true)
@@ -630,69 +656,6 @@ class InvoiceController extends Controller
             ->sortBy(function ($enr) {
                 return ($enr->grade ?? '') . '-' . ($enr->class_name ?? '') . '-' . ($enr->student?->last_name ?? '');
             });
-
-        // 3b. Calculate cohort breakdown of the selected class/grade (independent of residency filter)
-        $cohortQuery = Enrollment::with('student')
-            ->where('school_id', $school->id)
-            ->where('status', 'active');
-
-        if ($academicYear) {
-            $cohortQuery->where(function ($q) use ($academicYear) {
-                $q->where('academic_year', $academicYear)->orWhereNull('academic_year');
-            });
-        }
-        if ($term) {
-            $termVars = $this->getTermVariations($term);
-            $cohortQuery->where(function ($q) use ($termVars) {
-                $q->whereIn('term', $termVars)->orWhereNull('term')->orWhere('term', '');
-            });
-        }
-        if ($grade) {
-            $gradeVars = $this->getGradeVariations($grade);
-            $cohortQuery->where(function ($q) use ($gradeVars) {
-                $q->where(function ($sub) use ($gradeVars) {
-                    $sub->whereNotNull('grade')->where('grade', '!=', '')->whereIn('grade', $gradeVars);
-                })->orWhere(function ($sub) use ($gradeVars) {
-                    $sub->where(function ($nullGrade) {
-                        $nullGrade->whereNull('grade')->orWhere('grade', '');
-                    })->whereHas('student', fn ($sq) => $sq->whereIn('grade', $gradeVars));
-                })->orWhere(function ($sub) use ($gradeVars) {
-                    $sub->where(function ($nullGrade) {
-                        $nullGrade->whereNull('grade')->orWhere('grade', '');
-                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('grade')->where('grade', '!=', ''))
-                      ->whereHas('class', fn ($cq) => $cq->whereIn('grade', $gradeVars));
-                });
-            });
-        }
-        if ($className) {
-            $cohortQuery->where(function ($q) use ($className) {
-                $q->where(function ($sub) use ($className) {
-                    $sub->whereNotNull('class_name')->where('class_name', '!=', '')->where('class_name', $className);
-                })->orWhere(function ($sub) use ($className) {
-                    $sub->where(function ($nullClass) {
-                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
-                    })->whereHas('student', fn ($sq) => $sq->where('class_name', $className));
-                })->orWhere(function ($sub) use ($className) {
-                    $sub->where(function ($nullClass) {
-                        $nullClass->whereNull('class_name')->orWhere('class_name', '');
-                    })->whereDoesntHave('student', fn ($sq) => $sq->whereNotNull('class_name')->where('class_name', '!=', ''))
-                      ->whereHas('class', fn ($cq) => $cq->where('name', $className));
-                });
-            });
-        }
-
-        $cohortEnrollments = $cohortQuery->get()->unique('student_id');
-        $cohortBoarderCount = 0;
-        $cohortDayCount = 0;
-        foreach ($cohortEnrollments as $cEnr) {
-            $isBrd = $cEnr->isBoarder() || (bool) $cEnr->student?->is_boarding;
-            if ($isBrd) {
-                $cohortBoarderCount++;
-            } else {
-                $cohortDayCount++;
-            }
-        }
-        $cohortTotalCount = $cohortBoarderCount + $cohortDayCount;
 
         // 4. Calculate individual preview for each student
         $studentPreviews = [];
@@ -728,7 +691,9 @@ class InvoiceController extends Controller
             $appliedItems = [];
             $studentTotal = 0.0;
 
-            $studentGrade = $enrollment->grade ?? $student->grade ?? $enrollment->class?->grade;
+            $studentGrade = $enrollment->grade
+                ?: $student->getRawOriginal('grade')
+                ?: $enrollment->class?->grade;
             $applicableFees = $this->feeSelectionService->select(
                 $feeStructures,
                 $studentGrade,
@@ -761,8 +726,11 @@ class InvoiceController extends Controller
             $studentPreviews[] = [
                 'enrollment' => $enrollment,
                 'student' => $student,
-                'grade' => $enrollment->grade ?? $student->grade ?? '—',
-                'class_name' => $enrollment->class_name ?? $student->class_name ?? '—',
+                'grade' => $studentGrade ?: '—',
+                'class_name' => $enrollment->class_name
+                    ?: $student->getRawOriginal('class_name')
+                    ?: $enrollment->class?->name
+                    ?: '—',
                 'is_boarder' => $isBoarder,
                 'has_transport' => $hasTransport,
                 'existing_invoice' => $existingInvoice,
