@@ -1,19 +1,24 @@
 @extends('layouts.app')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/management-preview.css') }}">
+@endpush
+
 @section('content')
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
+<div class="management-screen students-screen">
+    <div class="ms-page-header">
         <div>
-            <h1 class="text-2xl font-bold text-slate-50">Student Management</h1>
-            <p class="text-slate-400 mt-1">Manage all students — profiles, subjects, activities, boarding, and more</p>
+            <p class="ms-eyebrow">ACADEMIC / STUDENT RECORDS</p>
+            <h1 class="ms-title">Student Management</h1>
+            <p class="ms-description">Manage student profiles, class placements and residency.</p>
         </div>
-        <a href="{{ route('admin.students.create') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-            + New Student
+        <a href="{{ route('admin.students.create') }}" class="ms-button ms-button-primary">
+            New Student
         </a>
     </div>
 
     <!-- Filters -->
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+    <div class="ms-filter">
         <form method="GET" class="flex flex-wrap items-end gap-3">
             <label class="text-xs text-slate-400">Category
                 <select name="category" class="block bg-slate-800 rounded-lg px-3 py-2 text-slate-100">
@@ -62,14 +67,14 @@
                     <option value="no" {{ request('boarding') == 'no' ? 'selected' : '' }}>Day Scholar</option>
                 </select>
             </div>
-            <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm transition">Filter</button>
+            <button type="submit" class="ms-button ms-button-primary">Apply filters</button>
         </form>
     </div>
 
     <!-- Students Table -->
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+    <div class="ms-table-card">
+        <div class="ms-table-scroll">
+            <table class="w-full text-sm ms-table">
                 <thead>
                     <tr class="border-b border-slate-800">
                         <th class="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase">Student</th>
@@ -91,11 +96,11 @@
                     <tr class="hover:bg-slate-800/50 transition">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-sm font-bold flex-shrink-0">
+                                <div class="ms-avatar w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
                                     {{ strtoupper(substr($student->first_name, 0, 1) . substr($student->last_name, 0, 1)) }}
                                 </div>
                                 <div>
-                                    <a href="{{ route('admin.students.show', $student) }}" class="text-slate-100 font-medium hover:text-indigo-400 transition">
+                                    <a href="{{ route('admin.students.show', $student) }}" class="ms-student-name">
                                         {{ $student->full_name }}
                                     </a>
                                     <p class="text-xs text-slate-500">{{ $student->gender ? ucfirst($student->gender) : '' }} {{ $student->date_of_birth ? '| ' . $student->date_of_birth->format('d M Y') : '' }}</p>
@@ -134,9 +139,8 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <a href="{{ route('admin.students.show', $student) }}" class="text-slate-400 hover:text-indigo-400 transition text-xs">View</a>
-                            <span class="text-slate-600 mx-1">|</span>
-                            <a href="{{ route('admin.students.edit', $student) }}" class="text-slate-400 hover:text-yellow-400 transition text-xs">Edit</a>
+                            <a href="{{ route('admin.students.show', $student) }}" class="ms-table-action">View</a>
+                            <a href="{{ route('admin.students.edit', $student) }}" class="ms-table-action">Edit</a>
                         </td>
                     </tr>
                     @empty
@@ -151,6 +155,6 @@
         </div>
     </div>
 
-    {{ $students->withQueryString()->links() }}
+    <div class="ms-pagination">{{ $students->withQueryString()->links() }}</div>
 </div>
 @endsection

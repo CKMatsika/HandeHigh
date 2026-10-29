@@ -1,22 +1,28 @@
 @extends('layouts.app')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/management-preview.css') }}">
+@endpush
+
 @section('content')
-    <div class="flex items-center justify-between mb-4">
+    <div class="management-screen enrollments-screen">
+    <div class="ms-page-header">
         <div>
-            <h1 class="text-lg font-semibold text-slate-50">Enrollments</h1>
-            <p class="text-xs text-slate-400 mt-1">Overview of enrolled students and their fee status.</p>
+            <p class="ms-eyebrow">ACADEMIC / STUDENT RECORDS</p>
+            <h1 class="ms-title">Enrollments</h1>
+            <p class="ms-description">Review student placements, academic periods and fee status.</p>
         </div>
-        <div class="flex gap-2">
-            <a href="{{ route('admin.enrollments.bulk-create') }}" class="inline-flex items-center rounded-full bg-indigo-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-indigo-600 transition">
+        <div class="ms-actions">
+            <a href="{{ route('admin.enrollments.bulk-create') }}" class="ms-button ms-button-secondary">
                 Bulk Enroll
             </a>
-            <a href="{{ route('admin.enrollments.create') }}" class="inline-flex items-center rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 transition">
+            <a href="{{ route('admin.enrollments.create') }}" class="ms-button ms-button-primary">
                 New Enrollment
             </a>
         </div>
     </div>
 
-    <form method="GET" action="{{ route('admin.enrollments.index') }}" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+    <form method="GET" action="{{ route('admin.enrollments.index') }}" class="ms-filter">
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div class="lg:col-span-2">
                 <label for="enrollment-search" class="mb-1 block text-[11px] font-medium text-slate-400">Search student</label>
@@ -122,9 +128,9 @@
         </div>
     @endif
 
-    <div class="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4">
+    <div class="ms-table-card">
         @if($enrollments->count())
-            <table class="min-w-full text-xs text-slate-100">
+            <div class="ms-table-scroll"><table class="min-w-full text-xs text-slate-100 ms-table">
                 <thead>
                     <tr class="border-b border-slate-800 text-slate-400">
                         <th class="text-left py-2 font-medium">Student</th>
@@ -195,7 +201,7 @@
                         </tr>
                     @endforeach
                 </tbody>
-            </table>
+            </table></div>
 
             <div class="mt-4">
                 {{ $enrollments->links() }}
@@ -203,5 +209,6 @@
         @else
             <p class="text-xs text-slate-400">{{ request()->hasAny(['search', 'academic_year', 'term', 'grade', 'class_name', 'stream', 'residency', 'gender', 'status']) ? 'No enrolments match these search filters.' : 'No enrollments have been captured yet.' }}</p>
         @endif
+    </div>
     </div>
 @endsection

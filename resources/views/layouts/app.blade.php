@@ -23,6 +23,7 @@
                 };
             </script>
         @endif
+        @stack('styles')
     </head>
     <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
         <div class="min-h-screen flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">

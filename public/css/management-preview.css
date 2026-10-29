@@ -1,0 +1,364 @@
+/* Scoped visual preview for the Invoices and Enrollments lists. */
+.management-screen {
+    --mp-bg: #111b2b;
+    --mp-panel: #152235;
+    --mp-panel-raised: #1b2a40;
+    --mp-line: #2b3c53;
+    --mp-text: #f1f5f9;
+    --mp-muted: #a8b5c7;
+    --mp-accent: #4f9cbd;
+    --mp-accent-hover: #66b3d1;
+    color: var(--mp-text);
+    font-size: 0.925rem;
+}
+
+.management-screen .ms-page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.management-screen .ms-eyebrow {
+    margin: 0 0 0.35rem;
+    color: #8fa4bc;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+}
+
+.management-screen .ms-title {
+    margin: 0;
+    color: var(--mp-text);
+    font-size: 1.8rem;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    line-height: 1.2;
+}
+
+.management-screen .ms-description {
+    margin: 0.45rem 0 0;
+    color: var(--mp-muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.management-screen .ms-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.55rem;
+}
+
+.management-screen .ms-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 2.55rem;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid transparent;
+    border-radius: 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-decoration: none;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.management-screen .ms-button-primary {
+    color: #071923;
+    background: #78bfd0;
+}
+
+.management-screen .ms-button-primary:hover {
+    background: #91d0dd;
+}
+
+.management-screen .ms-button-secondary {
+    color: #dce7f2;
+    background: #1c2a3d;
+    border-color: #3b4d65;
+}
+
+.management-screen .ms-button-secondary:hover {
+    background: #263951;
+    border-color: #56708d;
+}
+
+.management-screen .ms-filter,
+.management-screen .ms-table-card {
+    border: 1px solid var(--mp-line);
+    border-radius: 0.8rem;
+    background: var(--mp-panel);
+    box-shadow: 0 8px 22px rgb(0 0 0 / 10%);
+}
+
+.management-screen .ms-filter {
+    margin-bottom: 1rem;
+    padding: 1.15rem;
+    color: var(--mp-text);
+}
+
+.management-screen .ms-filter label {
+    margin-bottom: 0.4rem;
+    color: #c2cedb;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.management-screen .ms-filter input,
+.management-screen .ms-filter select {
+    min-height: 2.75rem;
+    border: 1px solid #3a4d65;
+    border-radius: 0.55rem;
+    background-color: #0e1928;
+    color: #f1f5f9;
+    font-size: 0.86rem;
+}
+
+.management-screen .ms-filter input::placeholder {
+    color: #8494a9;
+}
+
+.students-screen .ms-filter label select {
+    display: block;
+    width: 100%;
+    min-width: 145px;
+    margin-top: 0.4rem;
+}
+
+.management-screen .ms-filter input:focus,
+.management-screen .ms-filter select:focus {
+    border-color: var(--mp-accent);
+    outline: 2px solid rgb(79 156 189 / 22%);
+    outline-offset: 1px;
+    box-shadow: none;
+}
+
+.management-screen .ms-filter > div:last-child {
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-color: var(--mp-line);
+}
+
+.management-screen .ms-filter > div:last-child p {
+    color: #bac7d6;
+    font-size: 0.8rem;
+}
+
+.management-screen .ms-filter > div:last-child a,
+.management-screen .ms-filter > div:last-child button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.45rem;
+    border-radius: 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.management-screen .ms-filter > div:last-child a {
+    border-color: #3b4d65;
+    color: #d5dfeb;
+}
+
+.management-screen .ms-filter > div:last-child button {
+    border: 1px solid #78bfd0;
+    background: #78bfd0;
+    color: #071923;
+}
+
+.management-screen .ms-filter > div:last-child button:hover {
+    background: #91d0dd;
+}
+
+.management-screen .ms-table-card {
+    overflow: hidden;
+    padding: 0.35rem 1rem 1rem;
+}
+
+.management-screen .ms-table-scroll {
+    overflow-x: auto;
+}
+
+.management-screen .ms-table {
+    min-width: 860px;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: #e5ebf2;
+    font-size: 0.84rem;
+}
+
+.management-screen .ms-table thead th {
+    position: sticky;
+    top: 0;
+    padding: 0.9rem 0.75rem;
+    border-bottom: 1px solid #3a4b62;
+    background: var(--mp-panel);
+    color: #aab8c9;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.management-screen .ms-table tbody td {
+    padding: 0.85rem 0.75rem;
+    border-bottom: 1px solid #283950;
+    color: #dce5ef;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    vertical-align: middle;
+}
+
+.management-screen .ms-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.management-screen .ms-table tbody tr:hover td {
+    background: rgb(255 255 255 / 2.2%);
+}
+
+.management-screen .ms-table tbody td .text-\[10px\],
+.management-screen .ms-table tbody td .text-\[11px\] {
+    color: #9cacc0;
+    font-size: 0.75rem;
+}
+
+.management-screen .ms-table tbody td a.rounded-full,
+.management-screen .ms-table tbody td button.rounded-full {
+    min-height: 1.95rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #40536c;
+    border-radius: 0.45rem;
+    background: #1e2d42;
+    color: #e1eaf3;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.management-screen .ms-table tbody td a.rounded-full:hover,
+.management-screen .ms-table tbody td button.rounded-full:hover {
+    border-color: #68809b;
+    background: #293d56;
+}
+
+.management-screen .ms-table tbody td span.rounded-full {
+    font-size: 0.73rem;
+}
+
+.students-screen .ms-avatar {
+    border: 1px solid #476078;
+    background: #20354b;
+    color: #b7d7e2;
+}
+
+.students-screen .ms-student-name {
+    color: #f1f5f9;
+    font-size: 0.87rem;
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.students-screen .ms-student-name:hover {
+    color: #91d0dd;
+}
+
+.students-screen .ms-table-action {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.9rem;
+    margin-left: 0.25rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid #40536c;
+    border-radius: 0.45rem;
+    background: #1e2d42;
+    color: #e1eaf3;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.students-screen .ms-table-action:hover {
+    border-color: #68809b;
+    background: #293d56;
+}
+
+.students-screen .ms-table tbody td .text-indigo-300 {
+    color: #c3d0df;
+}
+
+.students-screen .ms-pagination {
+    margin-top: 1rem;
+}
+
+.students-screen .ms-pagination nav a,
+.students-screen .ms-pagination nav span {
+    border-color: #3b4d65;
+    background: #17263a;
+    color: #dce5ef;
+}
+
+.students-screen .ms-pagination nav [aria-current="page"] span {
+    border-color: #78bfd0;
+    background: #78bfd0;
+    color: #071923;
+}
+
+.management-screen .ms-table-card nav[role="navigation"] {
+    margin-top: 1rem;
+}
+
+.management-screen .ms-table-card nav[role="navigation"] a,
+.management-screen .ms-table-card nav[role="navigation"] span {
+    border-color: #3b4d65;
+    background: #17263a;
+    color: #dce5ef;
+}
+
+.management-screen .ms-table-card nav[role="navigation"] [aria-current="page"] span {
+    border-color: #78bfd0;
+    background: #78bfd0;
+    color: #071923;
+}
+
+.management-screen .ms-table-card > p,
+.management-screen .ms-table-card > div.text-center {
+    color: var(--mp-muted);
+    font-size: 0.88rem;
+}
+
+@media (max-width: 760px) {
+    .management-screen .ms-page-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .management-screen .ms-actions {
+        justify-content: flex-start;
+    }
+
+    .management-screen .ms-title {
+        font-size: 1.55rem;
+    }
+
+    .management-screen .ms-filter {
+        padding: 0.9rem;
+    }
+
+    .management-screen .ms-table-card {
+        padding-right: 0.55rem;
+        padding-left: 0.55rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .management-screen .ms-button {
+        transition: none;
+    }
+}
