@@ -5,6 +5,8 @@ namespace App\Services\Kiosk;
 use App\Models\KioskProduct;
 use App\Models\KioskSale;
 use App\Models\KioskSaleItem;
+use App\Models\KioskStockMovement;
+use App\Models\KioskTillSession;
 use App\Services\AccountingService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -23,7 +25,19 @@ class KioskService
      */
     public function createProduct(array $data): KioskProduct
     {
-        return KioskProduct::create($data);
+        return DB::transaction(function () use ($data) {
+            $product = KioskProduct::create($data);
+            if ((float) $product->stock_quantity !== 0.0) {
+                KioskStockMovement::create([
+                    'school_id' => $product->school_id, 'kiosk_product_id' => $product->id,
+                    'created_by' => auth()->id(), 'movement_type' => 'opening_stock',
+                    'quantity_delta' => $product->stock_quantity, 'quantity_before' => 0,
+                    'quantity_after' => $product->stock_quantity, 'reference_type' => 'product',
+                    'reference_id' => $product->id, 'notes' => 'Initial product stock',
+                ]);
+            }
+            return $product;
+        });
     }
 
     /**
@@ -36,7 +50,15 @@ class KioskService
             $items = $data['items'];
             $paymentMethod = $data['payment_method'] ?? 'cash';
             $saleDate = $data['sale_date'] ?? now()->toDateString();
-            $cashierId = $data['cashier_id'] ?? auth()->id() ?? 1;
+            $cashierId = (int) ($data['cashier_id'] ?? auth()->id());
+            if ($cashierId <= 0) {
+                throw new InvalidArgumentException('An authenticated cashier is required to record a kiosk sale.');
+            }
+            $till = KioskTillSession::where('school_id', $schoolId)->where('cashier_id', $cashierId)
+                ->where('status', 'open')->lockForUpdate()->first();
+            if (! $till) {
+                throw new InvalidArgumentException('Open a till before recording a kiosk sale.');
+            }
 
             if (empty($items)) {
                 throw new InvalidArgumentException('Kiosk sale must contain at least one item.');
@@ -45,6 +67,7 @@ class KioskService
             // Calculate totals and validate stock
             $subtotal = 0.0;
             $itemsToCreate = [];
+            $stockMovements = [];
 
             foreach ($items as $itemData) {
                 $productId = $itemData['kiosk_product_id'];
@@ -68,13 +91,16 @@ class KioskService
                     throw new InvalidArgumentException("Insufficient stock for product [{$product->name}]. Available: {$product->stock_quantity}, Requested: {$quantity}.");
                 }
 
-                $unitPrice = isset($itemData['unit_price']) ? (float) $itemData['unit_price'] : (float) $product->unit_price;
+                // The stored product price is authoritative; submitted browser prices are never trusted.
+                $unitPrice = (float) $product->unit_price;
                 $lineTotal = $unitPrice * $quantity;
                 $subtotal += $lineTotal;
 
                 // Decrement stock if stock tracking is enabled
                 if ($product->track_stock) {
+                    $before = (float) $product->stock_quantity;
                     $product->decrement('stock_quantity', $quantity);
+                    $stockMovements[] = ['product_id' => $product->id, 'quantity' => $quantity, 'before' => $before];
                 }
 
                 $itemsToCreate[] = [
@@ -102,6 +128,7 @@ class KioskService
                 'tax_amount' => $taxAmount,
                 'grand_total' => $grandTotal,
                 'cashier_id' => $cashierId,
+                'kiosk_till_session_id' => $till->id,
                 'customer_name' => $data['customer_name'] ?? null,
                 'notes' => $data['notes'] ?? null,
             ]);
@@ -109,6 +136,17 @@ class KioskService
             foreach ($itemsToCreate as $item) {
                 $item['kiosk_sale_id'] = $sale->id;
                 KioskSaleItem::create($item);
+            }
+
+            foreach ($stockMovements as $movement) {
+                KioskStockMovement::create([
+                    'school_id' => $schoolId, 'kiosk_product_id' => $movement['product_id'],
+                    'created_by' => $cashierId, 'movement_type' => 'sale',
+                    'quantity_delta' => -$movement['quantity'], 'quantity_before' => $movement['before'],
+                    'quantity_after' => $movement['before'] - $movement['quantity'],
+                    'reference_type' => 'kiosk_sale', 'reference_id' => $sale->id,
+                    'notes' => 'Stock sold through kiosk POS',
+                ]);
             }
 
             // Post to Accounting

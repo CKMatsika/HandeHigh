@@ -7,7 +7,9 @@
             <h1 class="text-xl font-semibold tracking-tight text-slate-50">Tuckshop & Kiosk Sales</h1>
             <p class="text-xs text-slate-400 mt-1">Retail point-of-sale, stock tracking, and automated revenue accounting</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+            <a href="{{ route('admin.kiosk.cashier') }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg text-sm transition">Till & Z Readings</a>
+            <a href="{{ route('admin.kiosk.stock-takes.index') }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg text-sm transition">Stock Takes</a>
             <a href="{{ route('admin.kiosk.products') }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg text-sm transition">
                 Inventory Products
             </a>
@@ -18,7 +20,8 @@
     </div>
 
     <!-- Summary Metrics -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-slate-900/80 rounded-xl border border-slate-800 p-5"><span class="text-xs text-slate-400 uppercase tracking-wider block mb-2">Selected Period Sales</span><span class="text-2xl font-bold text-violet-300">${{ number_format($periodTotal, 2) }}</span><span class="text-xs text-slate-400 block mt-1">Use date filters below</span></div>
         <div class="bg-slate-900/80 rounded-xl border border-slate-800 p-5">
             <span class="text-xs text-slate-400 uppercase tracking-wider block mb-2">Today's Total Sales</span>
             <span class="text-2xl font-bold text-emerald-400">${{ number_format($todayTotal, 2) }}</span>
@@ -40,6 +43,12 @@
                 Launch Point of Sale &rarr;
             </a>
         </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <section class="rounded-xl border border-slate-800 bg-slate-900 p-4"><h2 class="font-semibold text-slate-100">Open tills</h2><div class="mt-3 space-y-2">@forelse($openTills as $till)<div class="flex justify-between text-sm"><span class="text-slate-300">{{ $till->cashier?->name }} · {{ $till->till_label }}</span><span class="text-emerald-300">Open</span></div>@empty<p class="text-sm text-slate-500">No active tills.</p>@endforelse</div></section>
+        <section class="rounded-xl border border-slate-800 bg-slate-900 p-4"><h2 class="font-semibold text-slate-100">Best sellers</h2><div class="mt-3 space-y-2">@forelse($bestSellers as $item)<div class="flex justify-between gap-3 text-sm"><span class="text-slate-300">{{ $item->product?->name ?? 'Product removed' }}</span><span class="whitespace-nowrap text-slate-400">{{ number_format($item->units_sold) }} sold · ${{ number_format($item->revenue,2) }}</span></div>@empty<p class="text-sm text-slate-500">No sales recorded.</p>@endforelse</div></section>
+        <section class="rounded-xl border border-slate-800 bg-slate-900 p-4"><h2 class="font-semibold text-slate-100">Low stock ≤ 5</h2><div class="mt-3 space-y-2">@forelse($lowStock as $product)<div class="flex justify-between text-sm"><span class="text-slate-300">{{ $product->name }}</span><span class="text-amber-300">{{ $product->stock_quantity }}</span></div>@empty<p class="text-sm text-slate-500">No low stock alerts.</p>@endforelse</div><a href="{{ route('admin.kiosk.products') }}" class="mt-3 inline-block text-xs text-indigo-300">Manage products →</a></section>
     </div>
 
     <!-- Filters & Sales History -->

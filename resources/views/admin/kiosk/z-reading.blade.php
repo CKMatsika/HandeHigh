@@ -1,0 +1,12 @@
+@extends('layouts.app')
+@section('content')
+<div class="mx-auto max-w-4xl space-y-5 print:max-w-none">
+    <div class="flex justify-between print:hidden"><a href="{{ route('admin.kiosk.cashier') }}" class="text-sm text-indigo-300">← Till dashboard</a><button onclick="window.print()" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white">Print Z Reading</button></div>
+    <article class="rounded-xl border border-slate-800 bg-slate-900 p-6 text-slate-100 print:border-0 print:bg-white print:text-black">
+        <h1 class="text-2xl font-bold">Kiosk Z Reading</h1><p class="mt-1 text-slate-400 print:text-slate-700">{{ $session->z_reading_number }} · {{ $session->till_label }}</p>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2"><div>Cashier: <strong>{{ $session->cashier?->name }}</strong></div><div>Closed: <strong>{{ $session->closed_at?->format('d M Y H:i') }}</strong></div><div>Opened: {{ $session->opened_at->format('d M Y H:i') }}</div><div>Closed by: {{ $session->closedBy?->name }}</div></div>
+        <div class="mt-6 overflow-x-auto"><table class="w-full text-sm"><tbody class="divide-y divide-slate-700"><tr><td class="py-2">Opening float</td><td class="text-right">${{ number_format($session->opening_float,2) }}</td></tr><tr><td class="py-2">Cash sales</td><td class="text-right">${{ number_format($session->cash_sales,2) }}</td></tr><tr><td class="py-2">Mobile money sales</td><td class="text-right">${{ number_format($session->mobile_money_sales,2) }}</td></tr><tr><td class="py-2">Bank transfer sales</td><td class="text-right">${{ number_format($session->bank_transfer_sales,2) }}</td></tr><tr><td class="py-2">Card sales</td><td class="text-right">${{ number_format($session->card_sales,2) }}</td></tr><tr class="font-semibold"><td class="py-2">Total sales · {{ $session->sales_count }} receipts</td><td class="text-right">${{ number_format($session->total_sales,2) }}</td></tr><tr><td class="py-2">Expected cash in till</td><td class="text-right">${{ number_format($session->expected_cash,2) }}</td></tr><tr><td class="py-2">Counted cash</td><td class="text-right">${{ number_format($session->counted_cash,2) }}</td></tr><tr class="font-bold"><td class="py-2">Cash variance</td><td class="text-right">${{ number_format($session->cash_variance,2) }}</td></tr></tbody></table></div>
+        <p class="mt-5 text-xs text-slate-500 print:text-slate-700">This reading summarizes sales already posted by the kiosk accounting service. It does not create another receipt or journal entry.</p>
+    </article>
+</div>
+@endsection

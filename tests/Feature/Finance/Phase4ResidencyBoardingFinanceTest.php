@@ -16,6 +16,7 @@ use App\Models\InvoiceItem;
 use App\Models\JournalBatch;
 use App\Models\KioskProduct;
 use App\Models\KioskSale;
+use App\Models\KioskTillSession;
 use App\Models\Project;
 use App\Models\School;
 use App\Models\Student;
@@ -414,15 +415,28 @@ class Phase4ResidencyBoardingFinanceTest extends TestCase
 
         $kioskService = app(KioskService::class);
 
+        $till = KioskTillSession::create([
+            'school_id' => $this->school->id,
+            'till_label' => 'Test Kiosk',
+            'cashier_id' => $this->adminUser->id,
+            'opened_by' => $this->adminUser->id,
+            'status' => 'open',
+            'active_key' => 'open',
+            'opening_float' => 0,
+            'opened_at' => now(),
+        ]);
+
         $sale = $kioskService->recordSale([
             'school_id' => $this->school->id,
+            'cashier_id' => $this->adminUser->id,
+            'kiosk_till_session_id' => $till->id,
             'payment_method' => 'cash',
             'customer_name' => 'Student John',
             'items' => [
                 [
                     'kiosk_product_id' => $kioskProduct->id,
                     'quantity' => 3,
-                    'unit_price' => 1.20,
+                    'unit_price' => 99.99, // Browser-supplied prices must not override the product master.
                 ],
             ],
         ]);
@@ -430,6 +444,12 @@ class Phase4ResidencyBoardingFinanceTest extends TestCase
         $this->assertNotNull($sale);
         $this->assertEquals(3.60, $sale->grand_total);
         $this->assertEquals(17, $kioskProduct->fresh()->stock_quantity);
+        $this->assertDatabaseHas('kiosk_stock_movements', [
+            'school_id' => $this->school->id,
+            'kiosk_product_id' => $kioskProduct->id,
+            'movement_type' => 'sale',
+            'quantity_delta' => -3,
+        ]);
 
         // Verify GL Batch
         $journalBatch = JournalBatch::where('source_type', 'receipt')->where('reference_number', $sale->receipt_number)->first();

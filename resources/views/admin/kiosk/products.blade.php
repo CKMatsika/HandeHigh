@@ -8,9 +8,7 @@
             <p class="text-xs text-slate-400 mt-1">Manage retail items, pricing, and live inventory levels</p>
         </div>
         <div class="flex items-center gap-3">
-            <a href="{{ route('admin.kiosk.index') }}" class="text-slate-400 hover:text-slate-200 text-sm">
-                &larr; Sales Dashboard
-            </a>
+            @can('kiosk.backoffice.view')<a href="{{ route('admin.kiosk.index') }}" class="text-slate-400 hover:text-slate-200 text-sm">&larr; Sales Dashboard</a>@else<a href="{{ route('admin.kiosk.cashier') }}" class="text-slate-400 hover:text-slate-200 text-sm">&larr; Cashier Shift</a>@endcan
             <a href="{{ route('admin.kiosk.pos') }}" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm transition font-medium">
                 🛒 POS Terminal
             </a>
@@ -23,6 +21,7 @@
         </div>
     @endif
 
+    @can('kiosk.products.manage')
     <!-- Add Product Form Card -->
     <div class="bg-slate-900/80 rounded-xl border border-slate-800 p-5">
         <h3 class="text-sm font-semibold text-slate-100 mb-3">Add New Inventory Item</h3>
@@ -69,6 +68,7 @@
             </div>
         </form>
     </div>
+    @endcan
 
     <!-- Products Table -->
     <div class="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
@@ -82,6 +82,7 @@
                         <th class="px-4 py-3 text-right font-medium text-slate-300">Price</th>
                         <th class="px-4 py-3 text-right font-medium text-slate-300">Stock Qty</th>
                         <th class="px-4 py-3 text-center font-medium text-slate-300">Status</th>
+                        @can('kiosk.products.manage')<th class="px-4 py-3 text-right font-medium text-slate-300">Manage</th>@endcan
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800">
@@ -91,20 +92,34 @@
                             <td class="px-4 py-3 font-semibold text-slate-100">{{ $product->name }}</td>
                             <td class="px-4 py-3 capitalize text-slate-300">{{ $product->category }}</td>
                             <td class="px-4 py-3 text-right font-medium text-emerald-400">${{ number_format($product->unit_price, 2) }}</td>
-                            <td class="px-4 py-3 text-right">
+                            @can('kiosk.products.manage')<td class="px-4 py-3 text-right">
                                 <span class="font-bold {{ $product->stock_quantity <= 5 ? 'text-red-400' : 'text-slate-200' }}">
                                     {{ $product->stock_quantity }}
                                 </span>
-                            </td>
+                            </td>@endcan
                             <td class="px-4 py-3 text-center">
                                 <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $product->is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400' }}">
                                     {{ $product->is_active ? 'Active' : 'Disabled' }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 text-right">
+                                <details class="inline-block text-left">
+                                    <summary class="cursor-pointer rounded border border-slate-700 px-3 py-1.5 text-slate-200">Edit</summary>
+                                    <form method="POST" action="{{ route('admin.kiosk.products.update', $product) }}" class="absolute z-20 mt-2 grid w-72 gap-2 rounded-xl border border-slate-700 bg-slate-950 p-4 shadow-xl">
+                                        @csrf @method('PUT')
+                                        <label class="text-[11px] text-slate-400">Name<input name="name" required value="{{ $product->name }}" class="mt-1 w-full rounded border border-slate-700 bg-slate-800 p-2 text-xs text-white"></label>
+                                        <label class="text-[11px] text-slate-400">Category<input name="category" required value="{{ $product->category }}" class="mt-1 w-full rounded border border-slate-700 bg-slate-800 p-2 text-xs text-white"></label>
+                                        <div class="grid grid-cols-2 gap-2"><label class="text-[11px] text-slate-400">Selling price<input name="unit_price" type="number" min="0" step="0.01" required value="{{ $product->unit_price }}" class="mt-1 w-full rounded border border-slate-700 bg-slate-800 p-2 text-xs text-white"></label><label class="text-[11px] text-slate-400">Cost price<input name="cost_price" type="number" min="0" step="0.01" value="{{ $product->cost_price }}" class="mt-1 w-full rounded border border-slate-700 bg-slate-800 p-2 text-xs text-white"></label></div>
+                                        <label class="text-[11px] text-slate-400">Stock quantity<input name="stock_quantity" type="number" min="0" step="1" required value="{{ $product->stock_quantity }}" class="mt-1 w-full rounded border border-slate-700 bg-slate-800 p-2 text-xs text-white"></label>
+                                        <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="is_active" value="1" @checked($product->is_active)> Active for sale</label>
+                                        <button class="rounded bg-indigo-600 px-3 py-2 text-xs font-semibold text-white">Save product</button>
+                                    </form>
+                                </details>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-slate-500">
+                            <td colspan="7" class="px-4 py-8 text-center text-slate-500">
                                 No products created in inventory yet.
                             </td>
                         </tr>

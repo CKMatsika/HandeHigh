@@ -33,6 +33,8 @@ use App\Http\Controllers\Admin\StudentController as AdminStudentController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\YearEndProcessController;
+use App\Http\Controllers\Admin\KioskTillController;
+use App\Http\Controllers\Admin\KioskStockTakeController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Portal\LibrarianController;
@@ -53,6 +55,26 @@ Route::get('/schools/{school}/logo', [SchoolProfileController::class, 'streamLog
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('tenant');
+
+    // Kiosk access is permission-scoped so cashier accounts do not need broad admin roles.
+    Route::middleware(['tenant'])->prefix('admin/kiosk')->name('admin.kiosk.')->group(function () {
+        Route::get('/cashier', [KioskTillController::class, 'dashboard'])->name('cashier')->middleware('permission:kiosk.cashier.access|kiosk.backoffice.view');
+        Route::post('/tills/open', [KioskTillController::class, 'open'])->name('tills.open')->middleware('permission:kiosk.till.open');
+        Route::post('/tills/{session}/close', [KioskTillController::class, 'close'])->name('tills.close')->middleware('permission:kiosk.till.close');
+        Route::get('/tills/{session}/z-reading', [KioskTillController::class, 'reading'])->name('z-reading')->middleware('permission:kiosk.z-readings.view|kiosk.till.close');
+        Route::get('/stock-takes', [KioskStockTakeController::class, 'index'])->name('stock-takes.index')->middleware('permission:kiosk.stock-takes.view');
+        Route::get('/stock-takes/create', [KioskStockTakeController::class, 'create'])->name('stock-takes.create')->middleware('permission:kiosk.stock-takes.create');
+        Route::post('/stock-takes', [KioskStockTakeController::class, 'store'])->name('stock-takes.store')->middleware('permission:kiosk.stock-takes.create');
+        Route::post('/stock-takes/{take}/approve', [KioskStockTakeController::class, 'approve'])->name('stock-takes.approve')->middleware('permission:kiosk.stock-takes.approve');
+        Route::get('/', [\App\Http\Controllers\Admin\KioskController::class, 'index'])->name('index')->middleware('permission:kiosk.backoffice.view');
+        Route::get('/products', [\App\Http\Controllers\Admin\KioskController::class, 'products'])->name('products')->middleware('permission:kiosk.products.view');
+        Route::get('/stock-movements', [\App\Http\Controllers\Admin\KioskController::class, 'stockMovements'])->name('stock-movements')->middleware('permission:kiosk.stock.view');
+        Route::post('/products', [\App\Http\Controllers\Admin\KioskController::class, 'storeProduct'])->name('products.store')->middleware('permission:kiosk.products.manage');
+        Route::put('/products/{product}', [\App\Http\Controllers\Admin\KioskController::class, 'updateProduct'])->name('products.update')->middleware('permission:kiosk.products.manage');
+        Route::get('/pos', [\App\Http\Controllers\Admin\KioskController::class, 'pos'])->name('pos')->middleware('permission:kiosk.cashier.access|kiosk.backoffice.view');
+        Route::post('/sales', [\App\Http\Controllers\Admin\KioskController::class, 'storeSale'])->name('sales.store')->middleware('permission:kiosk.sales.create');
+        Route::get('/sales/{sale}', [\App\Http\Controllers\Admin\KioskController::class, 'showSale'])->name('sales.show')->middleware('permission:kiosk.sales.view|kiosk.cashier.access');
+    });
 
     // SDA Portal Routes (for committee members)
     Route::middleware(['auth', 'tenant'])->prefix('sda')->name('sda.')->group(function () {
@@ -421,15 +443,6 @@ Route::middleware(['auth'])->group(function () {
             Route::put('projects/{project}/tasks/{task}', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'update'])->name('projects.tasks.update');
             Route::patch('projects/{project}/tasks/{task}/toggle', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'toggle'])->name('projects.tasks.toggle');
             Route::delete('projects/{project}/tasks/{task}', [\App\Http\Controllers\Admin\ProjectTaskController::class, 'destroy'])->name('projects.tasks.destroy');
-
-            // Kiosk & Canteen Management
-            Route::get('kiosk', [\App\Http\Controllers\Admin\KioskController::class, 'index'])->name('kiosk.index');
-            Route::get('kiosk/products', [\App\Http\Controllers\Admin\KioskController::class, 'products'])->name('kiosk.products');
-            Route::post('kiosk/products', [\App\Http\Controllers\Admin\KioskController::class, 'storeProduct'])->name('kiosk.products.store');
-            Route::put('kiosk/products/{product}', [\App\Http\Controllers\Admin\KioskController::class, 'updateProduct'])->name('kiosk.products.update');
-            Route::get('kiosk/pos', [\App\Http\Controllers\Admin\KioskController::class, 'pos'])->name('kiosk.pos');
-            Route::post('kiosk/sales', [\App\Http\Controllers\Admin\KioskController::class, 'storeSale'])->name('kiosk.sales.store');
-            Route::get('kiosk/sales/{sale}', [\App\Http\Controllers\Admin\KioskController::class, 'showSale'])->name('kiosk.sales.show');
 
             // Customers
             Route::resource('customers', CustomerController::class)->except(['show', 'destroy']);

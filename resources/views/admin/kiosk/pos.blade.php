@@ -7,10 +7,12 @@
             <h1 class="text-xl font-semibold tracking-tight text-slate-50">🛒 Point-of-Sale Terminal</h1>
             <p class="text-xs text-slate-400 mt-1">Direct sales checkout with real-time stock decrement and cashbook recognition</p>
         </div>
-        <a href="{{ route('admin.kiosk.index') }}" class="text-slate-400 hover:text-slate-200 text-sm">
-            &larr; Sales Dashboard
-        </a>
+        <a href="{{ route('admin.kiosk.cashier') }}" class="text-slate-400 hover:text-slate-200 text-sm">&larr; Cashier Shift</a>
     </div>
+
+    @if(!$openTill)
+        <div class="rounded-lg border border-amber-700 bg-amber-950/40 p-4 text-sm text-amber-200">No till is open for your user. Open a till from the Cashier Shift dashboard before checkout. <a class="ml-1 underline" href="{{ route('admin.kiosk.cashier') }}">Open till</a></div>
+    @endif
 
     @if($errors->any())
         <div class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg text-sm">
@@ -71,7 +73,6 @@
                                     <span class="text-slate-400 text-[11px]" x-text="'$' + item.price.toFixed(2) + ' each'"></span>
                                     <input type="hidden" :name="'items[' + index + '][kiosk_product_id]'" :value="item.id">
                                     <input type="hidden" :name="'items[' + index + '][quantity]'" :value="item.qty">
-                                    <input type="hidden" :name="'items[' + index + '][unit_price]'" :value="item.price">
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <button type="button" @click="decrementQty(index)" class="h-6 w-6 rounded bg-slate-700 text-slate-200 hover:bg-slate-600 flex items-center justify-center font-bold">-</button>
@@ -114,7 +115,7 @@
                         <span class="text-xl font-bold text-emerald-400" x-text="'$' + total.toFixed(2)"></span>
                     </div>
 
-                    <button type="submit" :disabled="cart.length === 0"
+                    <button type="submit" :disabled="cart.length === 0 || {{ $openTill ? 'false' : 'true' }}"
                         class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg text-sm transition">
                         ✓ Complete Checkout & Post Sale
                     </button>

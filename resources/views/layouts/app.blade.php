@@ -365,6 +365,22 @@
                             </div>
                         </div>
 
+                        @if(auth()->user()->can('kiosk.backoffice.view') || auth()->user()->can('kiosk.cashier.access'))
+                        <div class="space-y-1">
+                            <button onclick="toggleMenu('kiosk')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
+                                <div class="flex items-center gap-2"><x-nav-icon name="cart" class="text-amber-400" /><span class="text-[10px] font-medium">KIOSK & CANTEEN</span></div>
+                                <svg id="kiosk-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <div id="kiosk-menu" class="hidden space-y-1 pl-6">
+                                @can('kiosk.cashier.access')<a href="{{ route('admin.kiosk.cashier') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.kiosk.cashier','admin.kiosk.tills.*','admin.kiosk.z-reading') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}"><x-nav-icon name="cash" class="text-emerald-400" /><span>Cashier Shift</span></a>@endcan
+                                @can('kiosk.backoffice.view')<a href="{{ route('admin.kiosk.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.kiosk.index') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}"><x-nav-icon name="chart" class="text-indigo-400" /><span>Back Office</span></a>@endcan
+                                @can('kiosk.products.view')<a href="{{ route('admin.kiosk.products') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.kiosk.products*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}"><x-nav-icon name="package" class="text-cyan-400" /><span>Products & Stock</span></a>@endcan
+                                @can('kiosk.stock.view')<a href="{{ route('admin.kiosk.stock-movements') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.kiosk.stock-movements') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}"><x-nav-icon name="layers" class="text-cyan-300" /><span>Stock Movement Ledger</span></a>@endcan
+                                @can('kiosk.stock-takes.view')<a href="{{ route('admin.kiosk.stock-takes.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.kiosk.stock-takes.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}"><x-nav-icon name="clipboard" class="text-amber-300" /><span>Stock Takes</span></a>@endcan
+                            </div>
+                        </div>
+                        @endif
+
                         <!-- Finance & Accounting -->
                         <div class="space-y-1">
                             <button onclick="toggleMenu('finance')" class="w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition text-slate-300">
@@ -975,6 +991,8 @@
                        currentRoute.includes('/bank-accounts') || currentRoute.includes('/cashbook') ||
                        currentRoute.includes('/credit-notes') || currentRoute.includes('/ai-finance')) {
                     toggleMenu('finance');
+                } else if (currentRoute.includes('/admin/kiosk')) {
+                    toggleMenu('kiosk');
                 } else if (currentRoute.includes('/communication')) {
                     toggleMenu('communication');
                 } else if (currentRoute.includes('/dashboard/headmaster') || currentRoute.includes('/dashboard/deputy-headmaster') || 

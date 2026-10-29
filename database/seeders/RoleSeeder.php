@@ -19,6 +19,8 @@ class RoleSeeder extends Seeder
             'bursar',
             'procurement-officer',
             'stores-person',
+            'kiosk-manager',
+            'kiosk-cashier',
             'teacher',
             'ict-coordinator',
             'student',

@@ -14,6 +14,10 @@ class RolePermissionSeeder extends Seeder
         return [
             'dashboard.view', 'dashboard.headmaster', 'dashboard.deputy-headmaster',
             'dashboard.accounts-clerk', 'dashboard.bursar', 'dashboard.procurement-officer',
+            'kiosk.backoffice.view', 'kiosk.cashier.access', 'kiosk.sales.view', 'kiosk.sales.create',
+            'kiosk.till.open', 'kiosk.till.close', 'kiosk.products.view', 'kiosk.products.manage',
+            'kiosk.stock.view', 'kiosk.stock.manage', 'kiosk.stock-takes.view', 'kiosk.stock-takes.create',
+            'kiosk.stock-takes.approve', 'kiosk.reports.view', 'kiosk.z-readings.view',
             'students.view', 'students.create', 'students.edit', 'students.delete',
             'enrollments.view', 'enrollments.create', 'enrollments.edit', 'enrollments.delete',
             'classes.view', 'classes.create', 'classes.edit', 'classes.delete',
@@ -88,14 +92,18 @@ class RolePermissionSeeder extends Seeder
         $reports = ['reports.view', 'reports.financial', 'reports.academic', 'reports.procurement', 'reports.attendance'];
         $schemes = ['schemes-of-work.view', 'schemes-of-work.create', 'schemes-of-work.edit', 'schemes-of-work.approve', 'schemes-of-work.reject'];
         $timetables = ['timetables.view', 'timetables.create', 'timetables.edit', 'timetables.delete', 'timetables.generate', 'timetables.publish', 'timetables.export'];
+        $kioskManager = ['kiosk.backoffice.view', 'kiosk.cashier.access', 'kiosk.sales.view', 'kiosk.sales.create', 'kiosk.till.open', 'kiosk.till.close', 'kiosk.products.view', 'kiosk.products.manage', 'kiosk.stock.view', 'kiosk.stock.manage', 'kiosk.stock-takes.view', 'kiosk.stock-takes.create', 'kiosk.stock-takes.approve', 'kiosk.reports.view', 'kiosk.z-readings.view'];
+        $kioskCashier = ['kiosk.cashier.access', 'kiosk.sales.view', 'kiosk.sales.create', 'kiosk.till.open', 'kiosk.till.close', 'kiosk.z-readings.view'];
 
         return [
             'super-admin' => self::permissions(),
-            'school-admin' => array_merge(['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.returns.view', 'inventory.returns.create', 'inventory.returns.edit', 'inventory.returns.delete', 'inventory.assets.view', 'inventory.assets.manage', 'procurement.requisitions.create', 'procurement.rfq.view', 'procurement.rfq.create', 'procurement.rfq.edit', 'procurement.rfq.delete', 'procurement.rfq.publish', 'procurement.quotations.view', 'procurement.quotations.create', 'procurement.quotations.edit', 'procurement.quotations.delete', 'procurement.comparison.view', 'procurement.comparison.create', 'procurement.comparison.edit', 'procurement.comparison.approve', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], $academic, $finance, $accounting, [
+            'kiosk-manager' => $kioskManager,
+            'kiosk-cashier' => $kioskCashier,
+            'school-admin' => array_merge($kioskManager, ['dashboard.view', 'inventory.view', 'inventory.catalog.manage', 'inventory.warehouses.manage', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.create', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.returns.view', 'inventory.returns.create', 'inventory.returns.edit', 'inventory.returns.delete', 'inventory.assets.view', 'inventory.assets.manage', 'procurement.requisitions.create', 'procurement.rfq.view', 'procurement.rfq.create', 'procurement.rfq.edit', 'procurement.rfq.delete', 'procurement.rfq.publish', 'procurement.quotations.view', 'procurement.quotations.create', 'procurement.quotations.edit', 'procurement.quotations.delete', 'procurement.comparison.view', 'procurement.comparison.create', 'procurement.comparison.edit', 'procurement.comparison.approve', 'procurement.purchase-orders.create', 'procurement.purchase-orders.issue', 'procurement.grv.view', 'procurement.grv.create', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], $academic, $finance, $accounting, [
                 'procurement.view', 'procurement.create', 'procurement.edit', 'procurement.delete', 'procurement.approve',
                 'procurement.vendors.view', 'procurement.vendors.create', 'procurement.vendors.edit', 'procurement.vendors.delete',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit', 'users.delete', 'roles.view', 'roles.assign'], $timetables),
-            'headmaster' => array_merge(['dashboard.headmaster', 'inventory.view', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.assets.view', 'procurement.requisitions.create'], $academic, $finance, [
+            'headmaster' => array_merge($kioskManager, ['dashboard.headmaster', 'inventory.view', 'inventory.ledger.view', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.assets.view', 'procurement.requisitions.create'], $academic, $finance, [
                 'procurement.view', 'procurement.approve', 'procurement.vendors.view',
             ], $communication, $reports, ['users.view', 'users.create', 'users.edit'], $schemes, $timetables),
             'deputy-headmaster' => array_merge(['dashboard.deputy-headmaster', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.assets.view', 'procurement.requisitions.create'], $academic, $finance, [
@@ -109,7 +117,7 @@ class RolePermissionSeeder extends Seeder
                 ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
                 ['communication.view', 'communication.create', 'communication.sms', 'communication.email'],
                 ['reports.view', 'reports.financial', 'reports.attendance']),
-            'bursar' => array_merge(['dashboard.bursar', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.assets.view'],
+            'bursar' => array_merge($kioskManager, ['dashboard.bursar', 'inventory.stock-requests.view', 'inventory.stock-requests.create', 'inventory.stock-requests.approve', 'inventory.stock-issues.create', 'inventory.stock-takes.view', 'inventory.stock-takes.approve', 'inventory.stock-levels.manage', 'inventory.assets.view'],
                 ['students.view', 'procurement.requisitions.create', 'inventory.view', 'inventory.ledger.view'], $finance, ['accounts.view', 'accounts.create', 'accounts.edit', 'journals.view', 'journals.create', 'journals.edit', 'bank-reconciliations.view', 'bank-reconciliations.create', 'bank-reconciliations.edit'],
                 ['procurement.view', 'procurement.approve', 'procurement.vendors.view'],
                 ['procurement.supplier-invoices.view', 'procurement.supplier-invoices.approve'],
@@ -130,7 +138,7 @@ class RolePermissionSeeder extends Seeder
                 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create',
             ],
             'teacher' => array_merge(['dashboard.view', 'procurement.requisitions.create', 'inventory.stock-requests.view', 'inventory.stock-requests.create'], ['students.view', 'enrollments.view', 'classes.view', 'subjects.view'], ['attendance.view', 'attendance.create', 'attendance.edit'], $communication, ['reports.view', 'reports.academic', 'reports.attendance'], array_slice($schemes, 0, 3), ['timetables.view', 'timetables.export']),
-            'accountant' => array_merge($accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view', 'inventory.assets.view', 'procurement.requisitions.create', 'procurement.grv.view', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
+            'accountant' => array_merge($kioskManager, $accounting, ['fees.view', 'invoices.view', 'payments.view', 'receipts.view', 'budgets.view', 'inventory.view', 'inventory.ledger.view', 'inventory.assets.view', 'procurement.requisitions.create', 'procurement.grv.view', 'procurement.supplier-invoices.view', 'procurement.supplier-invoices.create', 'procurement.supplier-invoices.approve'], ['communication.view', 'communication.create', 'communication.sms', 'communication.email'], ['reports.view', 'reports.financial']),
         ];
     }
 

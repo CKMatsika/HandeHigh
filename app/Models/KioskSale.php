@@ -22,6 +22,7 @@ class KioskSale extends Model
         'tax_amount',
         'grand_total',
         'cashier_id',
+        'kiosk_till_session_id',
         'customer_name',
         'notes',
         'project_id',
@@ -58,6 +59,11 @@ class KioskSale extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function tillSession(): BelongsTo
+    {
+        return $this->belongsTo(KioskTillSession::class, 'kiosk_till_session_id');
     }
 
     public function bankAccount(): BelongsTo

@@ -49,6 +49,11 @@ class LoginController extends Controller
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
 
+            $user = Auth::user();
+            if ($user && $user->can('kiosk.cashier.access') && ! $user->can('kiosk.backoffice.view')) {
+                return redirect()->intended(route('admin.kiosk.cashier'));
+            }
+
             return redirect()->intended(route('dashboard'));
         }
 
