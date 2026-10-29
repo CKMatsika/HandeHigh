@@ -21,8 +21,9 @@
                 };
             </script>
         @endif
+        <link rel="stylesheet" href="{{ asset('css/erp-design-system.css') }}">
     </head>
-    <body class="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+    <body class="erp-login min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
         <div class="absolute inset-0 bg-gradient-to-br from-indigo-600/30 via-slate-900 to-emerald-500/20 blur-3xl opacity-60"></div>
         <div class="relative w-full max-w-md mx-4">
             <div class="mb-6 text-center">

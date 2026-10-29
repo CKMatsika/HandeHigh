@@ -1,4 +1,4 @@
-/* Scoped visual preview for the Invoices and Enrollments lists. */
+/* List-specific styling for Invoices, Enrollments and Students. */
 .management-screen {
     --mp-bg: #111b2b;
     --mp-panel: #152235;

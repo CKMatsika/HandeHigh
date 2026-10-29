@@ -24,10 +24,11 @@
             </script>
         @endif
         @stack('styles')
+        <link rel="stylesheet" href="{{ asset('css/erp-design-system.css') }}">
     </head>
-    <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
-        <div class="min-h-screen flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-            <aside class="hidden md:flex w-64 shrink-0 h-screen sticky top-0 flex-col border-r border-slate-800 bg-slate-950/80 backdrop-blur-xl">
+    <body class="erp-app min-h-screen bg-slate-950 text-slate-100 antialiased">
+        <div class="erp-shell min-h-screen flex bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+            <aside class="erp-sidebar hidden md:flex w-64 shrink-0 h-screen sticky top-0 flex-col border-r border-slate-800 bg-slate-950/80 backdrop-blur-xl">
                 <div class="h-16 flex items-center px-6 border-b border-slate-800">
                     <span class="inline-flex items-center gap-2">
                         <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-500 text-xs font-bold tracking-tight">SE</span>
@@ -828,7 +829,7 @@
             </aside>
 
             <div class="flex-1 flex flex-col min-w-0 min-h-screen">
-                <header class="h-16 border-b border-slate-800 flex items-center justify-between px-4 lg:px-8 bg-slate-950/70 backdrop-blur-xl">
+                <header class="erp-topbar h-16 border-b border-slate-800 flex items-center justify-between px-4 lg:px-8 bg-slate-950/70 backdrop-blur-xl">
                     <div class="flex flex-col">
                         <span class="text-xs uppercase tracking-[0.2em] text-slate-500">Control Center</span>
                         <span class="text-sm font-semibold text-slate-50">{{ $user?->school?->name ?? 'Multi-School ERP' }}</span>
@@ -849,8 +850,8 @@
                     @endif
                 </header>
 
-                <main class="flex-1 overflow-y-auto">
-                    <div class="max-w-6xl mx-auto py-8 px-4 lg:px-8 space-y-4">
+                <main class="erp-main flex-1 overflow-y-auto">
+                    <div class="erp-content max-w-6xl mx-auto py-8 px-4 lg:px-8 space-y-4">
                         @if (session('status'))
                             <div class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 flex items-center justify-between">
                                 <span>{{ session('status') }}</span>
@@ -899,7 +900,7 @@
         </div>
 
         <!-- Footer Copyright -->
-        <footer class="bg-slate-900 border-t border-slate-800 py-4">
+        <footer class="erp-footer bg-slate-900 border-t border-slate-800 py-4">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="text-center">
                     <p class="text-slate-400 text-sm">
