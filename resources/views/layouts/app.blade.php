@@ -210,6 +210,11 @@
                                 </svg>
                             </button>
                             <div id="academic-menu" class="hidden space-y-1 pl-6">
+                                @can('student-reconciliation.view')
+                                    <a href="{{ route('admin.student-reconciliation.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.student-reconciliation.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                        <x-nav-icon name="clipboard-check" class="text-amber-400" /><span>Student Reconciliation</span>
+                                    </a>
+                                @endcan
                                 <a href="{{ route('admin.students.index') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.students.*') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <x-nav-icon name="users" class="text-blue-400" />
                                     <span>Students</span>

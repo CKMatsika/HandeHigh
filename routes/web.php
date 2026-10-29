@@ -35,6 +35,7 @@ use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\YearEndProcessController;
 use App\Http\Controllers\Admin\KioskTillController;
 use App\Http\Controllers\Admin\KioskStockTakeController;
+use App\Http\Controllers\Admin\StudentReconciliationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Portal\LibrarianController;
@@ -55,6 +56,16 @@ Route::get('/schools/{school}/logo', [SchoolProfileController::class, 'streamLog
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('tenant');
+
+    Route::middleware(['tenant'])->prefix('admin/student-reconciliation')->name('admin.student-reconciliation.')->group(function () {
+        Route::get('/', [StudentReconciliationController::class, 'index'])->name('index')->middleware('permission:student-reconciliation.view');
+        Route::get('/create', [StudentReconciliationController::class, 'create'])->name('create')->middleware('permission:student-reconciliation.upload');
+        Route::post('/', [StudentReconciliationController::class, 'store'])->name('store')->middleware('permission:student-reconciliation.upload');
+        Route::get('/{batch}', [StudentReconciliationController::class, 'show'])->name('show')->middleware('permission:student-reconciliation.view');
+        Route::get('/{batch}/print', [StudentReconciliationController::class, 'print'])->name('print')->middleware('permission:student-reconciliation.view');
+        Route::post('/{batch}/findings/{finding}/review', [StudentReconciliationController::class, 'review'])->name('review')->middleware('permission:student-reconciliation.review');
+        Route::get('/{batch}/export', [StudentReconciliationController::class, 'export'])->name('export')->middleware('permission:student-reconciliation.export');
+    });
 
     // Kiosk access is permission-scoped so cashier accounts do not need broad admin roles.
     Route::middleware(['tenant'])->prefix('admin/kiosk')->name('admin.kiosk.')->group(function () {

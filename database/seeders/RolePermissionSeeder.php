@@ -14,6 +14,7 @@ class RolePermissionSeeder extends Seeder
         return [
             'dashboard.view', 'dashboard.headmaster', 'dashboard.deputy-headmaster',
             'dashboard.accounts-clerk', 'dashboard.bursar', 'dashboard.procurement-officer',
+            'student-reconciliation.view', 'student-reconciliation.upload', 'student-reconciliation.review', 'student-reconciliation.export',
             'kiosk.backoffice.view', 'kiosk.cashier.access', 'kiosk.sales.view', 'kiosk.sales.create',
             'kiosk.till.open', 'kiosk.till.close', 'kiosk.products.view', 'kiosk.products.manage',
             'kiosk.stock.view', 'kiosk.stock.manage', 'kiosk.stock-takes.view', 'kiosk.stock-takes.create',
@@ -69,6 +70,7 @@ class RolePermissionSeeder extends Seeder
     public static function rolePermissions(): array
     {
         $academic = [
+            'student-reconciliation.view', 'student-reconciliation.upload', 'student-reconciliation.review', 'student-reconciliation.export',
             'students.view', 'students.create', 'students.edit', 'students.delete',
             'enrollments.view', 'enrollments.create', 'enrollments.edit', 'enrollments.delete',
             'classes.view', 'classes.create', 'classes.edit', 'classes.delete',
