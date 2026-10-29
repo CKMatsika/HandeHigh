@@ -44,13 +44,6 @@ class StudentReconciliationController extends Controller
         if (count($validated['files']) !== count($validated['source_types'])) {
             return back()->withErrors(['files' => 'Choose one source type for every file.'])->withInput();
         }
-        if ($request->boolean('complete_register') && ! array_intersect($validated['source_types'], ['student_register', 'class_register'])) {
-            return back()->withErrors(['complete_register' => 'A complete student-register comparison requires at least one student or class register.'])->withInput();
-        }
-        if ($request->boolean('complete_invoice_register') && ! in_array('invoice_register', $validated['source_types'], true)) {
-            return back()->withErrors(['complete_invoice_register' => 'A complete invoice comparison requires at least one invoice register.'])->withInput();
-        }
-
         try {
             $batch = $service->createBatch((int) Auth::user()->school_id, (int) Auth::id(), $validated, $validated['files']);
         } catch (\InvalidArgumentException $e) {
@@ -60,7 +53,7 @@ class StudentReconciliationController extends Controller
             return back()->withErrors(['files' => 'The reconciliation could not be completed. No ERP student, enrolment, invoice, or accounting records were changed.'])->withInput();
         }
 
-        return redirect()->route('admin.student-reconciliation.show', $batch)->with('success', 'Read-only reconciliation completed. Review the findings before using them to update ERP records through their normal workflows.');
+        return redirect()->route('admin.student-reconciliation.show', $batch)->with('success', 'Read-only reconciliation completed. The uploaded fields were analysed regardless of the source label. Review the findings before using them to update ERP records through their normal workflows.');
     }
 
     public function show(Request $request, StudentReconciliationBatch $batch)

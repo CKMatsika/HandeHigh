@@ -114,6 +114,61 @@ class StudentReconciliationTest extends TestCase
         $this->assertSame(2, Student::where('school_id', $this->school->id)->count());
     }
 
+    public function test_expected_total_is_invoice_evidence_even_when_source_is_labelled_student_register(): void
+    {
+        $student = $this->student('ADM-450', 'Tariro', 'Moyo', 'Lower 6', 'Lower 6 Arts');
+        Invoice::create([
+            'school_id' => $this->school->id, 'student_id' => $student->id, 'number' => 'INV-EXPECTED-450',
+            'type' => 'fees', 'academic_year' => '2026', 'term' => 'Term 1', 'total_amount' => 470,
+            'balance' => 470, 'issued_at' => '2026-01-01', 'due_date' => '2026-01-31', 'status' => 'unpaid',
+        ]);
+        $file = $this->xlsx('fees-register.xlsx', [
+            ['FEES PAYMENT SCHEDULE - TERM 1 2026'],
+            ['', '', '', '', '', 'EXPECTED'],
+            ['ERP Student ID', 'Student Name', 'Grade', 'Class', 'Category', 'TOTAL'],
+            [$student->id, 'Tariro Moyo', 'Lower 6', 'Lower 6 Arts', 'Boarding', 500],
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.student-reconciliation.store'), [
+            'academic_year' => '2026', 'term' => 'Term 1', 'complete_invoice_register' => '1',
+            'files' => [$file], 'source_types' => ['student_register'],
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $batch = StudentReconciliationBatch::where('school_id', $this->school->id)->latest('id')->firstOrFail();
+        $row = $batch->rows()->firstOrFail();
+        $this->assertSame(500.0, (float) $row->normalized_data['invoice_amount']);
+        $this->assertSame('expected total', $row->normalized_data['invoice_amount_basis']);
+        $this->assertTrue($row->normalized_data['invoice_claimed']);
+        $this->assertDatabaseHas('student_reconciliation_findings', ['batch_id' => $batch->id, 'code' => 'invoice_amount_mismatch', 'student_id' => $student->id]);
+        $this->assertDatabaseMissing('student_reconciliation_findings', ['batch_id' => $batch->id, 'code' => 'invoice_completeness_not_evaluable']);
+    }
+
+    public function test_invoice_completeness_checkbox_does_not_block_a_register_with_unstable_names(): void
+    {
+        $student = $this->student('ADM-470', 'Tariro', 'Moyo', 'Lower 6', 'Lower 6 Arts');
+        $file = $this->xlsx('two-row-fees-heading.xlsx', [
+            ['FEES PAYMENT SCHEDULE - TERM 1 2026'],
+            ['', '', '', '', '', 'EXPECTED'],
+            ['STUDENT', 'SURNAME', 'NAME', 'CLASS', 'CATEGORY', 'TOTAL'],
+            ['Tariro Moyo', 'Moyo', 'Tariro', 'Lower 6 Arts', 'Boarding', 470],
+            ['', 'TOTAL', '', '', '', 470],
+        ]);
+
+        $this->actingAs($this->admin)->post(route('admin.student-reconciliation.store'), [
+            'academic_year' => '2026', 'term' => 'Term 1', 'complete_invoice_register' => '1',
+            'files' => [$file], 'source_types' => ['class_register'],
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $batch = StudentReconciliationBatch::where('school_id', $this->school->id)->latest('id')->firstOrFail();
+        $this->assertSame('completed', $batch->status);
+        $this->assertSame(['last_name', 'first_name', 'class_name', 'invoice_amount'], $batch->sources()->first()->recognized_columns);
+        $this->assertSame(1, $batch->rows()->count(), 'A grand total row must not be reported as another student.');
+        $this->assertSame(470.0, (float) $batch->rows()->first()->normalized_data['invoice_amount']);
+        $this->assertDatabaseHas('student_reconciliation_findings', ['batch_id' => $batch->id, 'code' => 'invoice_completeness_identity_limited', 'severity' => 'info']);
+        $this->assertDatabaseHas('student_reconciliation_findings', ['batch_id' => $batch->id, 'code' => 'identity_needs_verification', 'student_id' => $student->id]);
+        $this->assertDatabaseHas('student_reconciliation_findings', ['batch_id' => $batch->id, 'code' => 'possible_invoice_missing_for_name_match', 'student_id' => $student->id, 'severity' => 'warning']);
+    }
+
     public function test_finding_review_is_audited_and_does_not_change_the_linked_student_or_tenant_records(): void
     {
         $student = $this->student('ADM-300', 'Review', 'Only', 'Form 3', 'North');

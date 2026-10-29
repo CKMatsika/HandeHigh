@@ -81,6 +81,8 @@ class StudentReconciliationService
             $sourceStudentIds = [];
             $invoiceSourceStudentIds = [];
             $invoiceSourceReferences = [];
+            $invoiceEvidenceRows = 0;
+            $invoiceEvidenceRowsWithStableIdentity = 0;
             $rowGroups = [];
             $matchedRows = 0;
             $rowsToPersist = [];
@@ -89,6 +91,8 @@ class StudentReconciliationService
                 $seenInFile = [];
                 foreach ($source['rows'] as $data) {
                     $match = $this->match($data, $byId, $byAdmission, $byRegistration, $byName);
+                    $hasInvoiceEvidence = $this->hasInvoiceEvidence($data, $source['type']);
+                    if ($hasInvoiceEvidence) $invoiceEvidenceRows++;
                     $studentId = $match['student']?->id;
                     $row = new StudentReconciliationRow([
                         'batch_id' => $batch->id, 'source_id' => $source['record']->id,
@@ -96,6 +100,7 @@ class StudentReconciliationService
                         'identity_key' => $data['identity_name_key'] !== '' ? hash('sha256', $data['identity_name_key']) : null,
                         'match_status' => $match['status'], 'match_confidence' => $match['confidence'],
                         'matched_student_id' => $studentId, 'candidate_student_ids' => $match['candidate_ids'] ?: null,
+                        'erp_invoice_total' => null, 'erp_invoice_ids' => null,
                     ]);
                     $rowsToPersist[] = $row;
 
@@ -103,9 +108,10 @@ class StudentReconciliationService
                         $matchedRows++;
                         $sourceStudentIds[$studentId] = true;
                         $rowGroups[$studentId][] = ['row' => $row, 'data' => $data, 'source_type' => $source['type']];
-                        if ($source['type'] === 'invoice_register') {
+                        if ($hasInvoiceEvidence) {
+                            $invoiceEvidenceRowsWithStableIdentity++;
+                            $invoiceSourceStudentIds[$studentId] = true;
                             if (! empty($data['invoice_number'])) $invoiceSourceReferences[$studentId.':'.StudentReconciliationWorkbookParser::normalizeText($data['invoice_number'])] = true;
-                            else $invoiceSourceStudentIds[$studentId] = true;
                         }
                         foreach ([
                             'erp_student_id' => [(string) $studentId, 'erp_id_mismatch', 'ERP student ID'],
@@ -118,8 +124,12 @@ class StudentReconciliationService
                         }
                     } elseif ($match['status'] === 'needs_verification') {
                         if (count($match['candidate_ids']) === 1) $sourceStudentIds[$match['candidate_ids'][0]] = true;
-                        $this->finding($batch, $row, $match['student']?->id, null, 'identity_needs_verification', 'warning', 'student_identity', $data['full_name'] ?? null, $match['student'] ? $this->studentName($match['student']) : null,
+                        $possibleStudent = count($match['candidate_ids']) === 1 ? $byId[$match['candidate_ids'][0]] ?? null : null;
+                        $this->finding($batch, $row, $possibleStudent?->id, null, 'identity_needs_verification', 'warning', 'student_identity', $data['full_name'] ?? null, $possibleStudent ? $this->studentName($possibleStudent) : null,
                             'Possible match based on names or supporting details only. Verify the student identity before relying on the comparisons.');
+                        if ($possibleStudent && $hasInvoiceEvidence) {
+                            $this->compareProvisionalInvoices($batch, $row, $data, $source['type'], $possibleStudent, $invoices->get($possibleStudent->id, collect())->values(), (string) $options['academic_year'], (string) $options['term']);
+                        }
                     } else {
                         $this->finding($batch, $row, null, null, $match['status'] === 'ambiguous' ? 'ambiguous_student_identity' : 'student_not_found', 'critical', 'student_identity', $data['full_name'] ?? $data['admission_number'] ?? null, null,
                             $match['status'] === 'ambiguous' ? 'The supplied identifiers point to multiple ERP students. Manual identity verification is required.' : 'No matching student was found in this school. This report does not create a student record.');
@@ -146,8 +156,14 @@ class StudentReconciliationService
 
             $this->compareCrossSource($batch, $rowGroups);
             if ($batch->complete_register) $this->reportMissingStudents($batch, $schoolId, $enrollments, $sourceStudentIds);
-            if ($batch->complete_invoice_register && collect($sources)->contains(fn ($source) => $source['type'] === 'invoice_register')) {
-                $this->reportInvoicesMissingFromSource($batch, $invoices, $invoiceSourceStudentIds, $invoiceSourceReferences);
+            if ($batch->complete_invoice_register) {
+                if ($invoiceEvidenceRows === 0) {
+                    $this->finding($batch, null, null, null, 'invoice_completeness_not_evaluable', 'info', 'invoice evidence', null, null, 'The completeness check was saved, but these uploads contain no recognised invoice number, invoice status, or expected billed amount. The reconciliation completed and no invoice-absence conclusions were drawn.');
+                } elseif ($invoiceEvidenceRowsWithStableIdentity !== $invoiceEvidenceRows) {
+                    $this->finding($batch, null, null, null, 'invoice_completeness_identity_limited', 'info', 'invoice identity', (string) $invoiceEvidenceRowsWithStableIdentity, $invoiceEvidenceRows.' evidence rows', 'The uploads contain invoice evidence, but not every evidence row matched a student using a stable ERP identifier. The reconciliation completed; ERP invoices absent from the uploads were not reported to avoid misleading absence findings.');
+                } else {
+                    $this->reportInvoicesMissingFromSource($batch, $invoices, $invoiceSourceStudentIds, $invoiceSourceReferences);
+                }
             }
 
             $this->persistRowsAndFindings($batch, $rowsToPersist);
@@ -230,7 +246,7 @@ class StudentReconciliationService
     private function compareInvoices(StudentReconciliationBatch $batch, StudentReconciliationRow $row, array $data, string $sourceType, Student $student, $invoices, string $academicYear, string $term): void
     {
         $claimPresent = array_key_exists('invoice_claimed', $data) && $data['invoice_claimed'] !== null;
-        $hasInvoiceEvidence = $sourceType === 'invoice_register' || $claimPresent || ! empty($data['invoice_number']);
+        $hasInvoiceEvidence = $this->hasInvoiceEvidence($data, $sourceType);
         if (! $hasInvoiceEvidence) return;
         if ((! empty($data['academic_year']) && (string) $data['academic_year'] !== $academicYear)
             || (! empty($data['term']) && StudentReconciliationWorkbookParser::normalizeTerm($data['term']) !== StudentReconciliationWorkbookParser::normalizeTerm($term))) return;
@@ -259,6 +275,42 @@ class StudentReconciliationService
         }
         if ($eligible->count() > 1 && empty($data['invoice_number'])) {
             $this->finding($batch, $row, $student->id, $eligible->first()->id, 'multiple_erp_invoices', 'warning', 'invoice count', (string) $eligible->count(), 'One or more', 'Multiple ERP invoices were found for this student in the selected period. Verify that they are separate valid charges.');
+        }
+    }
+
+    private function hasInvoiceEvidence(array $data, string $sourceType): bool
+    {
+        return $sourceType === 'invoice_register'
+            || ! empty($data['invoice_number'])
+            || ($data['invoice_claimed'] ?? null) !== null
+            || (! empty($data['invoice_amount_is_billed']) && is_numeric($data['invoice_amount'] ?? null));
+    }
+
+    /** Surface useful invoice leads for a unique name candidate without treating them as confirmed matches. */
+    private function compareProvisionalInvoices(StudentReconciliationBatch $batch, StudentReconciliationRow $row, array $data, string $sourceType, Student $candidate, $invoices, string $academicYear, string $term): void
+    {
+        if ((! empty($data['academic_year']) && (string) $data['academic_year'] !== $academicYear)
+            || (! empty($data['term']) && StudentReconciliationWorkbookParser::normalizeTerm($data['term']) !== StudentReconciliationWorkbookParser::normalizeTerm($term))) return;
+
+        $eligible = $invoices->filter(fn ($invoice) => ! in_array(Str::lower((string) $invoice->status), ['cancelled', 'canceled', 'void', 'reversed'], true));
+        if (! empty($data['invoice_number'])) $eligible = $eligible->filter(fn ($invoice) => StudentReconciliationWorkbookParser::normalizeText($invoice->number) === StudentReconciliationWorkbookParser::normalizeText($data['invoice_number']));
+        $claimPresent = array_key_exists('invoice_claimed', $data) && $data['invoice_claimed'] !== null;
+        $invoiceExpected = ($claimPresent && $data['invoice_claimed'] === true)
+            || (! $claimPresent && $sourceType === 'invoice_register')
+            || ! empty($data['invoice_number']);
+        $verificationNote = 'This is only a potential discrepancy based on a unique name candidate. Confirm the student identity before taking action.';
+
+        if ($eligible->isEmpty() && $invoiceExpected) {
+            $this->finding($batch, $row, $candidate->id, null, 'possible_invoice_missing_for_name_match', 'warning', 'invoice', $data['invoice_number'] ?? ($data['invoice_amount'] ?? 'Source claims invoiced'), 'No matching ERP invoice', 'A name-only candidate appears billed in the source but has no matching ERP invoice. '.$verificationNote);
+        } elseif ($eligible->isNotEmpty() && $claimPresent && $data['invoice_claimed'] === false) {
+            $this->finding($batch, $row, $candidate->id, $eligible->first()->id, 'possible_invoice_exists_for_name_match', 'warning', 'invoice status', 'Source says not invoiced', $eligible->pluck('number')->join(', '), 'An ERP invoice may exist for a name-only candidate whose source row says not invoiced. '.$verificationNote);
+        }
+
+        if (is_numeric($data['invoice_amount'] ?? null) && $eligible->isNotEmpty()) {
+            $invoiceTotal = (float) $eligible->sum('total_amount');
+            if (abs($invoiceTotal - (float) $data['invoice_amount']) > 0.01) {
+                $this->finding($batch, $row, $candidate->id, $eligible->first()->id, 'possible_invoice_amount_mismatch_for_name_match', 'warning', 'invoice amount', number_format((float) $data['invoice_amount'], 2, '.', ''), number_format($invoiceTotal, 2, '.', ''), 'The source amount differs from ERP invoices for a name-only candidate. '.$verificationNote);
+            }
         }
     }
 

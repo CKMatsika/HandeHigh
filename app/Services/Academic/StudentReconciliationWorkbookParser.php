@@ -25,7 +25,7 @@ class StudentReconciliationWorkbookParser
         'residency' => ['residency', 'residence', 'boarding status', 'student type', 'boarding', 'boarder day'],
         'invoice_status' => ['invoice status', 'invoiced', 'invoice issued', 'billing status', 'billed'],
         'invoice_number' => ['invoice number', 'invoice no', 'invoice #', 'invoice ref', 'invoice reference'],
-        'invoice_amount' => ['invoice amount', 'amount invoiced', 'expected total', 'expected fees', 'fees due', 'total fees', 'fee total', 'total amount', 'amount', 'fees', 'term total'],
+        'invoice_amount' => ['invoice amount', 'amount invoiced', 'expected total', 'expected fees', 'expected fee', 'expected amount', 'fees due', 'total fees', 'fee total', 'total amount', 'amount', 'fees', 'term total'],
         'academic_year' => ['academic year', 'year', 'school year'],
         'term' => ['term', 'school term', 'academic term'],
     ];
@@ -46,7 +46,7 @@ class StudentReconciliationWorkbookParser
         $columns = [];
         $highestHeaderRow = min(count($grid), 30);
         for ($i = 0; $i < $highestHeaderRow; $i++) {
-            $candidateColumns = $this->mapHeaders($grid[$i] ?? []);
+            $candidateColumns = $this->mapHeaders($grid[$i] ?? [], $grid[$i - 1] ?? []);
             $hasIdentity = isset($candidateColumns['full_name']) || (isset($candidateColumns['first_name']) && isset($candidateColumns['last_name'])) || isset($candidateColumns['erp_student_id']) || isset($candidateColumns['admission_number']) || isset($candidateColumns['registration_number']);
             if ($hasIdentity && count($candidateColumns) >= 2) {
                 $headerIndex = $i;
@@ -58,6 +58,7 @@ class StudentReconciliationWorkbookParser
         if ($headerIndex === null) {
             throw new InvalidArgumentException('Could not find a usable heading row. Include a student name or ID plus at least one other recognised heading.');
         }
+        $headerLabels = $this->headerLabels($grid[$headerIndex] ?? [], $grid[$headerIndex - 1] ?? []);
 
         $rows = [];
         $end = min(count($grid), $headerIndex + 5001);
@@ -66,11 +67,14 @@ class StudentReconciliationWorkbookParser
             foreach ($columns as $field => $columnIndex) {
                 $mapped[$field] = $this->normalizeValue($field, $grid[$i][$columnIndex] ?? null);
             }
+            $invoiceAmountColumn = $columns['invoice_amount'] ?? null;
+            $mapped['invoice_amount_basis'] = $invoiceAmountColumn === null ? null : ($headerLabels[$invoiceAmountColumn] ?? null);
+            $mapped['invoice_amount_is_billed'] = $this->amountHeadingIndicatesInvoice($mapped['invoice_amount_basis']);
+            $mapped['source_type'] = $sourceType;
             $mapped = $this->completeIdentity($mapped);
-            if (! $this->hasUsefulData($mapped)) {
+            if ($this->isSummaryRow($mapped) || ! $this->hasUsefulData($mapped)) {
                 continue;
             }
-            $mapped['source_type'] = $sourceType;
             $mapped['source_row_number'] = $i + 1;
             $mapped['identity_name_key'] = $this->nameKey($mapped['full_name'] ?? '');
             $rows[] = $mapped;
@@ -113,14 +117,19 @@ class StudentReconciliationWorkbookParser
         return preg_replace('/\s+/', ' ', Str::lower(Str::ascii(trim((string) $value)))) ?? '';
     }
 
-    private function mapHeaders(array $headerRow): array
+    private function mapHeaders(array $headerRow, array $previousHeaderRow = []): array
     {
         $result = [];
-        foreach ($headerRow as $index => $heading) {
-            $normalized = preg_replace('/[^a-z0-9]+/', ' ', Str::lower(Str::ascii(trim((string) $heading)))) ?? '';
-            $normalized = trim(preg_replace('/\s+/', ' ', $normalized) ?? '');
+        $labels = $this->headerLabels($headerRow, $previousHeaderRow);
+        $hasSplitName = in_array('surname', $labels, true) && in_array('name', $labels, true);
+        foreach ($labels as $index => $normalized) {
+            if ($hasSplitName && $normalized === 'student') continue;
+            if ($hasSplitName && $normalized === 'name') {
+                $result['first_name'] ??= $index;
+                continue;
+            }
             foreach (self::HEADERS as $field => $aliases) {
-                $normalizedAliases = array_map(fn ($alias) => trim(preg_replace('/\s+/', ' ', preg_replace('/[^a-z0-9]+/', ' ', Str::lower(Str::ascii($alias))) ?? '') ?? ''), $aliases);
+                $normalizedAliases = array_map(fn ($alias) => $this->normalizeHeading($alias), $aliases);
                 if (! isset($result[$field]) && in_array($normalized, $normalizedAliases, true)) {
                     $result[$field] = $index;
                     break;
@@ -128,6 +137,32 @@ class StudentReconciliationWorkbookParser
             }
         }
         return $result;
+    }
+
+    private function headerLabels(array $headerRow, array $previousHeaderRow = []): array
+    {
+        $labels = [];
+        foreach ($headerRow as $index => $heading) {
+            $current = $this->normalizeHeading($heading);
+            $previous = $this->normalizeHeading($previousHeaderRow[$index] ?? '');
+            $isGroupHeading = in_array($previous, ['expected', 'invoice', 'invoiced', 'fee', 'fees', 'billing', 'billed', 'amount', 'total'], true);
+            $labels[$index] = $isGroupHeading && $current !== '' && $previous !== $current
+                ? trim($previous.' '.$current)
+                : ($current !== '' ? $current : $previous);
+        }
+
+        return $labels;
+    }
+
+    private function normalizeHeading(mixed $heading): string
+    {
+        $normalized = preg_replace('/[^a-z0-9]+/', ' ', Str::lower(Str::ascii(trim((string) $heading)))) ?? '';
+        return trim(preg_replace('/\s+/', ' ', $normalized) ?? '');
+    }
+
+    private function amountHeadingIndicatesInvoice(?string $heading): bool
+    {
+        return $heading !== null && preg_match('/\b(invoice|invoiced|billed|expected)\b/', $heading) === 1;
     }
 
     private function normalizeValue(string $field, mixed $value): mixed
@@ -170,9 +205,15 @@ class StudentReconciliationWorkbookParser
             if (preg_match('/not\s+invoic|unbilled|no invoice|false|^no$|^n$/', $status)) $row['invoice_claimed'] = false;
             elseif (preg_match('/invoic|billed|paid|unpaid|outstanding|partial|^yes$|^y$|^true$|^1$/', $status)) $row['invoice_claimed'] = true;
             else $row['invoice_claimed'] = null;
+        } elseif (! empty($row['invoice_amount_is_billed']) && is_numeric($row['invoice_amount'] ?? null)) {
+            $row['invoice_claimed'] = true;
         } else {
             $row['invoice_claimed'] = null;
         }
+        $row['invoice_evidence'] = ($row['source_type'] ?? null) === 'invoice_register'
+            || ! empty($row['invoice_number'])
+            || $row['invoice_claimed'] !== null
+            || (! empty($row['invoice_amount_is_billed']) && is_numeric($row['invoice_amount'] ?? null));
         return $row;
     }
 
@@ -182,5 +223,15 @@ class StudentReconciliationWorkbookParser
             if (! empty($row[$field])) return true;
         }
         return false;
+    }
+
+    private function isSummaryRow(array $row): bool
+    {
+        if (! empty($row['erp_student_id']) || ! empty($row['admission_number']) || ! empty($row['registration_number']) || ! empty($row['invoice_number'])) {
+            return false;
+        }
+
+        $name = self::nameKey($row['full_name'] ?? '');
+        return preg_match('/^(?:(?:grand)?totals?|subtotal)(?:students?|fees?|amount)?$/', $name) === 1;
     }
 }
