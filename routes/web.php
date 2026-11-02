@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\AccountMappingController;
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\BankReconciliationController;
+use App\Http\Controllers\Admin\BankStudentPaymentAllocationController;
 use App\Http\Controllers\Admin\BillController;
 use App\Http\Controllers\Admin\BulkDocumentPrintController;
 use App\Http\Controllers\Admin\BudgetController;
@@ -423,6 +424,14 @@ Route::middleware(['auth'])->group(function () {
             Route::post('bank-reconciliations/unmatch', [BankReconciliationController::class, 'unmatchTransaction'])->name('bank-reconciliations.unmatch');
             Route::post('bank-reconciliations/add-cashbook-transaction', [BankReconciliationController::class, 'addCashbookTransaction'])->name('bank-reconciliations.add-cashbook-transaction');
             Route::post('bank-reconciliations/add-bank-transaction', [BankReconciliationController::class, 'addBankTransaction'])->name('bank-reconciliations.add-bank-transaction');
+            Route::get('bank-reconciliations/student-payment-allocation', [BankStudentPaymentAllocationController::class, 'index'])
+                ->name('bank-reconciliations.student-payment-allocation')->middleware('permission:bank-reconciliations.view|payments.view');
+            Route::get('bank-reconciliations/student-payment-allocation/students', [BankStudentPaymentAllocationController::class, 'searchStudents'])
+                ->name('bank-reconciliations.student-payment-allocation.students')->middleware('permission:bank-reconciliations.view|payments.view');
+            Route::get('bank-reconciliations/student-payment-allocation/students/{student}/invoices', [BankStudentPaymentAllocationController::class, 'studentInvoices'])
+                ->name('bank-reconciliations.student-payment-allocation.invoices')->middleware('permission:bank-reconciliations.view|payments.view');
+            Route::post('bank-reconciliations/student-payment-allocation/post', [BankStudentPaymentAllocationController::class, 'postSelected'])
+                ->name('bank-reconciliations.student-payment-allocation.post')->middleware('permission:payments.create|bank-reconciliations.edit');
             Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index', 'create', 'store', 'show'])
                 ->middlewareFor('show', 'can:view,bankReconciliation');
             Route::resource('interbank-transfers', InterbankTransferController::class)->only(['index', 'create', 'store']);

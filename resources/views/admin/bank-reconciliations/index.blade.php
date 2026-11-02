@@ -31,6 +31,9 @@
                 <button onclick="showImportModal()" class="w-full px-3 py-2 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition">
                     📁 Import Bank Statement
                 </button>
+                <a href="{{ route('admin.bank-reconciliations.student-payment-allocation') }}" class="block w-full px-3 py-2 bg-violet-600 text-center text-white text-xs rounded hover:bg-violet-700 transition">
+                    🧾 Review Student Payment Allocations
+                </a>
                 <button onclick="showAutoMatchModal()" class="w-full px-3 py-2 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700 transition">
                     🤖 Auto-Match Transactions
                 </button>
