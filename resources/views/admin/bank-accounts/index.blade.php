@@ -5,7 +5,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-xl font-semibold tracking-tight text-slate-50">Bank Accounts</h1>
-            <p class="text-xs text-slate-400 mt-1">Manage your school's bank accounts from chart of accounts.</p>
+            <p class="text-xs text-slate-400 mt-1">Manage accounts and review today's posted movements and current ledger balance.</p>
         </div>
         <a href="{{ route('admin.bank-accounts.create') }}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,12 +51,25 @@
                         <span class="text-slate-400">Currency:</span>
                         <span class="text-slate-300">{{ $account->currency ?? 'USD' }}</span>
                     </div>
-                    @if($account->opening_balance)
-                        <div class="flex justify-between text-sm font-medium">
-                            <span class="text-slate-400">Opening Balance:</span>
-                            <span class="text-emerald-500">${{ number_format($account->opening_balance, 2) }}</span>
+                    <div class="mt-3 grid grid-cols-2 gap-2 border-t border-slate-800 pt-3">
+                        <div class="rounded-lg bg-slate-950/60 p-2">
+                            <div class="text-[11px] text-slate-400">Today's opening</div>
+                            <div class="mt-1 text-sm font-semibold text-slate-100">${{ number_format((float) $account->today_opening_balance, 2) }}</div>
                         </div>
-                    @endif
+                        <div class="rounded-lg bg-emerald-950/30 p-2">
+                            <div class="text-[11px] text-slate-400">Today in</div>
+                            <div class="mt-1 text-sm font-semibold text-emerald-300">+${{ number_format((float) $account->today_total_in, 2) }}</div>
+                        </div>
+                        <div class="rounded-lg bg-rose-950/20 p-2">
+                            <div class="text-[11px] text-slate-400">Today out</div>
+                            <div class="mt-1 text-sm font-semibold text-rose-300">−${{ number_format((float) $account->today_total_out, 2) }}</div>
+                        </div>
+                        <div class="rounded-lg border border-indigo-800/70 bg-indigo-950/30 p-2">
+                            <div class="text-[11px] text-indigo-200">Closing balance now</div>
+                            <div class="mt-1 text-sm font-bold text-white">${{ number_format((float) $account->current_closing_balance, 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-slate-500">Posted ledger movements through {{ \Carbon\Carbon::parse($today)->format('d M Y') }}.</div>
                     @if($account->recent_transactions > 0)
                         <div class="text-xs text-slate-400">
                             {{ $account->recent_transactions }} transactions in last 7 days

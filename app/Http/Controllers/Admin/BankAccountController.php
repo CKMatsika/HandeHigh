@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Cashbook;
+use App\Models\JournalEntry;
 use Illuminate\Http\Request;
 
 class BankAccountController extends Controller
@@ -29,7 +30,40 @@ class BankAccountController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('admin.bank-accounts.index', compact('bankAccounts'));
+        $today = now()->toDateString();
+        $accountIds = $bankAccounts->pluck('id');
+        $ledgerTotals = $accountIds->isEmpty()
+            ? collect()
+            : JournalEntry::query()
+                ->join('journal_batches', 'journal_entries.journal_batch_id', '=', 'journal_batches.id')
+                ->where('journal_batches.school_id', $school->id)
+                ->where('journal_batches.status', 'posted')
+                ->whereIn('journal_entries.account_id', $accountIds)
+                ->whereDate('journal_batches.transaction_date', '<=', $today)
+                ->groupBy('journal_entries.account_id')
+                ->select('journal_entries.account_id')
+                ->selectRaw("SUM(CASE WHEN journal_batches.transaction_date < ? AND journal_entries.entry_type = 'debit' THEN journal_entries.amount ELSE 0 END) AS prior_debits", [$today])
+                ->selectRaw("SUM(CASE WHEN journal_batches.transaction_date < ? AND journal_entries.entry_type = 'credit' THEN journal_entries.amount ELSE 0 END) AS prior_credits", [$today])
+                ->selectRaw("SUM(CASE WHEN journal_batches.transaction_date = ? AND journal_entries.entry_type = 'debit' THEN journal_entries.amount ELSE 0 END) AS today_in", [$today])
+                ->selectRaw("SUM(CASE WHEN journal_batches.transaction_date = ? AND journal_entries.entry_type = 'credit' THEN journal_entries.amount ELSE 0 END) AS today_out", [$today])
+                ->get()->keyBy('account_id');
+
+        foreach ($bankAccounts as $account) {
+            $totals = $ledgerTotals->get($account->id);
+            $openingToday = (float) $account->opening_balance
+                + (float) ($totals->prior_debits ?? 0)
+                - (float) ($totals->prior_credits ?? 0);
+            $todayIn = (float) ($totals->today_in ?? 0);
+            $todayOut = (float) ($totals->today_out ?? 0);
+
+            $account->setAttribute('today_opening_balance', round($openingToday, 2));
+            $account->setAttribute('today_total_in', round($todayIn, 2));
+            $account->setAttribute('today_total_out', round($todayOut, 2));
+            $account->setAttribute('current_closing_balance', round($openingToday + $todayIn - $todayOut, 2));
+            $account->setAttribute('balance_as_of', $today);
+        }
+
+        return view('admin.bank-accounts.index', compact('bankAccounts', 'today'));
     }
 
     public function create()
