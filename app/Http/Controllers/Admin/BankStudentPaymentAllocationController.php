@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Services\Finance\AccountingPeriodService;
 use App\Services\Finance\BankStudentPaymentAllocationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class BankStudentPaymentAllocationController extends Controller
@@ -127,10 +128,7 @@ class BankStudentPaymentAllocationController extends Controller
         $validated = $request->validate([
             'selected_ids' => ['required', 'array', 'min:1', 'max:5'],
             'selected_ids.*' => ['required', 'integer', 'distinct'],
-            'items' => ['required', 'array'],
-            'items.*.student_id' => ['required', 'integer'],
-            'items.*.invoice_id' => ['required', 'integer'],
-            'items.*.confirm_reference_review' => ['nullable', 'accepted'],
+            'account_id' => ['required', 'integer'],
             'return_page' => ['nullable', 'integer', 'min:1'],
         ]);
         $school = $this->school();
@@ -139,11 +137,16 @@ class BankStudentPaymentAllocationController extends Controller
 
         foreach ($validated['selected_ids'] as $id) {
             try {
-                $transaction = BankTransaction::query()->where('school_id', $school->id)->findOrFail($id);
-                $item = $validated['items'][$id] ?? null;
-                if (! $item) {
-                    throw ValidationException::withMessages(['selection' => 'Choose a student and invoice for every selected bank line.']);
-                }
+                $transaction = BankTransaction::query()->where('school_id', $school->id)
+                    ->where('account_id', $validated['account_id'])->findOrFail($id);
+                $item = Validator::make((array) $request->input('items.' . $id, []), [
+                    'student_id' => ['required', 'integer'],
+                    'invoice_id' => ['required', 'integer'],
+                    // Unchecked checkboxes are omitted from the request. Validate confirmation only
+                    // when the selected row actually submits the field; the service enforces it
+                    // for blank/repeated source references.
+                    'confirm_reference_review' => ['sometimes', 'accepted'],
+                ])->validate();
                 $payment = $this->allocationService->post(
                     $transaction,
                     (int) $item['student_id'],
@@ -161,7 +164,7 @@ class BankStudentPaymentAllocationController extends Controller
         }
 
         return redirect()->route('admin.bank-reconciliations.student-payment-allocation', [
-            'account_id' => $request->input('account_id'),
+            'account_id' => $validated['account_id'],
             'page' => $validated['return_page'] ?? 1,
         ])
             ->with('allocation_posted', $posted)->with('allocation_errors', $errors);
