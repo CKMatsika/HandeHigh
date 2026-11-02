@@ -24,7 +24,10 @@ class LeadershipDashboardReportService
             ->with('teacher')
             ->get();
 
+        // This dashboard is an operational roster: archived and inactive profiles
+        // must not inflate current grade, stream, gender, or residency totals.
         $students = Student::where('school_id', $school->id)
+            ->where('status', 'active')
             ->with(['currentEnrollment.class.teacher'])
             ->get();
 
@@ -38,7 +41,7 @@ class LeadershipDashboardReportService
 
         $boarders = $students->filter(fn ($s) => (bool) ($s->is_boarding || $s->currentEnrollment?->is_boarding))->count();
         $dayScholars = $totalStudents - $boarders;
-        $activeStudents = $students->filter(fn ($s) => strtolower($s->status ?? 'active') === 'active')->count();
+        $activeStudents = $totalStudents;
 
         // Standard secondary grades order
         $standardGradeOrder = ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
@@ -513,7 +516,9 @@ class LeadershipDashboardReportService
 
     protected function drilldownStudents(School $school, array $params): array
     {
-        $query = Student::where('school_id', $school->id)->with(['currentEnrollment.class']);
+        $query = Student::where('school_id', $school->id)
+            ->where('status', 'active')
+            ->with(['currentEnrollment.class']);
 
         if (!empty($params['grade'])) {
             $grade = $params['grade'];

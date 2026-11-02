@@ -29,7 +29,7 @@ class DashboardController extends Controller
 
         // Get statistics for headmaster dashboard
         $stats = [
-            'total_students' => $school->students()->count(),
+            'total_students' => $school->students()->where('status', 'active')->count(),
             'total_teachers' => $school->teachers()->count(),
             'total_classes' => $school->classes()->count(),
             'total_subjects' => $school->subjects()->count(),

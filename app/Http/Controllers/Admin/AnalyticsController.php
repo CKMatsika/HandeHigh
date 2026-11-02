@@ -59,7 +59,7 @@ class AnalyticsController extends Controller
     protected function getAcademicStats($school)
     {
         return [
-            'totalStudents' => Student::where('school_id', $school->id)->count(),
+            'totalStudents' => Student::where('school_id', $school->id)->where('status', 'active')->count(),
             'totalTeachers' => Teacher::where('school_id', $school->id)->count(),
             'totalClasses' => SchoolClass::where('school_id', $school->id)->count(),
             'averageGPA' => $this->calculateAverageGPA($school),

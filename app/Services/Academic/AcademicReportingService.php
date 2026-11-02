@@ -28,7 +28,12 @@ class AcademicReportingService
     public function getEnrollmentSummary(School $school, array $filters = []): array
     {
         $query = Student::query()
-            ->where('students.school_id', $school->id);
+            ->where('students.school_id', $school->id)
+            ->where('students.status', '!=', 'archived');
+
+        if (empty($filters['status'])) {
+            $query->where('students.status', 'active');
+        }
 
         if (!empty($filters['grade'])) {
             $query->where('students.grade', $filters['grade']);
@@ -161,7 +166,12 @@ class AcademicReportingService
      */
     public function getEnrollmentByClass(School $school, array $filters = []): array
     {
-        $studentsQuery = Student::where('school_id', $school->id);
+        $studentsQuery = Student::where('school_id', $school->id)
+            ->where('status', '!=', 'archived');
+
+        if (empty($filters['status'])) {
+            $studentsQuery->where('status', 'active');
+        }
 
         if (!empty($filters['status'])) {
             $studentsQuery->where('status', $filters['status']);
@@ -238,7 +248,14 @@ class AcademicReportingService
     {
         $query = Student::query()
             ->where('school_id', $school->id)
+            ->where('status', '!=', 'archived')
             ->with(['guardians', 'scholarships']);
+
+        // The register is a current student listing by default. Other
+        // non-archived statuses remain available when explicitly requested.
+        if (empty($filters['status'])) {
+            $query->where('status', 'active');
+        }
 
         if (in_array($filters['funding_status'] ?? '', ['regular', 'scholarship'], true)) {
             $query->where('funding_status', $filters['funding_status']);
@@ -931,7 +948,7 @@ class AcademicReportingService
     public function getAcademicDashboardKPIs(School $school): array
     {
         // Total Students
-        $students = Student::where('school_id', $school->id)->get();
+        $students = Student::where('school_id', $school->id)->where('status', 'active')->get();
         $totalStudents = $students->count();
         $maleStudents = $students->where('gender', 'male')->count();
         $femaleStudents = $students->where('gender', 'female')->count();

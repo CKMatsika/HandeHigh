@@ -54,8 +54,8 @@ class AcademicReportController extends Controller
         $filters = $request->only(['grade', 'form', 'class_name', 'gender', 'status', 'is_boarding']);
         $report = $this->reportingService->getEnrollmentSummary($school, $filters);
 
-        $availableGrades = Student::where('school_id', $school->id)->distinct()->pluck('grade')->filter()->sort()->values();
-        $availableClasses = Student::where('school_id', $school->id)->distinct()->pluck('class_name')->filter()->sort()->values();
+        $availableGrades = Student::where('school_id', $school->id)->where('status', '!=', 'archived')->distinct()->pluck('grade')->filter()->sort()->values();
+        $availableClasses = Student::where('school_id', $school->id)->where('status', '!=', 'archived')->distinct()->pluck('class_name')->filter()->sort()->values();
 
         return view('admin.reports.enrollment-summary', array_merge($report, [
             'school' => $school,
@@ -84,7 +84,7 @@ class AcademicReportController extends Controller
         $filters = $request->only(['grade', 'status']);
         $report = $this->reportingService->getEnrollmentByClass($school, $filters);
 
-        $availableGrades = Student::where('school_id', $school->id)->distinct()->pluck('grade')->filter()->sort()->values();
+        $availableGrades = Student::where('school_id', $school->id)->where('status', '!=', 'archived')->distinct()->pluck('grade')->filter()->sort()->values();
 
         return view('admin.reports.enrollment-by-class', array_merge($report, [
             'school' => $school,
@@ -102,8 +102,8 @@ class AcademicReportController extends Controller
         $filters = $request->only(['grade', 'form', 'class_name', 'gender', 'status', 'is_boarding', 'funding_status', 'search']);
         $report = $this->reportingService->getStudentRegister($school, $filters, 25);
 
-        $availableGrades = Student::where('school_id', $school->id)->distinct()->pluck('grade')->filter()->sort()->values();
-        $availableClasses = Student::where('school_id', $school->id)->distinct()->pluck('class_name')->filter()->sort()->values();
+        $availableGrades = Student::where('school_id', $school->id)->where('status', '!=', 'archived')->distinct()->pluck('grade')->filter()->sort()->values();
+        $availableClasses = Student::where('school_id', $school->id)->where('status', '!=', 'archived')->distinct()->pluck('class_name')->filter()->sort()->values();
 
         return view('admin.reports.student-register', array_merge($report, [
             'school' => $school,
