@@ -511,6 +511,15 @@ class BankReconciliationService
      */
     private function parseDate($dateString, $format)
     {
+        $dateString = trim((string) $dateString);
+
+        // Spreadsheet applications may serialize a date-only cell as an ISO timestamp.
+        // The bank transaction is date-based, so preserve its stated calendar date.
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})[T ]/', $dateString, $matches)) {
+            $dateString = $matches[1];
+            $format = 'Y-m-d';
+        }
+
         try {
             return \Carbon\Carbon::createFromFormat($format, $dateString);
         } catch (\Exception $e) {
