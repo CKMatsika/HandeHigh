@@ -297,6 +297,9 @@ Route::middleware(['auth'])->group(function () {
                 ->middlewareFor(['edit', 'update'], 'can:update,subject')
                 ->middlewareFor('destroy', 'can:delete,subject');
             Route::resource('curricula', CurriculumController::class);
+            Route::get('/teachers/bulk-import', [\App\Http\Controllers\Admin\TeacherBulkImportController::class, 'create'])->name('teachers.bulk-import')->middleware('permission:teachers.create');
+            Route::post('/teachers/bulk-import', [\App\Http\Controllers\Admin\TeacherBulkImportController::class, 'store'])->name('teachers.bulk-import.store')->middleware('permission:teachers.create');
+            Route::get('/teachers/bulk-import/template', [\App\Http\Controllers\Admin\TeacherBulkImportController::class, 'template'])->name('teachers.bulk-import.template')->middleware('permission:teachers.create');
             Route::resource('teachers', \App\Http\Controllers\Admin\TeacherController::class)
                 ->middlewareFor('show', 'can:view,teacher')
                 ->middlewareFor(['edit', 'update'], 'can:update,teacher')

@@ -7,10 +7,15 @@
             <h1 class="text-xl font-semibold tracking-tight text-slate-50">Teachers</h1>
             <p class="text-xs text-slate-400 mt-1">Manage teaching staff, qualifications, subjects, and role assignments.</p>
         </div>
-        <a href="{{ route('admin.teachers.create') }}" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Add Teacher
-        </a>
+        <div class="flex flex-wrap gap-2">
+            @can('teachers.create')
+                <a href="{{ route('admin.teachers.bulk-import') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700">Bulk Import</a>
+                <a href="{{ route('admin.teachers.create') }}" class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Add Teacher
+                </a>
+            @endcan
+        </div>
     </div>
 
     <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
