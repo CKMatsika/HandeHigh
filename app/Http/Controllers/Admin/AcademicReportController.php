@@ -127,7 +127,16 @@ class AcademicReportController extends Controller
             ->where('school_id', $school->id)
             ->where('status', 'active')
             ->with([
-                'currentEnrollment' => fn ($q) => $q->select('id', 'student_id', 'class_id', 'grade', 'class_name', 'is_boarding'),
+                // latestOfMany joins enrollments to an aggregate subquery, so qualify
+                // the selected columns to avoid MySQL's ambiguous student_id error.
+                'currentEnrollment' => fn ($q) => $q->select(
+                    'enrollments.id',
+                    'enrollments.student_id',
+                    'enrollments.class_id',
+                    'enrollments.grade',
+                    'enrollments.class_name',
+                    'enrollments.is_boarding'
+                ),
                 'currentEnrollment.class:id,name,grade',
             ])
             ->get(['id', 'first_name', 'other_names', 'last_name', 'admission_number', 'registration_number', 'grade', 'class_name', 'is_boarding', 'funding_status', 'gender'])
