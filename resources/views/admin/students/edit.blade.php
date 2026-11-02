@@ -124,6 +124,24 @@
             Deactivate Student
         </button>
     </form>
+    @can('delete', $student)
+        <form method="POST" action="{{ route('admin.students.archive', $student) }}" class="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3" onsubmit="return confirm('Archive this student? They will leave active student and enrolment lists. Their invoices, payments, accounting, academic history, and profile will be preserved.');">
+            @csrf
+            <div>
+                <h3 class="text-sm font-semibold text-amber-300">Archive Student</h3>
+                <p class="mt-1 text-xs text-slate-400">Use this to remove the student from active records while retaining their complete history. You can restore them later from the Archived Students list.</p>
+            </div>
+            <label for="archive_reason" class="block text-xs font-medium text-slate-300">Reason for archiving</label>
+            <textarea id="archive_reason" name="archive_reason" required minlength="5" maxlength="1000" rows="2" class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100" placeholder="Enter the reason for archiving this student">{{ old('archive_reason') }}</textarea>
+            <label class="flex items-start gap-2 text-xs text-slate-300">
+                <input type="checkbox" name="confirmation" value="1" required class="mt-0.5 rounded border-slate-600 bg-slate-800 text-amber-500">
+                I understand the student will be archived, linked active enrolments will be archived, and historical records will be retained.
+            </label>
+            @error('archive_reason')<p class="text-xs text-red-400">{{ $message }}</p>@enderror
+            @error('confirmation')<p class="text-xs text-red-400">{{ $message }}</p>@enderror
+            <button type="submit" class="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-500/20">Archive Student</button>
+        </form>
+    @endcan
 </div>
 @endsection
 

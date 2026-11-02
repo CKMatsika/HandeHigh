@@ -29,7 +29,10 @@ class EnrollmentController extends Controller
         }
 
         $query = Enrollment::with(['student.guardians', 'student.currentEnrollment.class', 'invoices', 'class'])
-            ->where('school_id', $school->id);
+            ->where('school_id', $school->id)
+            ->whereHas('student', fn ($studentQuery) => $studentQuery
+                ->where('school_id', $school->id)
+                ->where('status', '!=', 'archived'));
 
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));

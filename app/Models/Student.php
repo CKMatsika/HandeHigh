@@ -27,6 +27,10 @@ class Student extends Model
         'funding_status',
         'has_transport',
         'status',
+        'status_before_archive',
+        'archived_at',
+        'archived_by',
+        'archive_reason',
         'exit_type',
         'exit_date',
         'exit_remarks',
@@ -35,6 +39,7 @@ class Student extends Model
     protected $casts = [
         'date_of_birth' => 'date',
         'exit_date' => 'date',
+        'archived_at' => 'datetime',
         'is_boarding' => 'boolean',
         'has_transport' => 'boolean',
     ];

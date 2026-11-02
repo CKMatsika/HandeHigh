@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Models\AuditLog;
 use App\Models\Enrollment;
 use App\Models\Subject;
 use App\Rules\TenantExists;
@@ -40,6 +41,7 @@ class StudentController extends Controller
         if (!$school) abort(403);
 
         $query = Student::where('school_id', $school->id)
+            ->where('status', '!=', 'archived')
             ->with(['house', 'currentBedAssignment.bed.dormitory', 'currentEnrollment.class']);
         $classMapping = app(\App\Services\StudentClassMappingService::class);
 
@@ -507,6 +509,10 @@ class StudentController extends Controller
         $user = Auth::user();
         $school = $user->school;
         if (!$school || $student->school_id !== $school->id) abort(403);
+        if ($student->status === 'archived') {
+            return redirect()->route('admin.students.show', $student)
+                ->with('error', 'Restore this student from the archive before editing their profile.');
+        }
 
         $guardians = Guardian::where('school_id', $school->id)->get();
         $classes = SchoolClass::where('school_id', $school->id)
@@ -526,6 +532,10 @@ class StudentController extends Controller
         $user = Auth::user();
         $school = $user->school;
         if (!$school || $student->school_id !== $school->id) abort(403);
+        if ($student->status === 'archived') {
+            return redirect()->route('admin.students.show', $student)
+                ->with('error', 'Restore this student from the archive before editing their profile.');
+        }
 
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
@@ -606,11 +616,161 @@ class StudentController extends Controller
         $user = Auth::user();
         $school = $user->school;
         if (!$school || $student->school_id !== $school->id) abort(403);
+        if ($student->status === 'archived') {
+            return redirect()->route('admin.students.archived')
+                ->with('error', 'Restore this student before changing their status.');
+        }
 
         $student->update(['status' => 'inactive']);
 
         return redirect()->route('admin.students.index')
             ->with('success', 'Student deactivated successfully.');
+    }
+
+    public function archived(Request $request)
+    {
+        $school = Auth::user()->school;
+        if (! $school) abort(403);
+
+        $students = Student::query()
+            ->where('school_id', $school->id)
+            ->where('status', 'archived')
+            ->with('latestEnrollment.class')
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim($request->input('search'));
+                $query->where(function ($matches) use ($search) {
+                    $matches->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('other_names', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('admission_number', 'like', "%{$search}%")
+                        ->orWhere('registration_number', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('archived_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('admin.students.archived', compact('school', 'students'));
+    }
+
+    public function archive(Request $request, Student $student)
+    {
+        $user = Auth::user();
+        $school = $user->school;
+        if (! $school || $student->school_id !== $school->id) abort(403);
+
+        $validated = $request->validate([
+            'archive_reason' => ['required', 'string', 'min:5', 'max:1000'],
+            'confirmation' => ['required', 'accepted'],
+        ]);
+
+        if ($student->status === 'archived') {
+            return back()->with('error', 'This student is already archived.');
+        }
+
+        DB::transaction(function () use ($student, $school, $user, $validated, $request) {
+            $activeEnrollmentIds = Enrollment::query()
+                ->where('school_id', $school->id)
+                ->where('student_id', $student->id)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->pluck('id')
+                ->all();
+
+            if ($activeEnrollmentIds) {
+                Enrollment::where('school_id', $school->id)
+                    ->where('student_id', $student->id)
+                    ->whereIn('id', $activeEnrollmentIds)
+                    ->update(['status' => 'archived', 'updated_at' => now()]);
+            }
+
+            $previousStatus = $student->status;
+            $student->update([
+                'status_before_archive' => $previousStatus,
+                'status' => 'archived',
+                'archived_at' => now(),
+                'archived_by' => $user->id,
+                'archive_reason' => trim($validated['archive_reason']),
+            ]);
+
+            AuditLog::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'action' => 'student_archived',
+                'model_type' => Student::class,
+                'model_id' => $student->id,
+                'old_values' => ['status' => $previousStatus],
+                'new_values' => [
+                    'status' => 'archived',
+                    'reason' => trim($validated['archive_reason']),
+                    'archived_enrollment_ids' => $activeEnrollmentIds,
+                ],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'module' => 'students',
+                'description' => "Student {$student->full_name} archived; linked financial and academic records retained.",
+            ]);
+        });
+
+        return redirect()->route('admin.students.archived')
+            ->with('success', "{$student->full_name} was archived. Linked records have been retained.");
+    }
+
+    public function restoreArchived(Request $request, Student $student)
+    {
+        $user = Auth::user();
+        $school = $user->school;
+        if (! $school || $student->school_id !== $school->id) abort(403);
+        if ($student->status !== 'archived') {
+            return back()->with('error', 'This student is not archived.');
+        }
+
+        DB::transaction(function () use ($student, $school, $user, $request) {
+            $archiveLog = AuditLog::query()
+                ->where('school_id', $school->id)
+                ->where('model_type', Student::class)
+                ->where('model_id', $student->id)
+                ->where('action', 'student_archived')
+                ->latest('id')
+                ->first();
+            $archiveValues = $archiveLog?->new_values ?? [];
+            $enrollmentIds = $archiveValues['archived_enrollment_ids'] ?? [];
+
+            if ($enrollmentIds) {
+                Enrollment::query()
+                    ->where('school_id', $school->id)
+                    ->where('student_id', $student->id)
+                    ->whereIn('id', $enrollmentIds)
+                    ->where('status', 'archived')
+                    ->update(['status' => 'active', 'updated_at' => now()]);
+            }
+
+            $previousStatus = $student->status_before_archive ?: 'inactive';
+            $student->update([
+                'status' => $previousStatus,
+                'status_before_archive' => null,
+                'archived_at' => null,
+                'archived_by' => null,
+                'archive_reason' => null,
+            ]);
+
+            AuditLog::create([
+                'school_id' => $school->id,
+                'user_id' => $user->id,
+                'action' => 'student_restored_from_archive',
+                'model_type' => Student::class,
+                'model_id' => $student->id,
+                'old_values' => ['status' => 'archived'],
+                'new_values' => ['status' => $previousStatus, 'restored_enrollment_ids' => $enrollmentIds],
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'module' => 'students',
+                'description' => "Student {$student->full_name} restored from archive.",
+            ]);
+        });
+
+        return redirect()->route('admin.students.archived')
+            ->with('success', "{$student->full_name} was restored.");
     }
 
     // --- SUBJECT MANAGEMENT ---

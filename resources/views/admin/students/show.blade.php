@@ -21,16 +21,25 @@
         </div>
         <div class="flex items-center gap-2">
             @php
-                $statusColors = ['active' => 'green', 'inactive' => 'slate', 'graduated' => 'blue', 'transferred' => 'yellow', 'expelled' => 'red'];
+                $statusColors = ['active' => 'green', 'inactive' => 'slate', 'graduated' => 'blue', 'transferred' => 'yellow', 'expelled' => 'red', 'archived' => 'amber'];
                 $color = $statusColors[$student->status] ?? 'slate';
             @endphp
             <span class="text-xs px-3 py-1 rounded-full bg-{{ $color }}-500/20 text-{{ $color }}-400 font-medium">{{ ucfirst($student->status) }}</span>
-            <a href="{{ route('admin.students.edit', $student) }}" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm transition">Edit Profile</a>
-            @if(auth()->user()->hasAnyRole(['super-admin', 'school-admin', 'headmaster', 'deputy-headmaster', 'bursar', 'accountant']))
+            @if($student->status !== 'archived')
+                <a href="{{ route('admin.students.edit', $student) }}" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm transition">Edit Profile</a>
+            @endif
+            @if($student->status !== 'archived' && auth()->user()->hasAnyRole(['super-admin', 'school-admin', 'headmaster', 'deputy-headmaster', 'bursar', 'accountant']))
                 <a href="{{ route('admin.students.scholarships', $student) }}" class="bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm">Scholarships</a>
             @endif
         </div>
     </div>
+
+    @if($student->status === 'archived')
+        <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            This student is archived. Their linked records are retained. Restore the student from <a href="{{ route('admin.students.archived') }}" class="font-semibold underline">Archived Students</a> before making profile changes.
+            @if($student->archive_reason)<div class="mt-1 text-xs text-amber-100/80">Reason: {{ $student->archive_reason }}</div>@endif
+        </div>
+    @endif
 
     <!-- Tabs -->
     @php

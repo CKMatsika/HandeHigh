@@ -12,9 +12,12 @@
             <h1 class="ms-title">Student Management</h1>
             <p class="ms-description">Manage student profiles, class placements and residency.</p>
         </div>
-        <a href="{{ route('admin.students.create') }}" class="ms-button ms-button-primary">
-            New Student
-        </a>
+        <div class="flex gap-2">
+            @can('students.view')
+                <a href="{{ route('admin.students.archived') }}" class="ms-button border border-slate-600 text-slate-200">Archived Students</a>
+            @endcan
+            <a href="{{ route('admin.students.create') }}" class="ms-button ms-button-primary">New Student</a>
+        </div>
     </div>
 
     <!-- Filters -->

@@ -242,6 +242,9 @@ Route::middleware(['auth'])->group(function () {
             Route::post('students/{student}/assign-bed', [AdminStudentController::class, 'assignBed'])->name('students.assign-bed');
             Route::delete('students/{student}/release-bed', [AdminStudentController::class, 'releaseBed'])->name('students.release-bed');
             Route::post('students/{student}/residency/transition', [AdminStudentController::class, 'transitionResidency'])->name('students.residency.transition');
+            Route::get('students/archived', [AdminStudentController::class, 'archived'])->name('students.archived')->middleware('permission:students.view');
+            Route::post('students/{student}/archive', [AdminStudentController::class, 'archive'])->name('students.archive')->middleware('can:delete,student');
+            Route::post('students/{student}/restore-archived', [AdminStudentController::class, 'restoreArchived'])->name('students.restore-archived')->middleware('can:delete,student');
 
             // Hostels & Dormitories Management
             Route::resource('hostels', \App\Http\Controllers\Admin\HostelController::class);
