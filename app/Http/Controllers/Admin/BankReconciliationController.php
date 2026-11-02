@@ -11,6 +11,7 @@ use App\Rules\TenantExists;
 use App\Services\BankReconciliationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class BankReconciliationController extends Controller
 {
@@ -148,20 +149,27 @@ class BankReconciliationController extends Controller
         if ($request->hasFile('statement_file')) {
             $file = $request->file('statement_file');
             $filePath = $file->store('statements', 'local');
+            $disk = Storage::disk('local');
+
+            if (! $filePath || ! $disk->exists($filePath)) {
+                return back()->with('error', 'The uploaded statement could not be stored. Please try again.');
+            }
 
             $options = [
                 'skip_header' => $request->boolean('skip_header', true),
                 'date_format' => $request->get('date_format', 'Y-m-d'),
             ];
 
-            $result = $this->reconciliationService->importBankStatement(
-                $validated['account_id'], 
-                storage_path('app/' . $filePath),
-                $options
-            );
-
-            // Clean up the file
-            unlink(storage_path('app/' . $filePath));
+            try {
+                $result = $this->reconciliationService->importBankStatement(
+                    $validated['account_id'],
+                    $disk->path($filePath),
+                    $options
+                );
+            } finally {
+                // Remove the private temporary upload without assuming the disk's root path.
+                $disk->delete($filePath);
+            }
 
             if ($result['success']) {
                 return back()->with('success', $result['message']);

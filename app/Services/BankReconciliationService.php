@@ -449,7 +449,16 @@ class BankReconciliationService
         $headers = $options['headers'] ?? ['date', 'description', 'amount', 'type'];
         $dateFormat = $options['date_format'] ?? 'Y-m-d';
 
-        if (($handle = fopen($filePath, 'r')) !== false) {
+        if (! is_file($filePath) || ! is_readable($filePath)) {
+            throw new \RuntimeException('The uploaded statement file could not be read.');
+        }
+
+        $handle = fopen($filePath, 'r');
+        if ($handle === false) {
+            throw new \RuntimeException('The uploaded statement file could not be opened.');
+        }
+
+        try {
             $row = 0;
             while (($data = fgetcsv($handle, 1000, ',')) !== false) {
                 if ($row === 0 && $options['skip_header'] ?? true) {
@@ -468,6 +477,7 @@ class BankReconciliationService
                 $transactions[] = $transaction;
                 $row++;
             }
+        } finally {
             fclose($handle);
         }
 
