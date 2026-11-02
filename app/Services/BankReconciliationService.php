@@ -447,6 +447,14 @@ class BankReconciliationService
     {
         $transactions = [];
         $headers = $options['headers'] ?? ['date', 'description', 'amount', 'type'];
+        $columns = array_is_list($headers) ? array_flip($headers) : $headers;
+        $columns = array_replace([
+            'date' => 0,
+            'description' => 1,
+            'amount' => 2,
+            'type' => 3,
+            'reference' => 4,
+        ], $columns);
         $dateFormat = $options['date_format'] ?? 'Y-m-d';
 
         if (! is_file($filePath) || ! is_readable($filePath)) {
@@ -466,12 +474,17 @@ class BankReconciliationService
                     continue;
                 }
 
+                $dateValue = trim((string) ($data[$columns['date']] ?? ''));
+                if ($dateValue === '') {
+                    throw new \InvalidArgumentException('Missing transaction date on CSV row ' . ($row + 1) . '.');
+                }
+
                 $transaction = [
-                    'date' => $this->parseDate($data[$headers['date']] ?? $data[0], $dateFormat),
-                    'description' => $data[$headers['description'] ?? $data[1]] ?? '',
-                    'amount' => floatval($data[$headers['amount'] ?? $data[2]] ?? 0),
-                    'type' => $data[$headers['type'] ?? $data[3]] ?? 'credit',
-                    'reference' => $data[$headers['reference'] ?? $data[4]] ?? null,
+                    'date' => $this->parseDate($dateValue, $dateFormat),
+                    'description' => $data[$columns['description']] ?? '',
+                    'amount' => floatval($data[$columns['amount']] ?? 0),
+                    'type' => $data[$columns['type']] ?? 'credit',
+                    'reference' => $data[$columns['reference']] ?? null,
                 ];
 
                 $transactions[] = $transaction;
