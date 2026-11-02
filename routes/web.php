@@ -429,6 +429,12 @@ Route::middleware(['auth'])->group(function () {
             Route::post('bank-reconciliations/add-bank-transaction', [BankReconciliationController::class, 'addBankTransaction'])->name('bank-reconciliations.add-bank-transaction');
             Route::get('bank-reconciliations/student-payment-allocation', [BankStudentPaymentAllocationController::class, 'index'])
                 ->name('bank-reconciliations.student-payment-allocation')->middleware('permission:bank-reconciliations.view|payments.view');
+            Route::get('bank-reconciliations/student-payment-allocation/deferred', [BankStudentPaymentAllocationController::class, 'deferred'])
+                ->name('bank-reconciliations.student-payment-allocation.deferred')->middleware('permission:bank-reconciliations.view|payments.view');
+            Route::post('bank-reconciliations/student-payment-allocation/defer-student', [BankStudentPaymentAllocationController::class, 'deferStudent'])
+                ->name('bank-reconciliations.student-payment-allocation.defer')->middleware('permission:payments.create|bank-reconciliations.edit');
+            Route::post('bank-reconciliations/student-payment-allocation/restore-student', [BankStudentPaymentAllocationController::class, 'restoreDeferredStudent'])
+                ->name('bank-reconciliations.student-payment-allocation.restore')->middleware('permission:payments.create|bank-reconciliations.edit');
             Route::get('bank-reconciliations/student-payment-allocation/students', [BankStudentPaymentAllocationController::class, 'searchStudents'])
                 ->name('bank-reconciliations.student-payment-allocation.students')->middleware('permission:bank-reconciliations.view|payments.view');
             Route::get('bank-reconciliations/student-payment-allocation/{transaction}/choose-invoice', [BankStudentPaymentAllocationController::class, 'invoicePicker'])

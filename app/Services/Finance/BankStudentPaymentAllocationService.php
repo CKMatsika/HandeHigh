@@ -5,6 +5,7 @@ namespace App\Services\Finance;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\BankTransaction;
+use App\Models\BankStudentPaymentReviewState;
 use App\Models\CashbookTransaction;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -13,6 +14,7 @@ use App\Models\Student;
 use App\Services\AccountingService;
 use App\Services\BankReconciliationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -24,6 +26,45 @@ class BankStudentPaymentAllocationService
 
     public function pendingQuery(int $schoolId, int $accountId)
     {
+        $query = $this->reviewableQuery($schoolId, $accountId);
+        if (! Schema::hasTable('bank_student_payment_review_states')) {
+            return $query;
+        }
+
+        return $query
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')->from('bank_student_payment_review_states as review_states')
+                    ->whereColumn('review_states.bank_transaction_id', 'bank_transactions.id')
+                    ->whereNotNull('review_states.deferred_at')
+                    ->where(function ($active) {
+                        $active->whereNull('review_states.restored_at')
+                            ->orWhereColumn('review_states.deferred_at', '>', 'review_states.restored_at');
+                    });
+            });
+    }
+
+    public function deferredQuery(int $schoolId, int $accountId)
+    {
+        $query = $this->reviewableQuery($schoolId, $accountId);
+        if (! Schema::hasTable('bank_student_payment_review_states')) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->with(['paymentAllocationReview.student'])
+            ->whereExists(function ($query) {
+                $query->selectRaw('1')->from('bank_student_payment_review_states as review_states')
+                    ->whereColumn('review_states.bank_transaction_id', 'bank_transactions.id')
+                    ->whereNotNull('review_states.deferred_at')
+                    ->where(function ($active) {
+                        $active->whereNull('review_states.restored_at')
+                            ->orWhereColumn('review_states.deferred_at', '>', 'review_states.restored_at');
+                    });
+            });
+    }
+
+    public function reviewableQuery(int $schoolId, int $accountId)
+    {
         return BankTransaction::query()
             ->where('school_id', $schoolId)
             ->where('account_id', $accountId)
@@ -33,6 +74,108 @@ class BankStudentPaymentAllocationService
             ->where('description', 'like', self::DESCRIPTION_PREFIX . '%')
             ->orderBy('transaction_date')
             ->orderBy('id');
+    }
+
+    /** Defer all currently pending source lines in this account that can be tied to this student. */
+    public function deferStudentLines(int $schoolId, int $accountId, int $transactionId, int $studentId, int $userId): int
+    {
+        if (! Schema::hasTable('bank_student_payment_review_states')) {
+            throw ValidationException::withMessages(['queue' => 'The deferred payment queue is not enabled yet. Apply the additive queue migration first.']);
+        }
+
+        $current = $this->pendingQuery($schoolId, $accountId)->findOrFail($transactionId);
+        $student = Student::query()->where('school_id', $schoolId)->findOrFail($studentId);
+        $numbers = array_filter(array_map(static fn ($value) => trim((string) $value), [
+            $student->admission_number,
+            $student->registration_number,
+        ]));
+        $identifierRows = Student::query()->where('school_id', $schoolId)
+            ->where(function ($query) use ($numbers) {
+                if ($numbers) {
+                    $query->whereIn('admission_number', $numbers)->orWhereIn('registration_number', $numbers);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            })->get(['id', 'admission_number', 'registration_number']);
+        $numberOwners = [];
+        foreach ($identifierRows as $row) {
+            foreach ([$row->admission_number, $row->registration_number] as $number) {
+                $number = trim((string) $number);
+                if ($number !== '') $numberOwners[$number][] = (int) $row->id;
+            }
+        }
+        $uniqueNumbers = array_values(array_filter($numbers, fn ($number) => count(array_unique($numberOwners[$number] ?? [])) === 1
+            && (int) $numberOwners[$number][0] === (int) $student->id));
+        $normalizedNames = $this->normalizeName(trim(implode(' ', array_filter([
+            $student->first_name,
+            $student->other_names,
+        ]))));
+        $surname = mb_strtolower(trim((string) $student->last_name));
+        $sameNameStudents = Student::query()->where('school_id', $schoolId)
+            ->whereRaw('LOWER(last_name) = ?', [$surname])
+            ->get(['id', 'first_name', 'other_names'])
+            ->filter(fn (Student $candidate) => $this->normalizeName(trim(implode(' ', array_filter([
+                $candidate->first_name,
+                $candidate->other_names,
+            ])))) === $normalizedNames)
+            ->values();
+        $uniqueNameMatch = $sameNameStudents->count() === 1 && (int) $sameNameStudents->first()->id === (int) $student->id;
+        $deferredCount = 0;
+
+        DB::transaction(function () use ($current, $student, $uniqueNumbers, $normalizedNames, $surname, $uniqueNameMatch, $schoolId, $accountId, $userId, &$deferredCount) {
+            $this->reviewableQuery($schoolId, $accountId)->select(['id', 'school_id', 'description'])->reorder()->orderBy('bank_transactions.id')
+                ->chunkById(200, function ($transactions) use ($current, $student, $numbers, $normalizedNames, $surname, $schoolId, $userId, &$deferredCount) {
+                    foreach ($transactions as $transaction) {
+                        $source = $this->parseSourceDescription((string) $transaction->description);
+                        $matches = (int) $transaction->id === (int) $current->id;
+
+                        if (! $matches && $source) {
+                            $sourceNumber = trim((string) $source['student_number']);
+                            $numberMatches = $sourceNumber !== '' && $sourceNumber !== '[number blank]' && in_array($sourceNumber, $uniqueNumbers, true);
+                            $nameMatches = $uniqueNameMatch && $source['surname'] !== ''
+                                && mb_strtolower($source['surname']) === $surname
+                                && $this->normalizeName($source['given_names']) === $normalizedNames;
+                            $matches = $numberMatches || $nameMatches;
+                        }
+
+                        if (! $matches) continue;
+
+                        BankStudentPaymentReviewState::updateOrCreate(
+                            ['bank_transaction_id' => $transaction->id],
+                            [
+                                'school_id' => $schoolId,
+                                'student_id' => $student->id,
+                                'deferred_by' => $userId,
+                                'deferred_at' => now(),
+                                'restored_by' => null,
+                                'restored_at' => null,
+                            ]
+                        );
+                        $deferredCount++;
+                    }
+                }, 'bank_transactions.id');
+        });
+
+        return $deferredCount;
+    }
+
+    public function restoreStudentLines(int $schoolId, int $accountId, int $studentId, int $userId): int
+    {
+        if (! Schema::hasTable('bank_student_payment_review_states')) {
+            throw ValidationException::withMessages(['queue' => 'The deferred payment queue is not enabled yet. Apply the additive queue migration first.']);
+        }
+
+        return BankStudentPaymentReviewState::query()
+            ->where('school_id', $schoolId)
+            ->where('student_id', $studentId)
+            ->whereHas('bankTransaction', fn ($query) => $query->where('account_id', $accountId)
+                ->where('status', 'unmatched')->where('source', 'bank_statement')
+                ->where('transaction_type', 'credit')->where('description', 'like', self::DESCRIPTION_PREFIX.'%'))
+            ->whereNotNull('deferred_at')
+            ->where(function ($query) {
+                $query->whereNull('restored_at')->orWhereColumn('deferred_at', '>', 'restored_at');
+            })
+            ->update(['restored_by' => $userId, 'restored_at' => now(), 'updated_at' => now()]);
     }
 
     public function suggest(BankTransaction $transaction, int $referenceCount = 1): array

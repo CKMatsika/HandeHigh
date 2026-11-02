@@ -5,10 +5,17 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <p class="text-xs text-slate-400"><a class="text-indigo-300 hover:text-indigo-200" href="{{ route('admin.bank-reconciliations.index') }}">Bank Reconciliations</a> / Student Payment Allocation</p>
-            <h1 class="mt-1 text-xl font-semibold text-slate-50">Review Student Payment Allocations</h1>
+            <h1 class="mt-1 text-xl font-semibold text-slate-50">{{ $deferredMode ? 'Deferred Student Payment Allocations' : 'Review Student Payment Allocations' }}</h1>
             <p class="mt-1 max-w-3xl text-sm text-slate-400">Review imported student-register credits, verify the student and Term 1 2026 invoice, then post up to five payments at a time. Posting creates the ERP receipt, allocation, journal and cashbook match.</p>
         </div>
-        <a href="{{ route('admin.bank-reconciliations.index') }}" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Back to bank reconciliations</a>
+        <div class="flex flex-wrap gap-2">
+            @if($deferredMode)
+                <a href="{{ route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account?->id]) }}" class="rounded-lg border border-indigo-700 px-3 py-2 text-sm text-indigo-200 hover:bg-indigo-950">Active queue ({{ $activeCount }})</a>
+            @else
+                <a href="{{ route('admin.bank-reconciliations.student-payment-allocation.deferred', ['account_id' => $account?->id]) }}" class="rounded-lg border border-amber-700 px-3 py-2 text-sm text-amber-200 hover:bg-amber-950">Deferred for later ({{ $deferredCount }})</a>
+            @endif
+            <a href="{{ route('admin.bank-reconciliations.index') }}" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">Back to bank reconciliations</a>
+        </div>
     </div>
 
     @if(session('allocation_posted'))
@@ -27,6 +34,15 @@
             <ul class="mt-2 list-inside list-disc">@foreach(session('allocation_errors') as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
     @endif
+    @if(session('allocation_deferred_count'))
+        <div class="rounded-lg border border-amber-700 bg-amber-950/40 p-4 text-sm text-amber-100">Moved {{ session('allocation_deferred_count') }} pending payment line(s) for this student to Deferred for later. No payment or accounting data was changed.</div>
+    @endif
+    @if(session('allocation_restored_count'))
+        <div class="rounded-lg border border-indigo-700 bg-indigo-950/40 p-4 text-sm text-indigo-100">Returned {{ session('allocation_restored_count') }} payment line(s) for this student to the active queue.</div>
+    @endif
+    @if(!$deferralAvailable)
+        <div class="rounded-lg border border-amber-700 bg-amber-950/40 p-4 text-sm text-amber-100">The separate deferred queue is not enabled yet. The additive database migration must be applied before you can move payments between queues. The active payment queue remains available.</div>
+    @endif
 
     <form method="GET" class="flex flex-wrap items-end gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
         <label class="min-w-64 flex-1 text-xs text-slate-300">Bank account
@@ -34,7 +50,7 @@
                 @foreach($accounts as $option)<option value="{{ $option->id }}" @selected($account?->id === $option->id)>{{ $option->code }} · {{ $option->name }}</option>@endforeach
             </select>
         </label>
-        <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">Show imported lines</button>
+        <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">{{ $deferredMode ? 'Show deferred lines' : 'Show imported lines' }}</button>
     </form>
 
     <div class="rounded-xl border {{ $period?->isOpen() ? 'border-emerald-800 bg-emerald-950/30' : 'border-amber-700 bg-amber-950/30' }} p-4 text-sm">
@@ -50,14 +66,17 @@
     @if(!$account)
         <div class="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-sm text-slate-400">No active bank account is available for this school.</div>
     @elseif(!$transactions || $transactions->isEmpty())
-        <div class="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-sm text-slate-300">No unmatched imported student-register credits remain for {{ $account->name }}.</div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-sm text-slate-300">{{ $deferredMode ? 'There are no deferred payment lines for '.$account->name.'.' : 'No active unmatched imported student-register credits remain for '.$account->name.'.' }}</div>
     @else
         <form method="POST" action="{{ route('admin.bank-reconciliations.student-payment-allocation.post') }}" id="allocation-form" class="space-y-3">
             @csrf
             <input type="hidden" name="account_id" value="{{ $account->id }}">
             <input type="hidden" name="return_page" value="{{ $transactions->currentPage() }}">
+            <input type="hidden" name="return_queue" value="{{ $deferredMode ? 'deferred' : 'active' }}">
+            <input type="hidden" id="defer-transaction-id" name="defer_transaction_id" value="">
+            <input type="hidden" id="defer-student-id" name="defer_student_id" value="">
             <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm">
-                <div class="text-slate-300">{{ $transactions->total() }} pending imported lines · Page {{ $transactions->currentPage() }} of {{ $transactions->lastPage() }} · Posting limit: 5 lines per batch</div>
+                <div class="text-slate-300">{{ $transactions->total() }} {{ $deferredMode ? 'deferred' : 'active pending' }} imported lines · Page {{ $transactions->currentPage() }} of {{ $transactions->lastPage() }} · Posting limit: 5 lines per batch</div>
                 <div class="text-xs text-slate-400">Original imported bank lines are retained and matched to the payment cashbook entry.</div>
             </div>
 
@@ -108,7 +127,7 @@
                                     <option value="">Choose invoice…</option>
                                     @if($invoice)<option value="{{ $invoice->id }}" selected>{{ $invoice->number }} · balance ${{ number_format((float) $invoice->balance, 2) }}</option>@endif
                                 </select>
-                                <a href="#" class="invoice-picker-link mt-2 inline-flex rounded-lg border border-indigo-700 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-950" data-url="{{ route('admin.bank-reconciliations.student-payment-allocation.invoice-picker', ['transaction' => $transaction->id]) }}" data-account="{{ $account->id }}" data-page="{{ $transactions->currentPage() }}">Find this student’s invoice manually</a>
+                                <a href="#" class="invoice-picker-link mt-2 inline-flex rounded-lg border border-indigo-700 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-950" data-url="{{ route('admin.bank-reconciliations.student-payment-allocation.invoice-picker', ['transaction' => $transaction->id]) }}" data-account="{{ $account->id }}" data-page="{{ $transactions->currentPage() }}" data-queue="{{ $deferredMode ? 'deferred' : 'active' }}">Find this student’s invoice manually</a>
                                 <p class="invoice-status mt-1 text-xs text-slate-400" aria-live="polite">Choose the student, then open the invoice finder to review and select their invoice.</p>
                                 @if($review['reference_needs_review'])
                                     <label class="mt-3 flex items-start gap-2 text-xs text-amber-200">
@@ -119,6 +138,13 @@
                                 <button type="button" class="post-single-line mt-3 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50" @disabled(!$period?->isOpen())>
                                     Post this payment now
                                 </button>
+                                @if($deferredMode)
+                                    @if($student)
+                                        <button type="submit" name="student_id" value="{{ $student->id }}" formaction="{{ route('admin.bank-reconciliations.student-payment-allocation.restore') }}" formmethod="POST" data-queue-action="restore" class="mt-2 w-full rounded-lg border border-indigo-700 px-3 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-950">Return all this student’s deferred lines to active queue</button>
+                                    @endif
+                                @elseif($deferralAvailable)
+                                    <button type="button" class="defer-student mt-2 w-full rounded-lg border border-amber-700 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-950">Move this student’s remaining payments to Deferred</button>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -151,6 +177,20 @@
         });
     });
 
+    form.querySelectorAll('.defer-student').forEach(button => button.addEventListener('click', () => {
+        const card = button.closest('[data-line]');
+        const studentId = card.querySelector('.student-select').value;
+        if (!studentId) { alert('Select and verify the student first.'); card.querySelector('.student-select').focus(); return; }
+        if (!confirm('Move this student’s remaining matching payment lines to Deferred for later? Original bank lines and posted receipts will remain unchanged.')) return;
+        form.querySelector('#defer-transaction-id').value = card.dataset.line;
+        form.querySelector('#defer-student-id').value = studentId;
+        button.dataset.queueAction = 'defer';
+        button.setAttribute('type', 'submit');
+        button.setAttribute('formaction', '{{ route('admin.bank-reconciliations.student-payment-allocation.defer') }}');
+        button.setAttribute('formmethod', 'POST');
+        form.requestSubmit(button);
+    }));
+
     form.querySelectorAll('.invoice-picker-link').forEach(link => link.addEventListener('click', event => {
         event.preventDefault();
         const card = link.closest('[data-line]');
@@ -160,6 +200,7 @@
         url.searchParams.set('account_id', link.dataset.account);
         url.searchParams.set('page', link.dataset.page);
         url.searchParams.set('student_id', studentId);
+        url.searchParams.set('queue', link.dataset.queue);
         window.location.assign(url.toString());
     }));
 
@@ -201,6 +242,7 @@
     }));
 
     form.addEventListener('submit', event => {
+        if (event.submitter?.dataset.queueAction) return;
         const selected = [...form.querySelectorAll('.line-select:checked')];
         if (selected.length < 1 || selected.length > 5) { event.preventDefault(); alert('Select between one and five payment lines.'); return; }
         const incomplete = selected.some(box => {

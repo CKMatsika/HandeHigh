@@ -48,6 +48,11 @@ class BankTransaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function paymentAllocationReview()
+    {
+        return $this->hasOne(BankStudentPaymentReviewState::class);
+    }
+
     public function cashbookMatches()
     {
         return $this->belongsToMany(CashbookTransaction::class, 'transaction_matches')

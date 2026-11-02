@@ -3,7 +3,7 @@
 @section('content')
 <div class="mx-auto max-w-5xl space-y-5">
     <div>
-        <p class="text-xs text-slate-400"><a class="text-indigo-300 hover:text-indigo-200" href="{{ route('admin.bank-reconciliations.index') }}">Bank Reconciliations</a> / <a class="text-indigo-300 hover:text-indigo-200" href="{{ route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account->id, 'page' => request('page', 1)]) }}">Payment Allocation</a> / Choose Invoice</p>
+        <p class="text-xs text-slate-400"><a class="text-indigo-300 hover:text-indigo-200" href="{{ route('admin.bank-reconciliations.index') }}">Bank Reconciliations</a> / <a class="text-indigo-300 hover:text-indigo-200" href="{{ $queue === 'deferred' ? route('admin.bank-reconciliations.student-payment-allocation.deferred', ['account_id' => $account->id, 'page' => request('page', 1)]) : route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account->id, 'page' => request('page', 1)]) }}">{{ $queue === 'deferred' ? 'Deferred Payment Allocations' : 'Payment Allocation' }}</a> / Choose Invoice</p>
         <h1 class="mt-1 text-xl font-semibold text-white">Choose an invoice for {{ trim($student->first_name . ' ' . $student->other_names . ' ' . $student->last_name) }}</h1>
         <p class="mt-1 text-sm text-slate-400">This list is limited to this student’s outstanding Term 1 2026 invoices. Selecting one returns you to the same imported payment card.</p>
     </div>
@@ -46,7 +46,7 @@
                             <div class="text-lg font-semibold {{ $canAcceptPayment ? 'text-emerald-300' : 'text-amber-300' }}">${{ number_format((float) $invoice->balance, 2) }}</div>
                         </div>
                         @if($canAcceptPayment)
-                            <a href="{{ route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account->id, 'page' => request('page', 1), 'selected_transaction' => $bankTransaction->id, 'student_id' => $student->id, 'invoice_id' => $invoice->id]) }}" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">Select this invoice</a>
+                            <a href="{{ $queue === 'deferred' ? route('admin.bank-reconciliations.student-payment-allocation.deferred', ['account_id' => $account->id, 'page' => request('page', 1), 'selected_transaction' => $bankTransaction->id, 'student_id' => $student->id, 'invoice_id' => $invoice->id]) : route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account->id, 'page' => request('page', 1), 'selected_transaction' => $bankTransaction->id, 'student_id' => $student->id, 'invoice_id' => $invoice->id]) }}" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">Select this invoice</a>
                         @else
                             <span class="max-w-40 text-right text-xs text-amber-300">Balance is less than this payment; it cannot accept the full amount.</span>
                         @endif
@@ -58,7 +58,7 @@
     </div>
 
     <div class="flex justify-end">
-        <a href="{{ route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account->id, 'page' => request('page', 1)]) }}" class="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">Return without selecting</a>
+        <a href="{{ $queue === 'deferred' ? route('admin.bank-reconciliations.student-payment-allocation.deferred', ['account_id' => $account->id, 'page' => request('page', 1)]) : route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $account->id, 'page' => request('page', 1)]) }}" class="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">Return without selecting</a>
     </div>
 </div>
 @endsection

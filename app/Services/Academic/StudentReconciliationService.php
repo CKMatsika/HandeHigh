@@ -59,7 +59,11 @@ class StudentReconciliationService
                 $sources[] = ['record' => $source, 'type' => $sourceData['type'], 'rows' => $sourceData['rows']];
             }
 
-            $students = Student::where('school_id', $schoolId)->get();
+            // Keep the in-memory identity index limited to fields used by reconciliation.
+            $students = Student::query()->select([
+                'id', 'school_id', 'first_name', 'other_names', 'last_name', 'date_of_birth',
+                'admission_number', 'registration_number',
+            ])->where('school_id', $schoolId)->get();
             $byId = $students->keyBy('id');
             $byAdmission = $this->indexBy($students, 'admission_number');
             $byRegistration = $this->indexBy($students, 'registration_number');
@@ -69,11 +73,16 @@ class StudentReconciliationService
                 if ($key !== '') $byName[$key][] = $student;
             }
 
-            $enrollments = Enrollment::where('school_id', $schoolId)
-                ->where('academic_year', (string) $options['academic_year'])->with('class')->get()
+            $enrollments = Enrollment::query()->select([
+                'id', 'school_id', 'student_id', 'class_id', 'academic_year', 'term', 'grade',
+                'class_name', 'is_boarding', 'student_type', 'status',
+            ])->where('school_id', $schoolId)
+                ->where('academic_year', (string) $options['academic_year'])->with('class:id,name,grade')->get()
                 ->filter(fn ($enrollment) => StudentReconciliationWorkbookParser::normalizeTerm($enrollment->term) === StudentReconciliationWorkbookParser::normalizeTerm($options['term']))
                 ->groupBy('student_id');
-            $invoices = Invoice::where('school_id', $schoolId)->where('academic_year', (string) $options['academic_year'])
+            $invoices = Invoice::query()->select([
+                'id', 'school_id', 'student_id', 'number', 'academic_year', 'term', 'total_amount', 'status',
+            ])->where('school_id', $schoolId)->where('academic_year', (string) $options['academic_year'])
                 ->whereNotIn(DB::raw('LOWER(status)'), ['cancelled', 'canceled', 'void', 'reversed'])->get()
                 ->filter(fn ($invoice) => StudentReconciliationWorkbookParser::normalizeTerm($invoice->term) === StudentReconciliationWorkbookParser::normalizeTerm($options['term']))
                 ->groupBy('student_id');
@@ -380,14 +389,18 @@ class StudentReconciliationService
             DB::table('student_reconciliation_rows')->insert($chunk);
         }
 
-        $rowIds = DB::table('student_reconciliation_rows')->where('batch_id', $batch->id)
-            ->get(['id', 'source_id', 'source_row_number'])
-            ->mapWithKeys(fn ($item) => [$item->source_id.':'.$item->source_row_number => $item->id]);
+        // Fetch inserted row identifiers in bounded pages. The full batch may contain
+        // thousands of rows while the PHP worker is already holding parsed source data.
+        $rowIds = [];
+        DB::table('student_reconciliation_rows')->where('batch_id', $batch->id)
+            ->select(['id', 'source_id', 'source_row_number'])->orderBy('id')->chunkById(500, function ($items) use (&$rowIds) {
+                foreach ($items as $item) $rowIds[$item->source_id.':'.$item->source_row_number] = $item->id;
+            });
         $findingInserts = [];
         foreach ($this->pendingFindings as $finding) {
             $key = $finding['_source_row_key'];
             unset($finding['_source_row_key']);
-            if ($key !== null) $finding['source_row_id'] = $rowIds->get($key);
+            if ($key !== null) $finding['source_row_id'] = $rowIds[$key] ?? null;
             $finding['created_at'] = $now;
             $finding['updated_at'] = $now;
             $findingInserts[] = $finding;

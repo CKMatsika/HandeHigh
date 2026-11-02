@@ -10,6 +10,8 @@ use App\Models\Student;
 use App\Services\Finance\AccountingPeriodService;
 use App\Services\Finance\BankStudentPaymentAllocationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -19,8 +21,19 @@ class BankStudentPaymentAllocationController extends Controller
 
     public function index(Request $request)
     {
+        return $this->showQueue($request, false);
+    }
+
+    public function deferred(Request $request)
+    {
+        return $this->showQueue($request, true);
+    }
+
+    private function showQueue(Request $request, bool $deferredMode)
+    {
         $this->authorizeReview($request);
         $school = $this->school();
+        $deferralAvailable = Schema::hasTable('bank_student_payment_review_states');
         $accounts = Account::query()->where('school_id', $school->id)->where('type', 'asset')->active()
             ->where(function ($query) {
                 $query->where('category', 'bank')->orWhere('code', 'like', '13%')
@@ -36,8 +49,12 @@ class BankStudentPaymentAllocationController extends Controller
         abort_if($accountId && ! $account, 404);
 
         $transactions = $account
-            ? $this->allocationService->pendingQuery($school->id, $account->id)->paginate(25)->withQueryString()
+            ? ($deferredMode
+                ? $this->allocationService->deferredQuery($school->id, $account->id)
+                : $this->allocationService->pendingQuery($school->id, $account->id))->paginate(25)->withQueryString()
             : null;
+        $activeCount = $account ? $this->allocationService->pendingQuery($school->id, $account->id)->count() : 0;
+        $deferredCount = $account ? $this->allocationService->deferredQuery($school->id, $account->id)->count() : 0;
         $referenceCounts = [];
         if ($transactions) {
             $references = $transactions->getCollection()->pluck('reference_number')->filter(fn ($ref) => trim((string) $ref) !== '')->unique()->values();
@@ -46,9 +63,16 @@ class BankStudentPaymentAllocationController extends Controller
                     ->where('account_id', $account->id)->where('source', 'bank_statement')
                     ->where('reference_number', $reference)->count();
             }
-            $transactions->getCollection()->transform(function ($transaction) use ($referenceCounts) {
+            $transactions->getCollection()->transform(function ($transaction) use ($referenceCounts, $deferredMode) {
                 $reference = trim((string) $transaction->reference_number);
                 $transaction->allocation_review = $this->allocationService->suggest($transaction, $referenceCounts[$reference] ?? 1);
+                if ($deferredMode && $transaction->paymentAllocationReview?->student) {
+                    $review = $transaction->allocation_review;
+                    $review['candidates'] = $review['candidates']->push($transaction->paymentAllocationReview->student)->unique('id')->values();
+                    $review['student'] = $transaction->paymentAllocationReview->student;
+                    $review['match_basis'] = 'Student previously selected; deferred for later review';
+                    $transaction->allocation_review = $review;
+                }
                 return $transaction;
             });
 
@@ -80,7 +104,7 @@ class BankStudentPaymentAllocationController extends Controller
         }
 
         $period = app(AccountingPeriodService::class)->getPeriodForDate('2026-01-30', $school->id);
-        return view('admin.bank-reconciliations.student-payment-allocation', compact('accounts', 'account', 'transactions', 'period'));
+        return view('admin.bank-reconciliations.student-payment-allocation', compact('accounts', 'account', 'transactions', 'period', 'deferredMode', 'activeCount', 'deferredCount', 'deferralAvailable'));
     }
 
     public function searchStudents(Request $request)
@@ -105,9 +129,10 @@ class BankStudentPaymentAllocationController extends Controller
             'student_id' => ['required', 'integer'],
             'page' => ['nullable', 'integer', 'min:1'],
             'q' => ['nullable', 'string', 'max:100'],
+            'queue' => ['nullable', 'in:active,deferred'],
         ]);
         $account = Account::query()->where('school_id', $school->id)->whereKey($validated['account_id'])->firstOrFail();
-        $bankTransaction = $this->allocationService->pendingQuery($school->id, $account->id)->findOrFail($transaction);
+        $bankTransaction = $this->allocationService->reviewableQuery($school->id, $account->id)->findOrFail($transaction);
         $student = Student::query()->where('school_id', $school->id)
             ->select(['id', 'school_id', 'first_name', 'last_name', 'other_names', 'admission_number', 'registration_number'])
             ->findOrFail($validated['student_id']);
@@ -118,7 +143,72 @@ class BankStudentPaymentAllocationController extends Controller
         }
         $invoices = $invoicesQuery->paginate(20, ['*'], 'invoice_page')->withQueryString();
 
-        return view('admin.bank-reconciliations.student-payment-invoice-picker', compact('account', 'bankTransaction', 'student', 'invoices'));
+        $queue = $validated['queue'] ?? 'active';
+        return view('admin.bank-reconciliations.student-payment-invoice-picker', compact('account', 'bankTransaction', 'student', 'invoices', 'queue'));
+    }
+
+    public function deferStudent(Request $request)
+    {
+        $this->authorizeReview($request);
+        abort_unless($request->user()->can('bank-reconciliations.edit') || $request->user()->can('payments.create'), 403);
+        $validated = $request->validate([
+            'account_id' => ['required', 'integer'],
+            'defer_transaction_id' => ['required', 'integer'],
+            'defer_student_id' => ['required', 'integer'],
+        ]);
+        Account::query()->where('school_id', $this->school()->id)->findOrFail($validated['account_id']);
+        $school = $this->school();
+        $count = DB::transaction(function () use ($request, $validated, $school) {
+            $count = $this->allocationService->deferStudentLines(
+                $school->id,
+                (int) $validated['account_id'],
+                (int) $validated['defer_transaction_id'],
+                (int) $validated['defer_student_id'],
+                (int) $request->user()->id
+            );
+            \App\Models\AuditLog::create([
+                'school_id' => $school->id, 'user_id' => $request->user()->id,
+                'action' => 'student_bank_payment_lines_deferred', 'model_type' => Student::class,
+                'model_id' => (int) $validated['defer_student_id'], 'module' => 'finance',
+                'new_values' => ['account_id' => (int) $validated['account_id'], 'line_count' => $count],
+                'description' => 'Unmatched imported student payment lines moved to the deferred review queue.',
+                'ip_address' => $request->ip(), 'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            ]);
+            return $count;
+        });
+
+        return redirect()->route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $validated['account_id']])
+            ->with('allocation_deferred_count', $count);
+    }
+
+    public function restoreDeferredStudent(Request $request)
+    {
+        $this->authorizeReview($request);
+        abort_unless($request->user()->can('bank-reconciliations.edit') || $request->user()->can('payments.create'), 403);
+        $validated = $request->validate(['account_id' => ['required', 'integer'], 'student_id' => ['required', 'integer']]);
+        $school = $this->school();
+        Account::query()->where('school_id', $school->id)->findOrFail($validated['account_id']);
+        abort_unless(Student::where('school_id', $school->id)->whereKey($validated['student_id'])->exists(), 404);
+        $count = DB::transaction(function () use ($request, $validated, $school) {
+            $count = $this->allocationService->restoreStudentLines(
+                $school->id,
+                (int) $validated['account_id'],
+                (int) $validated['student_id'],
+                (int) $request->user()->id
+            );
+            \App\Models\AuditLog::create([
+                'school_id' => $school->id, 'user_id' => $request->user()->id,
+                'action' => 'student_bank_payment_lines_restored', 'model_type' => Student::class,
+                'model_id' => (int) $validated['student_id'], 'module' => 'finance',
+                'new_values' => ['account_id' => (int) $validated['account_id'], 'line_count' => $count],
+                'description' => 'Deferred imported student payment lines returned to the active review queue.',
+                'ip_address' => $request->ip(), 'user_agent' => substr((string) $request->userAgent(), 0, 255),
+            ]);
+            return $count;
+        });
+
+        return redirect()->route('admin.bank-reconciliations.student-payment-allocation.deferred', ['account_id' => $validated['account_id']])
+            ->with('allocation_restored_count', $count);
     }
 
     public function postSelected(Request $request)
@@ -130,6 +220,7 @@ class BankStudentPaymentAllocationController extends Controller
             'selected_ids.*' => ['required', 'integer', 'distinct'],
             'account_id' => ['required', 'integer'],
             'return_page' => ['nullable', 'integer', 'min:1'],
+            'return_queue' => ['nullable', 'in:active,deferred'],
         ]);
         $school = $this->school();
         $posted = [];
@@ -163,10 +254,11 @@ class BankStudentPaymentAllocationController extends Controller
             }
         }
 
-        return redirect()->route('admin.bank-reconciliations.student-payment-allocation', [
-            'account_id' => $validated['account_id'],
-            'page' => $validated['return_page'] ?? 1,
-        ])
+        $returnRoute = ($validated['return_queue'] ?? 'active') === 'deferred'
+            ? 'admin.bank-reconciliations.student-payment-allocation.deferred'
+            : 'admin.bank-reconciliations.student-payment-allocation';
+
+        return redirect()->route($returnRoute, ['account_id' => $validated['account_id'], 'page' => $validated['return_page'] ?? 1])
             ->with('allocation_posted', $posted)->with('allocation_errors', $errors);
     }
 

@@ -35,6 +35,7 @@ class StudentReconciliationWorkbookParser
         try {
             $reader = IOFactory::createReaderForFile($file->getRealPath());
             $reader->setReadDataOnly(true);
+            $reader->setReadEmptyCells(false);
             $spreadsheet = $reader->load($file->getRealPath());
             $sheet = $spreadsheet->getActiveSheet();
             $grid = $sheet->toArray(null, true, true, false);
