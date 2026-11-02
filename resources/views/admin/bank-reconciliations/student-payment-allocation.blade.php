@@ -148,15 +148,21 @@
         status.textContent = 'Looking up this student’s open Term 1 2026 invoices…';
         const url = select.dataset.urlTemplate.replace('__STUDENT__', encodeURIComponent(studentId));
         let invoices = [];
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
         try {
-            const response = await fetch(url, {headers: {'Accept': 'application/json'}});
+            const response = await fetch(url, {headers: {'Accept': 'application/json'}, signal: controller.signal});
             if (!response.ok) throw new Error('Invoice lookup failed');
             invoices = await response.json();
         } catch (error) {
             select.dataset.loadedStudent = '';
             select.innerHTML = '<option value="">Could not load invoices</option>';
-            status.textContent = 'Invoice lookup failed. Check your connection and select the student again to retry.';
+            status.textContent = error.name === 'AbortError'
+                ? 'Invoice lookup took over 15 seconds. Retry by selecting the student again.'
+                : 'Invoice lookup failed. Check your connection and select the student again to retry.';
             return;
+        } finally {
+            clearTimeout(timeout);
         }
         const preferredInvoice = select.dataset.selected;
         select.innerHTML = '<option value="">Choose invoice…</option>';

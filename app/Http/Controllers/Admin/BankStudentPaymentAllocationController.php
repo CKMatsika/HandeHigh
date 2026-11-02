@@ -65,7 +65,7 @@ class BankStudentPaymentAllocationController extends Controller
             'label' => trim($student->first_name . ' ' . $student->other_names . ' ' . $student->last_name),
             'admission_number' => $student->admission_number,
             'registration_number' => $student->registration_number,
-        ]));
+        ]))->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
     public function studentInvoices(Request $request, Student $student)
@@ -77,7 +77,7 @@ class BankStudentPaymentAllocationController extends Controller
             'id' => $invoice->id,
             'label' => $invoice->number . ' · Term 1 2026 · balance $' . number_format((float) $invoice->balance, 2),
             'balance' => (float) $invoice->balance,
-        ]));
+        ]))->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
     public function postSelected(Request $request)
