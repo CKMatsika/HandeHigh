@@ -23,7 +23,10 @@
             <h1 class="text-2xl font-bold text-white">Class &amp; Category Student Register</h1>
             <p class="text-sm text-slate-300">Print active students by grade, class/stream, and Day, Boarding, or Scholarship category.</p>
         </div>
-        <button type="button" onclick="window.print()" class="no-print rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-500">Print Register</button>
+        <div class="no-print flex gap-2">
+            <a href="{{ route('admin.reports.class-category-register.export', request()->query()) }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">Download Excel</a>
+            <button type="button" onclick="window.print()" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-500">Print Register</button>
+        </div>
     </div>
 
     <form method="GET" action="{{ route('admin.reports.class-category-register') }}" class="no-print grid grid-cols-1 gap-4 rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">

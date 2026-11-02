@@ -394,6 +394,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('reports/enrollment-by-class', [AcademicReportController::class, 'enrollmentByClass'])->name('reports.enrollment-by-class');
             Route::get('reports/student-register', [AcademicReportController::class, 'studentRegister'])->name('reports.student-register');
             Route::get('reports/class-category-register', [AcademicReportController::class, 'classCategoryRegister'])->name('reports.class-category-register');
+            Route::get('reports/class-category-register/export', [AcademicReportController::class, 'exportClassCategoryRegister'])->name('reports.class-category-register.export');
             Route::get('reports/student-register/export', [AcademicReportController::class, 'exportStudentRegister'])->name('reports.student-register.export');
             Route::post('reports/student-register/reconciliation-export', \App\Http\Controllers\Admin\Term1ReconciliationExportController::class)
                 ->name('reports.student-register.reconciliation-export')
