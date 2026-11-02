@@ -82,7 +82,8 @@
                                 @endif
                             </p>
                             @if($review['match_basis'])<p class="text-xs text-indigo-300">Suggested match: {{ $review['match_basis'] }}. Check it before posting.</p>@endif
-                            @if($review['reason'])<p class="text-xs text-amber-300">Review needed: {{ $review['reason'] }}</p>@endif
+                            @if($review['reason'])<p class="review-reason text-xs text-amber-300">Review needed: {{ $review['reason'] }}</p>@endif
+                            <p class="manual-match-note hidden text-xs text-amber-200">Manual student selected. Confirm the identity and invoice before posting.</p>
                         </div>
 
                         <div class="grid gap-3 md:grid-cols-2">
@@ -106,12 +107,16 @@
                                     <option value="">Choose invoice…</option>
                                     @if($invoice)<option value="{{ $invoice->id }}" selected>{{ $invoice->number }} · balance ${{ number_format((float) $invoice->balance, 2) }}</option>@endif
                                 </select>
+                                <p class="invoice-status mt-1 text-xs text-slate-400" aria-live="polite">Invoices are loaded for the selected student only.</p>
                                 @if($review['reference_needs_review'])
                                     <label class="mt-3 flex items-start gap-2 text-xs text-amber-200">
                                         <input type="checkbox" name="items[{{ $transaction->id }}][confirm_reference_review]" value="1" class="mt-0.5 rounded border-amber-700 bg-slate-950">
                                         I reviewed this blank or repeated source reference; keep its original value on the receipt.
                                     </label>
                                 @endif
+                                <button type="button" class="post-single-line mt-3 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50" @disabled(!$period?->isOpen())>
+                                    Post this payment now
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -135,11 +140,24 @@
 
     async function loadInvoices(card, studentId) {
         const select = card.querySelector('.invoice-select');
-        select.innerHTML = '<option value="">Loading invoices…</option>';
-        if (!studentId) { select.innerHTML = '<option value="">Choose student first…</option>'; return; }
+        const status = card.querySelector('.invoice-status');
+        if (!studentId) { select.innerHTML = '<option value="">Choose student first…</option>'; status.textContent = 'Choose a student to load their open Term 1 2026 invoices.'; return; }
+        if (select.dataset.loadedStudent === String(studentId)) return;
+        select.dataset.loadedStudent = String(studentId);
+        select.innerHTML = '<option value="">Loading this student’s invoices…</option>';
+        status.textContent = 'Looking up this student’s open Term 1 2026 invoices…';
         const url = select.dataset.urlTemplate.replace('__STUDENT__', encodeURIComponent(studentId));
-        const response = await fetch(url, {headers: {'Accept': 'application/json'}});
-        const invoices = response.ok ? await response.json() : [];
+        let invoices = [];
+        try {
+            const response = await fetch(url, {headers: {'Accept': 'application/json'}});
+            if (!response.ok) throw new Error('Invoice lookup failed');
+            invoices = await response.json();
+        } catch (error) {
+            select.dataset.loadedStudent = '';
+            select.innerHTML = '<option value="">Could not load invoices</option>';
+            status.textContent = 'Invoice lookup failed. Check your connection and select the student again to retry.';
+            return;
+        }
         const preferredInvoice = select.dataset.selected;
         select.innerHTML = '<option value="">Choose invoice…</option>';
         invoices.forEach(invoice => {
@@ -148,11 +166,23 @@
         });
         if (preferredInvoice && invoices.some(invoice => String(invoice.id) === String(preferredInvoice))) select.value = String(preferredInvoice);
         else if (invoices.length === 1) select.value = String(invoices[0].id);
+        status.textContent = invoices.length ? `${invoices.length} open Term 1 2026 invoice(s) loaded for this student.` : 'No open Term 1 2026 invoice was found for this student.';
     }
 
     form.querySelectorAll('.student-select').forEach(select => {
-        if (select.value) loadInvoices(select.closest('[data-line]'), select.value);
-        select.addEventListener('change', () => loadInvoices(select.closest('[data-line]'), select.value));
+        const card = select.closest('[data-line]');
+        const invoiceSelect = card.querySelector('.invoice-select');
+        if (invoiceSelect.options.length > 1) invoiceSelect.dataset.loadedStudent = select.value;
+        select.addEventListener('change', () => {
+            invoiceSelect.dataset.selected = '';
+            invoiceSelect.dataset.loadedStudent = '';
+            card.querySelector('.review-reason')?.classList.add('hidden');
+            card.querySelector('.manual-match-note')?.classList.toggle('hidden', !select.value);
+            loadInvoices(card, select.value);
+        });
+        invoiceSelect.addEventListener('focus', () => {
+            if (select.value && invoiceSelect.options.length <= 1) loadInvoices(card, select.value);
+        });
     });
 
     form.querySelectorAll('.student-search-button').forEach(button => button.addEventListener('click', async () => {
@@ -178,6 +208,18 @@
     form.querySelectorAll('.line-select').forEach(box => box.addEventListener('change', () => {
         const selected = form.querySelectorAll('.line-select:checked').length;
         if (selected > 5) { box.checked = false; alert('Post no more than five payment lines in one batch.'); }
+    }));
+
+    form.querySelectorAll('.post-single-line').forEach(button => button.addEventListener('click', () => {
+        const card = button.closest('[data-line]');
+        const student = card.querySelector('.student-select');
+        const invoice = card.querySelector('.invoice-select');
+        if (!student.value) { alert('Select and verify the student first.'); student.focus(); return; }
+        if (!invoice.value) { alert('Select this student’s Term 1 2026 invoice first.'); invoice.focus(); return; }
+        const referenceReview = card.querySelector('input[name$="[confirm_reference_review]"]');
+        if (referenceReview && !referenceReview.checked) { alert('Review and confirm the blank or repeated bank reference first.'); referenceReview.focus(); return; }
+        form.querySelectorAll('.line-select').forEach(box => { box.checked = box.closest('[data-line]') === card; });
+        form.requestSubmit();
     }));
 
     form.addEventListener('submit', event => {

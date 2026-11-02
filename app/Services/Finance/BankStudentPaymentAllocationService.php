@@ -39,34 +39,17 @@ class BankStudentPaymentAllocationService
     {
         $source = $this->parseSourceDescription($transaction->description);
         $candidates = $source ? $this->findStudentCandidates((int) $transaction->school_id, $source) : collect();
-        $invoicesByStudent = [];
-
-        foreach ($candidates as $student) {
-            $invoicesByStudent[$student->id] = $this->openTermOneInvoices((int) $transaction->school_id, $student->id);
-        }
-
         $student = $candidates->count() === 1 ? $candidates->first() : null;
         $numberMatched = $student && $source && $source['student_number'] !== '' && $source['student_number'] !== '[number blank]'
             && in_array($source['student_number'], [$student->admission_number, $student->registration_number], true);
-        $invoices = $student ? ($invoicesByStudent[$student->id] ?? collect()) : collect();
-        $fittingInvoices = $invoices->filter(fn (Invoice $invoice) => $this->cents($invoice->balance) >= $this->cents($transaction->amount))->values();
 
         $reason = null;
-        $invoice = null;
         if (! $source) {
             $reason = 'The imported line does not contain the expected student and source-row details.';
         } elseif ($candidates->isEmpty()) {
             $reason = 'No school student matched the imported admission or registration number, or exact name.';
         } elseif ($candidates->count() > 1) {
             $reason = 'More than one student matches. Choose the correct student manually.';
-        } elseif ($invoices->isEmpty()) {
-            $reason = 'No open Term 1 2026 invoice exists for this student.';
-        } elseif ($fittingInvoices->count() === 1) {
-            $invoice = $fittingInvoices->first();
-        } elseif ($fittingInvoices->count() > 1) {
-            $reason = 'More than one Term 1 2026 invoice can accept this payment. Choose one manually.';
-        } else {
-            $reason = 'The payment exceeds the remaining balance on the student’s Term 1 2026 invoice.';
         }
 
         $reference = trim((string) $transaction->reference_number);
@@ -75,16 +58,15 @@ class BankStudentPaymentAllocationService
         return [
             'source' => $source,
             'candidates' => $candidates,
-            'invoices_by_student' => $invoicesByStudent,
             'student' => $student,
-            'invoice' => $invoice,
+            'invoice' => null,
             'reason' => $reason,
             'match_basis' => $source && $student
                 ? ($numberMatched ? 'ERP admission/registration number match' : 'Exact name match; verify')
                 : null,
             'reference_needs_review' => $referenceNeedsReview,
             'reference_count' => $referenceCount,
-            'ready' => $student !== null && $invoice !== null,
+            'ready' => false,
         ];
     }
 
@@ -98,6 +80,7 @@ class BankStudentPaymentAllocationService
         $like = '%' . addcslashes($search, '%_\\') . '%';
 
         return Student::query()
+            ->select(['id', 'school_id', 'first_name', 'last_name', 'other_names', 'admission_number', 'registration_number'])
             ->where('school_id', $schoolId)
             ->where(function ($query) use ($like) {
                 $query->where('first_name', 'like', $like)
@@ -112,6 +95,7 @@ class BankStudentPaymentAllocationService
     public function openTermOneInvoices(int $schoolId, int $studentId)
     {
         return Invoice::query()
+            ->select(['id', 'school_id', 'student_id', 'number', 'academic_year', 'term', 'balance', 'status', 'issued_at'])
             ->where('school_id', $schoolId)
             ->where('student_id', $studentId)
             ->where('academic_year', '2026')
