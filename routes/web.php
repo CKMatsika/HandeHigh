@@ -428,8 +428,8 @@ Route::middleware(['auth'])->group(function () {
                 ->name('bank-reconciliations.student-payment-allocation')->middleware('permission:bank-reconciliations.view|payments.view');
             Route::get('bank-reconciliations/student-payment-allocation/students', [BankStudentPaymentAllocationController::class, 'searchStudents'])
                 ->name('bank-reconciliations.student-payment-allocation.students')->middleware('permission:bank-reconciliations.view|payments.view');
-            Route::get('bank-reconciliations/student-payment-allocation/students/{student}/invoices', [BankStudentPaymentAllocationController::class, 'studentInvoices'])
-                ->name('bank-reconciliations.student-payment-allocation.invoices')->middleware('permission:bank-reconciliations.view|payments.view');
+            Route::get('bank-reconciliations/student-payment-allocation/{transaction}/choose-invoice', [BankStudentPaymentAllocationController::class, 'invoicePicker'])
+                ->name('bank-reconciliations.student-payment-allocation.invoice-picker')->middleware('permission:bank-reconciliations.view|payments.view');
             Route::post('bank-reconciliations/student-payment-allocation/post', [BankStudentPaymentAllocationController::class, 'postSelected'])
                 ->name('bank-reconciliations.student-payment-allocation.post')->middleware('permission:payments.create|bank-reconciliations.edit');
             Route::resource('bank-reconciliations', BankReconciliationController::class)->parameters(['bank-reconciliations' => 'bankReconciliation'])->only(['index', 'create', 'store', 'show'])

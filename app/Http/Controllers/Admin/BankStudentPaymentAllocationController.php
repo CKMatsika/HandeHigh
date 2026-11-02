@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\BankTransaction;
+use App\Models\Invoice;
 use App\Models\Student;
 use App\Services\Finance\AccountingPeriodService;
 use App\Services\Finance\BankStudentPaymentAllocationService;
@@ -49,6 +50,32 @@ class BankStudentPaymentAllocationController extends Controller
                 $transaction->allocation_review = $this->allocationService->suggest($transaction, $referenceCounts[$reference] ?? 1);
                 return $transaction;
             });
+
+            $selectedLineId = (int) $request->query('selected_transaction', 0);
+            $selectedStudentId = (int) $request->query('student_id', 0);
+            $selectedInvoiceId = (int) $request->query('invoice_id', 0);
+            $selectedLine = $selectedLineId ? $transactions->getCollection()->firstWhere('id', $selectedLineId) : null;
+            if ($selectedLine && $selectedStudentId && $selectedInvoiceId) {
+                $manualStudent = Student::query()->where('school_id', $school->id)
+                    ->select(['id', 'school_id', 'first_name', 'last_name', 'other_names', 'admission_number', 'registration_number'])
+                    ->find($selectedStudentId);
+                $manualInvoice = $manualStudent
+                    ? $this->allocationService->openTermOneInvoicesQuery($school->id, $manualStudent->id)->whereKey($selectedInvoiceId)->first()
+                    : null;
+
+                if ($manualStudent && $manualInvoice) {
+                    $review = $selectedLine->allocation_review;
+                    $review['candidates'] = $review['candidates']->push($manualStudent)->unique('id')->values();
+                    $review['student'] = $manualStudent;
+                    $review['invoice'] = $manualInvoice;
+                    $review['match_basis'] = 'Manually selected in the invoice finder';
+                    $review['reason'] = (int) round((float) $manualInvoice->balance * 100) >= (int) round((float) $selectedLine->amount * 100)
+                        ? null
+                        : 'The selected invoice balance is less than this payment amount.';
+                    $review['ready'] = $review['reason'] === null;
+                    $selectedLine->allocation_review = $review;
+                }
+            }
         }
 
         $period = app(AccountingPeriodService::class)->getPeriodForDate('2026-01-30', $school->id);
@@ -68,16 +95,29 @@ class BankStudentPaymentAllocationController extends Controller
         ]))->header('Cache-Control', 'private, no-store, max-age=0');
     }
 
-    public function studentInvoices(Request $request, Student $student)
+    public function invoicePicker(Request $request, int $transaction)
     {
         $this->authorizeReview($request);
-        abort_unless((int) $student->school_id === (int) $this->school()->id, 404);
-        $invoices = $this->allocationService->openTermOneInvoices($student->school_id, $student->id);
-        return response()->json($invoices->map(fn ($invoice) => [
-            'id' => $invoice->id,
-            'label' => $invoice->number . ' · Term 1 2026 · balance $' . number_format((float) $invoice->balance, 2),
-            'balance' => (float) $invoice->balance,
-        ]))->header('Cache-Control', 'private, no-store, max-age=0');
+        $school = $this->school();
+        $validated = $request->validate([
+            'account_id' => ['required', 'integer'],
+            'student_id' => ['required', 'integer'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+        $account = Account::query()->where('school_id', $school->id)->whereKey($validated['account_id'])->firstOrFail();
+        $bankTransaction = $this->allocationService->pendingQuery($school->id, $account->id)->findOrFail($transaction);
+        $student = Student::query()->where('school_id', $school->id)
+            ->select(['id', 'school_id', 'first_name', 'last_name', 'other_names', 'admission_number', 'registration_number'])
+            ->findOrFail($validated['student_id']);
+        $invoicesQuery = $this->allocationService->openTermOneInvoicesQuery($school->id, $student->id);
+        if (filled($validated['q'] ?? null)) {
+            $search = '%' . addcslashes(trim($validated['q']), '%_\\') . '%';
+            $invoicesQuery->where('number', 'like', $search);
+        }
+        $invoices = $invoicesQuery->paginate(20, ['*'], 'invoice_page')->withQueryString();
+
+        return view('admin.bank-reconciliations.student-payment-invoice-picker', compact('account', 'bankTransaction', 'student', 'invoices'));
     }
 
     public function postSelected(Request $request)
@@ -91,6 +131,7 @@ class BankStudentPaymentAllocationController extends Controller
             'items.*.student_id' => ['required', 'integer'],
             'items.*.invoice_id' => ['required', 'integer'],
             'items.*.confirm_reference_review' => ['nullable', 'accepted'],
+            'return_page' => ['nullable', 'integer', 'min:1'],
         ]);
         $school = $this->school();
         $posted = [];
@@ -119,7 +160,10 @@ class BankStudentPaymentAllocationController extends Controller
             }
         }
 
-        return redirect()->route('admin.bank-reconciliations.student-payment-allocation', ['account_id' => $request->input('account_id')])
+        return redirect()->route('admin.bank-reconciliations.student-payment-allocation', [
+            'account_id' => $request->input('account_id'),
+            'page' => $validated['return_page'] ?? 1,
+        ])
             ->with('allocation_posted', $posted)->with('allocation_errors', $errors);
     }
 

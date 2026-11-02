@@ -55,6 +55,7 @@
         <form method="POST" action="{{ route('admin.bank-reconciliations.student-payment-allocation.post') }}" id="allocation-form" class="space-y-3">
             @csrf
             <input type="hidden" name="account_id" value="{{ $account->id }}">
+            <input type="hidden" name="return_page" value="{{ $transactions->currentPage() }}">
             <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm">
                 <div class="text-slate-300">{{ $transactions->total() }} pending imported lines · Page {{ $transactions->currentPage() }} of {{ $transactions->lastPage() }} · Posting limit: 5 lines per batch</div>
                 <div class="text-xs text-slate-400">Original imported bank lines are retained and matched to the payment cashbook entry.</div>
@@ -89,7 +90,7 @@
                         <div class="grid gap-3 md:grid-cols-2">
                             <div>
                                 <label class="text-xs text-slate-300">Student (suggested value is not accepted until you select this line)</label>
-                                <select class="student-select mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" name="items[{{ $transaction->id }}][student_id]" data-invoices-url-template="{{ route('admin.bank-reconciliations.student-payment-allocation.invoices', ['student' => '__STUDENT__']) }}">
+                                <select class="student-select mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" name="items[{{ $transaction->id }}][student_id]">
                                     <option value="">Choose student…</option>
                                     @foreach($review['candidates'] as $candidate)
                                         <option value="{{ $candidate->id }}" @selected($student?->id === $candidate->id)>{{ trim($candidate->first_name . ' ' . $candidate->other_names . ' ' . $candidate->last_name) }} · #{{ $candidate->admission_number ?: $candidate->registration_number ?: $candidate->id }}</option>
@@ -102,12 +103,13 @@
                                 <p class="student-search-results mt-1 text-xs text-slate-400" aria-live="polite"></p>
                             </div>
                             <div>
-                                <label class="text-xs text-slate-300">Open Term 1 2026 invoice</label>
+                                <label class="text-xs text-slate-300">Selected Term 1 2026 invoice</label>
                                 <select class="invoice-select mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" name="items[{{ $transaction->id }}][invoice_id]" data-selected="{{ $invoice?->id }}">
                                     <option value="">Choose invoice…</option>
                                     @if($invoice)<option value="{{ $invoice->id }}" selected>{{ $invoice->number }} · balance ${{ number_format((float) $invoice->balance, 2) }}</option>@endif
                                 </select>
-                                <p class="invoice-status mt-1 text-xs text-slate-400" aria-live="polite">Invoices are loaded for the selected student only.</p>
+                                <a href="#" class="invoice-picker-link mt-2 inline-flex rounded-lg border border-indigo-700 px-3 py-2 text-xs font-medium text-indigo-200 hover:bg-indigo-950" data-url="{{ route('admin.bank-reconciliations.student-payment-allocation.invoice-picker', ['transaction' => $transaction->id]) }}" data-account="{{ $account->id }}" data-page="{{ $transactions->currentPage() }}">Find this student’s invoice manually</a>
+                                <p class="invoice-status mt-1 text-xs text-slate-400" aria-live="polite">Choose the student, then open the invoice finder to review and select their invoice.</p>
                                 @if($review['reference_needs_review'])
                                     <label class="mt-3 flex items-start gap-2 text-xs text-amber-200">
                                         <input type="checkbox" name="items[{{ $transaction->id }}][confirm_reference_review]" value="1" class="mt-0.5 rounded border-amber-700 bg-slate-950">
@@ -136,60 +138,30 @@
 (() => {
     const form = document.getElementById('allocation-form');
     if (!form) return;
-    const searchBase = @json(route('admin.bank-reconciliations.student-payment-allocation.students'));
-
-    async function loadInvoices(card, studentId) {
-        const select = card.querySelector('.invoice-select');
-        const status = card.querySelector('.invoice-status');
-        if (!studentId) { select.innerHTML = '<option value="">Choose student first…</option>'; status.textContent = 'Choose a student to load their open Term 1 2026 invoices.'; return; }
-        if (select.dataset.loadedStudent === String(studentId)) return;
-        select.dataset.loadedStudent = String(studentId);
-        select.innerHTML = '<option value="">Loading this student’s invoices…</option>';
-        status.textContent = 'Looking up this student’s open Term 1 2026 invoices…';
-        const url = select.dataset.urlTemplate.replace('__STUDENT__', encodeURIComponent(studentId));
-        let invoices = [];
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        try {
-            const response = await fetch(url, {headers: {'Accept': 'application/json'}, signal: controller.signal});
-            if (!response.ok) throw new Error('Invoice lookup failed');
-            invoices = await response.json();
-        } catch (error) {
-            select.dataset.loadedStudent = '';
-            select.innerHTML = '<option value="">Could not load invoices</option>';
-            status.textContent = error.name === 'AbortError'
-                ? 'Invoice lookup took over 15 seconds. Retry by selecting the student again.'
-                : 'Invoice lookup failed. Check your connection and select the student again to retry.';
-            return;
-        } finally {
-            clearTimeout(timeout);
-        }
-        const preferredInvoice = select.dataset.selected;
-        select.innerHTML = '<option value="">Choose invoice…</option>';
-        invoices.forEach(invoice => {
-            const option = document.createElement('option');
-            option.value = invoice.id; option.textContent = invoice.label; select.append(option);
-        });
-        if (preferredInvoice && invoices.some(invoice => String(invoice.id) === String(preferredInvoice))) select.value = String(preferredInvoice);
-        else if (invoices.length === 1) select.value = String(invoices[0].id);
-        status.textContent = invoices.length ? `${invoices.length} open Term 1 2026 invoice(s) loaded for this student.` : 'No open Term 1 2026 invoice was found for this student.';
-    }
 
     form.querySelectorAll('.student-select').forEach(select => {
         const card = select.closest('[data-line]');
         const invoiceSelect = card.querySelector('.invoice-select');
-        if (invoiceSelect.options.length > 1) invoiceSelect.dataset.loadedStudent = select.value;
         select.addEventListener('change', () => {
             invoiceSelect.dataset.selected = '';
-            invoiceSelect.dataset.loadedStudent = '';
+            invoiceSelect.innerHTML = '<option value="">Choose invoice…</option>';
+            card.querySelector('.invoice-status').textContent = 'Student changed. Open the invoice finder to choose an invoice for the new student.';
             card.querySelector('.review-reason')?.classList.add('hidden');
             card.querySelector('.manual-match-note')?.classList.toggle('hidden', !select.value);
-            loadInvoices(card, select.value);
-        });
-        invoiceSelect.addEventListener('focus', () => {
-            if (select.value && invoiceSelect.options.length <= 1) loadInvoices(card, select.value);
         });
     });
+
+    form.querySelectorAll('.invoice-picker-link').forEach(link => link.addEventListener('click', event => {
+        event.preventDefault();
+        const card = link.closest('[data-line]');
+        const studentId = card.querySelector('.student-select').value;
+        if (!studentId) { alert('Select and verify the student first.'); card.querySelector('.student-select').focus(); return; }
+        const url = new URL(link.dataset.url, window.location.origin);
+        url.searchParams.set('account_id', link.dataset.account);
+        url.searchParams.set('page', link.dataset.page);
+        url.searchParams.set('student_id', studentId);
+        window.location.assign(url.toString());
+    }));
 
     form.querySelectorAll('.student-search-button').forEach(button => button.addEventListener('click', async () => {
         const card = button.closest('[data-line]');

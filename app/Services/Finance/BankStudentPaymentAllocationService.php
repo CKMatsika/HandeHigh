@@ -92,17 +92,17 @@ class BankStudentPaymentAllocationService
             ->orderBy('last_name')->orderBy('first_name')->limit(15)->get();
     }
 
-    public function openTermOneInvoices(int $schoolId, int $studentId)
+    public function openTermOneInvoicesQuery(int $schoolId, int $studentId)
     {
         return Invoice::query()
-            ->select(['id', 'school_id', 'student_id', 'number', 'academic_year', 'term', 'balance', 'status', 'issued_at'])
+            ->select(['id', 'school_id', 'student_id', 'number', 'academic_year', 'term', 'total_amount', 'balance', 'status', 'issued_at'])
             ->where('school_id', $schoolId)
             ->where('student_id', $studentId)
             ->where('academic_year', '2026')
             ->whereIn('term', self::TERM_ONE_VALUES)
             ->whereNotIn('status', ['cancelled', 'void', 'deleted'])
             ->where('balance', '>', 0)
-            ->orderBy('issued_at')->orderBy('id')->get();
+            ->orderBy('issued_at')->orderBy('id');
     }
 
     public function post(BankTransaction $transaction, int $studentId, int $invoiceId, bool $referenceReviewed, int $userId): Payment
