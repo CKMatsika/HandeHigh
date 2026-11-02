@@ -530,6 +530,84 @@ class InvoiceController extends Controller
         return array_values(array_unique($variations));
     }
 
+    /**
+     * Resolve the current, active Student Management cohort using the same
+     * placement precedence as the class-category register. Invoice creation
+     * still intersects this cohort with an active enrollment for the selected
+     * academic year and term.
+     */
+    private function currentActiveStudentIdsForBulkInvoice(
+        School $school,
+        string $academicYear,
+        ?string $grade,
+        ?string $className,
+        string $residency,
+        string $studentCategory,
+        \App\Services\StudentClassMappingService $classMapping,
+    ): array {
+        $filterGrade = filled($grade)
+            ? ($classMapping->canonicalGrade($school->id, $grade, $grade, $academicYear) ?? $grade)
+            : null;
+
+        return Student::query()
+            ->where('school_id', $school->id)
+            ->where('status', 'active')
+            ->with([
+                'currentEnrollment:id,student_id,class_id,grade,class_name,is_boarding',
+                'currentEnrollment.class:id,school_id,grade,name',
+            ])
+            ->get(['id', 'school_id', 'grade', 'class_name', 'is_boarding', 'funding_status'])
+            ->filter(function (Student $student) use ($school, $academicYear, $filterGrade, $className, $residency, $studentCategory, $classMapping) {
+                $currentEnrollment = $student->currentEnrollment;
+                $currentGrade = $currentEnrollment?->grade
+                    ?: $currentEnrollment?->class?->grade
+                    ?: $student->getRawOriginal('grade');
+                $currentClass = $currentEnrollment?->class_name
+                    ?: $currentEnrollment?->class?->name
+                    ?: $student->getRawOriginal('class_name');
+                $isBoarding = (bool) ($currentEnrollment?->is_boarding ?? $student->getRawOriginal('is_boarding'));
+                $fundingStatus = $student->getRawOriginal('funding_status');
+
+                if ($filterGrade) {
+                    $resolvedGrade = $classMapping->canonicalGrade(
+                        $school->id,
+                        (string) $currentGrade,
+                        (string) $currentClass,
+                        $academicYear,
+                    ) ?? $currentGrade;
+
+                    if (! $resolvedGrade || ! $classMapping->gradesMatch((string) $resolvedGrade, $filterGrade)) {
+                        return false;
+                    }
+                }
+
+                if (filled($className) && mb_strtolower(trim((string) $currentClass)) !== mb_strtolower(trim($className))) {
+                    return false;
+                }
+
+                if ($residency === 'boarding' && ! $isBoarding) {
+                    return false;
+                }
+
+                if ($residency === 'day' && $isBoarding) {
+                    return false;
+                }
+
+                if ($studentCategory === 'regular' && $fundingStatus === 'scholarship') {
+                    return false;
+                }
+
+                if ($studentCategory === 'scholarship' && $fundingStatus !== 'scholarship') {
+                    return false;
+                }
+
+                return true;
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     public function bulkCreate(Request $request)
     {
         $user = Auth::user();
@@ -544,6 +622,10 @@ class InvoiceController extends Controller
         $grade = $request->input('grade');
         $className = $request->input('class_name');
         $residency = $request->input('residency', 'all'); // 'all', 'boarding', 'day'
+        $studentCategory = $request->input('student_category', 'all'); // 'all', 'regular', 'scholarship'
+        if (! in_array($studentCategory, ['all', 'regular', 'scholarship'], true)) {
+            $studentCategory = 'all';
+        }
         $includeOptional = $request->boolean('include_optional', false);
         $issuedAt = $request->input('issued_at', now()->format('Y-m-d'));
         $dueDate = $request->input('due_date', now()->addDays(30)->format('Y-m-d'));
@@ -557,6 +639,15 @@ class InvoiceController extends Controller
         $terms = ['Term 1', 'Term 2', 'Term 3'];
 
         $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $currentCohortStudentIds = $this->currentActiveStudentIdsForBulkInvoice(
+            $school,
+            $academicYear,
+            $grade,
+            $className,
+            $residency,
+            $studentCategory,
+            $classMapping,
+        );
         $grades = SchoolClass::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade')
             ->merge(Student::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
             ->merge(FeeStructure::where('school_id', $school->id)->whereNotNull('grade')->distinct()->pluck('grade'))
@@ -609,7 +700,7 @@ class InvoiceController extends Controller
             'grade', 'class_name', 'is_boarding', 'has_transport', 'student_type', 'status',
         ])
         ->with([
-            'student:id,school_id,first_name,last_name,admission_number,grade,class_name,is_boarding,has_transport',
+            'student:id,school_id,first_name,last_name,admission_number,grade,class_name,is_boarding,has_transport,funding_status',
             'student.invoices' => function ($q) use ($academicYear, $term) {
                 $q->where('academic_year', $academicYear)
                   ->where('term', $term)
@@ -623,7 +714,8 @@ class InvoiceController extends Controller
         // Student Management is authoritative for current active status.
         ->whereHas('student', fn ($q) => $q
             ->where('school_id', $school->id)
-            ->where('status', 'active'));
+            ->where('status', 'active'))
+        ->whereIn('enrollments.student_id', $currentCohortStudentIds);
 
         if ($academicYear) {
             $enrollmentQuery->where(function ($q) use ($academicYear) {
@@ -819,6 +911,7 @@ class InvoiceController extends Controller
             'selectedGrade' => $grade,
             'selectedClass' => $className,
             'selectedResidency' => $residency,
+            'selectedStudentCategory' => $studentCategory,
             'includeOptional' => $includeOptional,
             'issuedAt' => $issuedAt,
             'dueDate' => $dueDate,
@@ -857,6 +950,7 @@ class InvoiceController extends Controller
             'grade' => ['nullable', 'string'],
             'class_name' => ['nullable', 'string', 'max:100'],
             'residency' => ['nullable', 'in:all,boarding,day'],
+            'student_category' => ['nullable', 'in:all,regular,scholarship'],
             'include_optional' => ['nullable', 'boolean'],
             'custom_fee_items' => ['nullable', 'array'],
             'custom_fee_items.*.description' => ['required_with:custom_fee_items', 'string', 'max:255'],
@@ -884,7 +978,17 @@ class InvoiceController extends Controller
         $className = $validated['class_name'] ?? null;
         $residency = $validated['residency'] ?? 'all';
         $grade = $validated['grade'] ?? null;
+        $studentCategory = $validated['student_category'] ?? 'all';
         $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $currentCohortStudentIds = $this->currentActiveStudentIdsForBulkInvoice(
+            $school,
+            $academicYear,
+            $grade,
+            $className,
+            $residency,
+            $studentCategory,
+            $classMapping,
+        );
         $selectedEnrollmentQuery = Enrollment::with(['student.guardians', 'class'])
             ->where('school_id', $school->id)
             ->where('status', 'active')
@@ -898,7 +1002,8 @@ class InvoiceController extends Controller
             })
             ->whereHas('student', fn ($q) => $q
                 ->where('school_id', $school->id)
-                ->where('status', 'active'));
+                ->where('status', 'active'))
+            ->whereIn('enrollments.student_id', $currentCohortStudentIds);
 
         if (filled($grade)) {
             $canonicalFilterGrade = $classMapping->canonicalGrade($school->id, $grade, $grade, $academicYear) ?? $grade;

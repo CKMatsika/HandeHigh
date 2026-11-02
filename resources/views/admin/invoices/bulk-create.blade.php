@@ -55,7 +55,7 @@
                 <span class="text-[11px] text-slate-400">Adjust filters to automatically recalculate billing preview</span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                 <div>
                     <label class="block text-[11px] font-medium text-slate-300 mb-1" for="filter_year">Academic Year</label>
                     <select id="filter_year" name="academic_year" class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
@@ -92,6 +92,16 @@
                             <option value="{{ $c }}" {{ $selectedClass === $c ? 'selected' : '' }}>{{ $c }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-300 mb-1" for="filter_student_category">Student Category</label>
+                    <select id="filter_student_category" name="student_category" class="w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                        <option value="all" {{ $selectedStudentCategory === 'all' ? 'selected' : '' }}>All categories</option>
+                        <option value="regular" {{ $selectedStudentCategory === 'regular' ? 'selected' : '' }}>Regular students</option>
+                        <option value="scholarship" {{ $selectedStudentCategory === 'scholarship' ? 'selected' : '' }}>Scholarship students</option>
+                    </select>
+                    <p class="text-[10px] text-slate-500 mt-1">Choose Regular + Boarding to match the register’s Boarding category.</p>
                 </div>
 
                 <div>
@@ -133,6 +143,7 @@
         <input type="hidden" name="grade" value="{{ $selectedGrade }}">
         <input type="hidden" name="class_name" value="{{ $selectedClass }}">
         <input type="hidden" name="residency" value="{{ $selectedResidency }}">
+        <input type="hidden" name="student_category" value="{{ $selectedStudentCategory }}">
         <input type="hidden" name="include_optional" value="{{ $includeOptional ? '1' : '0' }}">
 
         {{-- 2. Fee Structure Selection (Manual Ticking) Card --}}
@@ -385,6 +396,9 @@
                                         <div class="text-[11px] text-slate-400">
                                             Reg: {{ $student->admission_number ?? $student->national_id ?? "ID #{$student->id}" }}
                                         </div>
+                                        <span class="mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold {{ $student->funding_status === 'scholarship' ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-700/70 text-slate-300' }}">
+                                            {{ $student->funding_status === 'scholarship' ? 'Scholarship' : 'Regular' }}
+                                        </span>
                                     </td>
                                     <td class="py-3 px-4 whitespace-nowrap">
                                         <span class="inline-flex items-center gap-1 font-medium text-slate-200">
