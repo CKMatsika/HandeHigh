@@ -131,6 +131,8 @@
         <input type="hidden" name="academic_year" value="{{ $selectedYear }}">
         <input type="hidden" name="term" value="{{ $selectedTerm }}">
         <input type="hidden" name="grade" value="{{ $selectedGrade }}">
+        <input type="hidden" name="class_name" value="{{ $selectedClass }}">
+        <input type="hidden" name="residency" value="{{ $selectedResidency }}">
         <input type="hidden" name="include_optional" value="{{ $includeOptional ? '1' : '0' }}">
 
         {{-- 2. Fee Structure Selection (Manual Ticking) Card --}}

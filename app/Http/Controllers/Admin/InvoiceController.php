@@ -619,7 +619,11 @@ class InvoiceController extends Controller
             'class:id,school_id,grade,name',
         ])
         ->where('school_id', $school->id)
-        ->where('status', 'active');
+        ->where('status', 'active')
+        // Student Management is authoritative for current active status.
+        ->whereHas('student', fn ($q) => $q
+            ->where('school_id', $school->id)
+            ->where('status', 'active'));
 
         if ($academicYear) {
             $enrollmentQuery->where(function ($q) use ($academicYear) {
@@ -678,8 +682,7 @@ class InvoiceController extends Controller
         $cohortRows = (clone $enrollmentQuery)
             ->select('enrollments.student_id')
             ->selectRaw(
-                'MAX(CASE WHEN enrollments.is_boarding = 1 OR enrollments.student_type = ? OR EXISTS (SELECT 1 FROM students AS cohort_students WHERE cohort_students.id = enrollments.student_id AND cohort_students.is_boarding = 1) THEN 1 ELSE 0 END) AS is_boarder',
-                ['boarding']
+                'MAX(CASE WHEN enrollments.is_boarding IS NOT NULL THEN enrollments.is_boarding WHEN EXISTS (SELECT 1 FROM students AS cohort_students WHERE cohort_students.id = enrollments.student_id AND cohort_students.is_boarding = 1) THEN 1 ELSE 0 END) AS is_boarder'
             )
             ->groupBy('enrollments.student_id')
             ->toBase();
@@ -695,19 +698,21 @@ class InvoiceController extends Controller
 
         if ($residency === 'boarding') {
             $enrollmentQuery->where(function ($q) {
-                $q->where('is_boarding', true)
-                  ->orWhere('student_type', 'boarding')
-                  ->orWhereHas('student', fn ($sq) => $sq->where('is_boarding', true));
+                $q->where('enrollments.is_boarding', true)
+                  ->orWhere(function ($legacy) {
+                      $legacy->whereNull('enrollments.is_boarding')
+                          ->whereHas('student', fn ($sq) => $sq->where('is_boarding', true));
+                  });
             });
         } elseif ($residency === 'day') {
             $enrollmentQuery->where(function ($q) {
-                $q->where(function ($sub) {
-                    $sub->where('is_boarding', false)->orWhereNull('is_boarding');
-                })->where(function ($sub) {
-                    $sub->where('student_type', '!=', 'boarding')->orWhereNull('student_type');
-                })->whereHas('student', function ($sq) {
-                    $sq->where('is_boarding', false)->orWhereNull('is_boarding');
-                });
+                $q->where('enrollments.is_boarding', false)
+                  ->orWhere(function ($legacy) {
+                      $legacy->whereNull('enrollments.is_boarding')
+                          ->whereHas('student', function ($sq) {
+                              $sq->where('is_boarding', false)->orWhereNull('is_boarding');
+                          });
+                  });
             });
         }
 
@@ -732,7 +737,7 @@ class InvoiceController extends Controller
                 continue;
             }
 
-            $isBoarder = $enrollment->isBoarder() || (bool) $student->is_boarding;
+            $isBoarder = (bool) ($enrollment->is_boarding ?? $student->is_boarding);
             $hasTransport = (bool) $enrollment->has_transport || (bool) $student->has_transport;
             $existingInvoice = $student->invoices?->first();
 
@@ -850,6 +855,8 @@ class InvoiceController extends Controller
             'issued_at' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issued_at'],
             'grade' => ['nullable', 'string'],
+            'class_name' => ['nullable', 'string', 'max:100'],
+            'residency' => ['nullable', 'in:all,boarding,day'],
             'include_optional' => ['nullable', 'boolean'],
             'custom_fee_items' => ['nullable', 'array'],
             'custom_fee_items.*.description' => ['required_with:custom_fee_items', 'string', 'max:255'],
@@ -872,15 +879,98 @@ class InvoiceController extends Controller
             ? $request->boolean('match_fee_grade')
             : true;
 
-        // Fetch enrollments and deduplicate by student_id to ensure single invoice per student
-        $enrollments = Enrollment::with(['student.guardians', 'class'])
+        // Revalidate the submitted cohort against the active student master,
+        // active selected-period enrollment, and filters used by the preview.
+        $className = $validated['class_name'] ?? null;
+        $residency = $validated['residency'] ?? 'all';
+        $grade = $validated['grade'] ?? null;
+        $classMapping = app(\App\Services\StudentClassMappingService::class);
+        $selectedEnrollmentQuery = Enrollment::with(['student.guardians', 'class'])
             ->where('school_id', $school->id)
+            ->where('status', 'active')
+            ->where(function ($q) use ($academicYear) {
+                $q->where('academic_year', $academicYear)->orWhereNull('academic_year');
+            })
+            ->where(function ($q) use ($term) {
+                $q->whereIn('term', $this->getTermVariations($term))
+                    ->orWhereNull('term')
+                    ->orWhere('term', '');
+            })
+            ->whereHas('student', fn ($q) => $q
+                ->where('school_id', $school->id)
+                ->where('status', 'active'));
+
+        if (filled($grade)) {
+            $canonicalFilterGrade = $classMapping->canonicalGrade($school->id, $grade, $grade, $academicYear) ?? $grade;
+            $gradeVars = $classMapping->gradeAliases($canonicalFilterGrade);
+            $gradeClassNames = $classMapping->gradeAliasesForSchool($school->id, $canonicalFilterGrade);
+            $selectedEnrollmentQuery->where(function ($q) use ($gradeVars, $gradeClassNames, $school) {
+                $q->whereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->whereIn('grade', $gradeVars))
+                    ->orWhere(function ($legacy) use ($gradeVars, $gradeClassNames, $school) {
+                        $legacy->whereDoesntHave('class')
+                            ->where(function ($placement) use ($gradeVars, $gradeClassNames, $school) {
+                                $placement->whereIn('enrollments.grade', $gradeVars)
+                                    ->orWhereIn('enrollments.class_name', $gradeClassNames)
+                                    ->orWhereHas('student', function ($sq) use ($gradeVars, $gradeClassNames, $school) {
+                                        $sq->where('school_id', $school->id)
+                                            ->where(function ($studentQuery) use ($gradeVars, $gradeClassNames) {
+                                                $studentQuery->whereIn('grade', $gradeVars)
+                                                    ->orWhereIn('class_name', $gradeClassNames);
+                                            });
+                                    });
+                            });
+                    });
+            });
+        }
+
+        if (filled($className)) {
+            $selectedEnrollmentQuery->where(function ($q) use ($className, $school) {
+                $q->whereHas('class', fn ($cq) => $cq->where('school_id', $school->id)->where('name', $className))
+                    ->orWhere(function ($legacy) use ($className, $school) {
+                        $legacy->whereDoesntHave('class')
+                            ->where(function ($placement) use ($className, $school) {
+                                $placement->where('enrollments.class_name', $className)
+                                    ->orWhereHas('student', fn ($sq) => $sq->where('school_id', $school->id)->where('class_name', $className));
+                            });
+                    });
+            });
+        }
+
+        if ($residency === 'boarding') {
+            $selectedEnrollmentQuery->where(function ($q) {
+                $q->where('enrollments.is_boarding', true)
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('enrollments.is_boarding')
+                            ->whereHas('student', fn ($sq) => $sq->where('is_boarding', true));
+                    });
+            });
+        } elseif ($residency === 'day') {
+            $selectedEnrollmentQuery->where(function ($q) {
+                $q->where('enrollments.is_boarding', false)
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('enrollments.is_boarding')
+                            ->whereHas('student', fn ($sq) => $sq->where('is_boarding', false)->orWhereNull('is_boarding'));
+                    });
+            });
+        }
+
+        $enrollments = $selectedEnrollmentQuery
             ->whereIn('id', $validated['enrollment_ids'])
             ->get()
             ->unique('student_id');
 
+        $requestedEnrollmentCount = collect($validated['enrollment_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->count();
+
+        if ($enrollments->count() !== $requestedEnrollmentCount) {
+            return back()->withErrors([
+                'enrollment_ids' => 'The selected batch includes a student who is no longer active or does not have an eligible active enrollment for this year and term. Refresh the preview and select the cohort again.',
+            ])->withInput();
+        }
+
         // Fetch fee structures for this academic year, term, and school
-        $grade = $validated['grade'] ?? null;
         $feeStructureQuery = FeeStructure::where('school_id', $school->id)
             ->where('academic_year', $academicYear)
             ->where('term', $term);
@@ -970,7 +1060,7 @@ class InvoiceController extends Controller
                         return;
                     }
 
-                    $isBoarder = $enrollment->isBoarder() || (bool) $student->is_boarding;
+                    $isBoarder = (bool) ($enrollment->is_boarding ?? $student->is_boarding);
                     $hasTransport = (bool) $enrollment->has_transport || (bool) $student->has_transport;
 
                     // Resolve items for this student
