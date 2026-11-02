@@ -12,6 +12,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <a href="{{ route('admin.reports.enrollment-summary') }}" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm transition">Enrollment Summary</a>
+            <a href="{{ route('admin.reports.class-category-register') }}" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium shadow-sm transition">Class &amp; Category Register</a>
             <a href="{{ route('admin.reports.academic-performance') }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium shadow-sm transition">Performance Summary</a>
             <a href="{{ route('admin.reports.attendance-summary') }}" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium shadow-sm transition">Attendance Summary</a>
         </div>

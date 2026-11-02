@@ -581,6 +581,10 @@
                                     <x-nav-icon name="users" class="text-blue-400" />
                                     <span>Student Master Register</span>
                                 </a>
+                                <a href="{{ route('admin.reports.class-category-register') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.class-category-register') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
+                                    <x-nav-icon name="users" class="text-cyan-400" />
+                                    <span>Class &amp; Category Register</span>
+                                </a>
                                 <a href="{{ route('admin.reports.academic-performance') }}" class="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-slate-800/80 transition {{ request()->routeIs('admin.reports.academic-performance') ? 'bg-slate-800/80 text-slate-50' : 'text-slate-300' }}">
                                     <x-nav-icon name="chart" class="text-emerald-400" />
                                     <span>Performance Summary</span>

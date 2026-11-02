@@ -113,6 +113,49 @@ class AcademicReportController extends Controller
         ]));
     }
 
+    /** Printable class and student-category listing for active students. */
+    public function classCategoryRegister(Request $request)
+    {
+        $school = $this->getTenantSchool($request);
+        $filters = $request->validate([
+            'grade' => ['nullable', 'string', 'max:50'],
+            'class_name' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'in:day,boarding,scholarship'],
+        ]);
+
+        $students = Student::query()
+            ->where('school_id', $school->id)
+            ->where('status', 'active')
+            ->with([
+                'currentEnrollment' => fn ($q) => $q->select('id', 'student_id', 'class_id', 'grade', 'class_name', 'is_boarding'),
+                'currentEnrollment.class:id,name,grade',
+            ])
+            ->get(['id', 'first_name', 'other_names', 'last_name', 'admission_number', 'registration_number', 'grade', 'class_name', 'is_boarding', 'funding_status', 'gender'])
+            ->map(function (Student $student) {
+                $enrollment = $student->currentEnrollment;
+                $student->report_grade = $enrollment?->grade ?: $enrollment?->class?->grade ?: $student->getRawOriginal('grade');
+                $student->report_class_name = $enrollment?->class_name ?: $enrollment?->class?->name ?: $student->getRawOriginal('class_name');
+                $student->report_is_boarding = $enrollment?->is_boarding ?? (bool) $student->getRawOriginal('is_boarding');
+                return $student;
+            });
+
+        $availableGrades = $students->pluck('report_grade')->filter()->unique()->sort()->values();
+        $availableClasses = $students
+            ->when(!empty($filters['grade']), fn ($rows) => $rows->where('report_grade', $filters['grade']))
+            ->pluck('report_class_name')->filter()->unique()->sort()->values();
+
+        $students = $students
+            ->when(!empty($filters['grade']), fn ($rows) => $rows->where('report_grade', $filters['grade']))
+            ->when(!empty($filters['class_name']), fn ($rows) => $rows->where('report_class_name', $filters['class_name']))
+            ->when(($filters['category'] ?? null) === 'scholarship', fn ($rows) => $rows->where('funding_status', 'scholarship'))
+            ->when(($filters['category'] ?? null) === 'boarding', fn ($rows) => $rows->filter(fn ($student) => $student->funding_status !== 'scholarship' && (bool) $student->report_is_boarding))
+            ->when(($filters['category'] ?? null) === 'day', fn ($rows) => $rows->filter(fn ($student) => $student->funding_status !== 'scholarship' && ! (bool) $student->report_is_boarding))
+            ->sortBy(fn ($student) => sprintf('%s|%s|%s|%s', $student->report_grade, $student->report_class_name, $student->last_name, $student->first_name))
+            ->values();
+
+        return view('admin.reports.class-category-register', compact('school', 'filters', 'students', 'availableGrades', 'availableClasses'));
+    }
+
     public function exportStudentRegister(Request $request)
     {
         $school = $this->getTenantSchool($request);
