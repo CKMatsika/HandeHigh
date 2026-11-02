@@ -553,7 +553,14 @@ class InvoiceController extends Controller
             ->where('school_id', $school->id)
             ->where('status', 'active')
             ->with([
-                'currentEnrollment:id,student_id,class_id,grade,class_name,is_boarding',
+                'currentEnrollment' => fn ($query) => $query->select(
+                    'enrollments.id',
+                    'enrollments.student_id',
+                    'enrollments.class_id',
+                    'enrollments.grade',
+                    'enrollments.class_name',
+                    'enrollments.is_boarding',
+                ),
                 'currentEnrollment.class:id,school_id,grade,name',
             ])
             ->get(['id', 'school_id', 'grade', 'class_name', 'is_boarding', 'funding_status'])
