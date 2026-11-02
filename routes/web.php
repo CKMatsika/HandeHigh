@@ -605,6 +605,13 @@ Route::middleware(['auth'])->group(function () {
 
             // Cashbook
             Route::get('/cashbook', [App\Http\Controllers\Admin\CashbookController::class, 'index'])->name('cashbook.index');
+            Route::get('/cashbook/import-expenses', [App\Http\Controllers\Admin\CashbookController::class, 'importExpenses'])->name('cashbook.import-expenses');
+            Route::get('/cashbook/import-expenses/template', [App\Http\Controllers\Admin\CashbookController::class, 'downloadExpenseTemplate'])->name('cashbook.import-expenses.template');
+            Route::post('/cashbook/import-expenses', [App\Http\Controllers\Admin\CashbookController::class, 'storeExpenseImport'])->name('cashbook.import-expenses.store');
+            Route::get('/cashbook/import-expenses/{batch}', [App\Http\Controllers\Admin\CashbookController::class, 'showExpenseImport'])->name('cashbook.import-expenses.show');
+            Route::post('/cashbook/import-expenses/{batch}/rows/{row}/mapping', [App\Http\Controllers\Admin\CashbookController::class, 'updateExpenseImportMapping'])->name('cashbook.import-expenses.mapping');
+            Route::post('/cashbook/import-expenses/{batch}/validate', [App\Http\Controllers\Admin\CashbookController::class, 'validateExpenseImport'])->name('cashbook.import-expenses.validate');
+            Route::post('/cashbook/import-expenses/{batch}/post', [App\Http\Controllers\Admin\CashbookController::class, 'postExpenseImport'])->name('cashbook.import-expenses.post');
             Route::get('/cashbook/create', [App\Http\Controllers\Admin\CashbookController::class, 'create'])->name('cashbook.create');
             Route::post('/cashbook', [App\Http\Controllers\Admin\CashbookController::class, 'store'])->name('cashbook.store');
             Route::get('/cashbook/{cashbook}', [App\Http\Controllers\Admin\CashbookController::class, 'show'])->name('cashbook.show');

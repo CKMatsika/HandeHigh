@@ -8,9 +8,12 @@ use App\Models\Cashbook;
 use App\Models\Account;
 use App\Models\Department;
 use App\Models\Invoice;
+use App\Models\MigrationBatch;
+use App\Models\MigrationStagingRow;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Rules\TenantExists;
+use App\Services\Finance\CashbookExpenseCsvImportService;
 use Illuminate\Http\Request;
 
 class CashbookController extends Controller
@@ -71,6 +74,107 @@ class CashbookController extends Controller
         $transactionTypes = ['income', 'expense', 'transfer'];
 
         return view('admin.cashbook.index', compact('transactions', 'bankAccounts', 'categories', 'transactionTypes', 'projects', 'costCenters'));
+    }
+
+    public function importExpenses()
+    {
+        $school = auth()->user()?->school;
+        abort_unless($school, 403);
+
+        $accounts = Account::where('school_id', $school->id)
+            ->where('is_active', true)
+            ->where('is_postable', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type', 'category']);
+
+        return view('admin.cashbook.import-expenses', compact('accounts'));
+    }
+
+    public function downloadExpenseTemplate(CashbookExpenseCsvImportService $importer)
+    {
+        return response($importer->template(), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="cashbook-expense-import-template.csv"',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    public function storeExpenseImport(Request $request, CashbookExpenseCsvImportService $importer)
+    {
+        $request->validate(['file' => ['required', 'file', 'mimes:csv,txt', 'max:10240']]);
+        $user = auth()->user();
+        abort_unless($user?->school_id, 403);
+
+        $batch = $importer->stage($request->file('file'), (int) $user->school_id, $user);
+
+        return redirect()->route('admin.cashbook.import-expenses.show', $batch)
+            ->with('success', 'CSV rows staged for review. Nothing has been posted to the Cashbook or General Ledger.');
+    }
+
+    public function showExpenseImport(MigrationBatch $batch)
+    {
+        $this->authorizeExpenseImport($batch);
+        $batch->load(['stagingRows']);
+        $accounts = Account::where('school_id', $batch->school_id)
+            ->where('is_active', true)
+            ->where('is_postable', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type', 'category']);
+
+        return view('admin.cashbook.import-expenses-review', compact('batch', 'accounts'));
+    }
+
+    public function updateExpenseImportMapping(Request $request, MigrationBatch $batch, MigrationStagingRow $row, CashbookExpenseCsvImportService $importer)
+    {
+        $this->authorizeExpenseImport($batch);
+        abort_unless($row->migration_batch_id === $batch->id && $row->school_id === $batch->school_id, 404);
+        abort_if($batch->status === 'posted' || $row->status === 'posted', 422, 'Posted rows cannot be remapped.');
+        $validated = $request->validate([
+            'cash_account_id' => ['required', 'integer', TenantExists::make('accounts')],
+            'offset_account_id' => ['required', 'integer', TenantExists::make('accounts')],
+            'category' => ['required', 'string', 'max:50'],
+        ]);
+
+        foreach (['cash_account_id', 'offset_account_id'] as $field) {
+            abort_unless(Account::where('school_id', $batch->school_id)->whereKey($validated[$field])->exists(), 422, 'Mappings must use accounts from this school.');
+        }
+        $importer->updateMapping($batch, $row, $validated);
+
+        return redirect()->route('admin.cashbook.import-expenses.show', $batch)->with('success', 'Row mapping saved. Review its validation status before posting.');
+    }
+
+    public function validateExpenseImport(MigrationBatch $batch, CashbookExpenseCsvImportService $importer)
+    {
+        $this->authorizeExpenseImport($batch);
+        abort_if($batch->status === 'posted', 422, 'This batch has already been posted.');
+        $importer->validateBatch($batch);
+
+        return redirect()->route('admin.cashbook.import-expenses.show', $batch->fresh())
+            ->with('success', $batch->fresh()->status === 'validated'
+                ? 'All rows passed validation. Review the totals and post only when ready.'
+                : 'Validation complete. Held rows still require attention.');
+    }
+
+    public function postExpenseImport(Request $request, MigrationBatch $batch, CashbookExpenseCsvImportService $importer)
+    {
+        $this->authorizeExpenseImport($batch);
+        $request->validate(['confirm_reviewed' => ['required', 'accepted']]);
+
+        try {
+            $result = $importer->post($batch, auth()->user());
+        } catch (\Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['import' => 'Posting was refused or rolled back: '.$exception->getMessage()]);
+        }
+
+        return redirect()->route('admin.cashbook.import-expenses.show', $result['batch'])
+            ->with('success', $result['posted_count'].' expense transaction(s) posted. Journal debits and credits each total $'.number_format($result['debit_cents'] / 100, 2).'.');
+    }
+
+    private function authorizeExpenseImport(MigrationBatch $batch): void
+    {
+        abort_unless($batch->school_id === auth()->user()?->school_id, 403);
+        abort_unless($batch->import_type === 'cashbook_expense_csv', 404);
     }
 
     public function create()
