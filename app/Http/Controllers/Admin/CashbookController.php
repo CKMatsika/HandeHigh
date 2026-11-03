@@ -81,13 +81,26 @@ class CashbookController extends Controller
         $school = auth()->user()?->school;
         abort_unless($school, 403);
 
+        $batches = MigrationBatch::query()
+            ->where('school_id', $school->id)
+            ->where('import_type', 'cashbook_expense_csv')
+            ->with('uploader:id,name')
+            ->withCount([
+                'stagingRows as validated_rows_count' => fn ($query) => $query->where('status', 'validated'),
+                'stagingRows as held_rows_count' => fn ($query) => $query->where('status', 'unresolved'),
+                'stagingRows as posted_rows_count' => fn ($query) => $query->where('status', 'posted'),
+            ])
+            ->withSum('stagingRows as amount_total', 'amount')
+            ->latest()
+            ->paginate(10);
+
         $accounts = Account::where('school_id', $school->id)
             ->where('is_active', true)
             ->where('is_postable', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'type', 'category']);
 
-        return view('admin.cashbook.import-expenses', compact('accounts'));
+        return view('admin.cashbook.import-expenses', compact('accounts', 'batches'));
     }
 
     public function downloadExpenseTemplate(CashbookExpenseCsvImportService $importer)
