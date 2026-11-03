@@ -188,6 +188,13 @@ class CashbookExpenseCsvImportService
     {
         $seen = [];
         foreach ($batch->stagingRows as $row) {
+            if ($row->status === 'posted') {
+                if ($row->reference_number) {
+                    $seen[strtoupper($row->reference_number)] = true;
+                }
+                continue;
+            }
+
             $errors = $this->validateStagedRow($batch, $row, $row->parsed_data ?? [], $seen);
             $row->validation_errors = $errors ?: null;
             $row->status = $errors ? 'unresolved' : 'validated';
@@ -205,14 +212,15 @@ class CashbookExpenseCsvImportService
     {
         return DB::transaction(function () use ($batch, $user) {
             $batch = MigrationBatch::whereKey($batch->id)->where('school_id', $user->school_id)->lockForUpdate()->firstOrFail();
-            if ($batch->import_type !== self::IMPORT_TYPE || $batch->status !== 'validated') {
-                throw new RuntimeException('Only a fully validated Cashbook expense batch can be posted.');
+            if ($batch->import_type !== self::IMPORT_TYPE || ! in_array($batch->status, ['uploaded', 'validated', 'partially_posted'], true)) {
+                throw new RuntimeException('This Cashbook expense batch is not available for posting.');
             }
 
             $rows = MigrationStagingRow::where('migration_batch_id', $batch->id)
+                ->where('status', 'validated')
                 ->orderBy('accounting_date')->orderBy('row_number')->lockForUpdate()->get();
-            if ($rows->isEmpty() || $rows->contains(fn ($row) => $row->status !== 'validated' || ! empty($row->validation_errors))) {
-                throw new RuntimeException('The batch contains unresolved rows. Validate and resolve every row before posting.');
+            if ($rows->isEmpty() || $rows->contains(fn ($row) => ! empty($row->validation_errors))) {
+                throw new RuntimeException('There are no validated expense rows ready to post. Resolve and validate at least one row first.');
             }
 
             $posted = 0;
@@ -291,14 +299,18 @@ class CashbookExpenseCsvImportService
                 $posted++;
             }
 
+            $postedRowCount = MigrationStagingRow::where('migration_batch_id', $batch->id)->where('status', 'posted')->count();
+            $validatedRowCount = MigrationStagingRow::where('migration_batch_id', $batch->id)->where('status', 'validated')->count();
+            $heldRowCount = MigrationStagingRow::where('migration_batch_id', $batch->id)->whereNotIn('status', ['validated', 'posted'])->count();
+            $complete = $postedRowCount === (int) $batch->total_rows;
             $batch->update([
-                'status' => 'posted',
-                'valid_rows' => $posted,
-                'error_rows' => 0,
-                'posted_rows' => $posted,
-                'total_debit' => $debitCents / 100,
-                'total_credit' => $creditCents / 100,
-                'is_balanced' => $debitCents === $creditCents,
+                'status' => $complete ? 'posted' : ($postedRowCount > 0 ? 'partially_posted' : ($heldRowCount === 0 ? 'validated' : 'uploaded')),
+                'valid_rows' => $validatedRowCount,
+                'error_rows' => $heldRowCount,
+                'posted_rows' => $postedRowCount,
+                'total_debit' => ((int) round((float) $batch->total_debit * 100) + $debitCents) / 100,
+                'total_credit' => ((int) round((float) $batch->total_credit * 100) + $creditCents) / 100,
+                'is_balanced' => ((int) round((float) $batch->total_debit * 100) + $debitCents) === ((int) round((float) $batch->total_credit * 100) + $creditCents),
                 'approved_by' => $user->id,
                 'approved_at' => now(),
                 'posted_at' => now(),
@@ -446,11 +458,14 @@ class CashbookExpenseCsvImportService
     {
         $rows = $batch->stagingRows()->get();
         $valid = $rows->where('status', 'validated')->count();
-        $errors = $rows->where('status', '!=', 'validated')->count();
+        $posted = $rows->where('status', 'posted')->count();
+        $errors = $rows->whereNotIn('status', ['validated', 'posted'])->count();
+        $complete = $rows->isNotEmpty() && $posted === $rows->count();
         $batch->update([
-            'status' => $errors === 0 && $rows->isNotEmpty() ? 'validated' : 'uploaded',
+            'status' => $complete ? 'posted' : ($posted > 0 ? 'partially_posted' : ($errors === 0 && $valid > 0 ? 'validated' : 'uploaded')),
             'valid_rows' => $valid,
             'error_rows' => $errors,
+            'posted_rows' => $posted,
             'total_rows' => $rows->count(),
         ]);
     }

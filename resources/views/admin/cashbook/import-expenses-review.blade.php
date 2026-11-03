@@ -8,7 +8,7 @@
             <h1 class="mt-2 text-2xl font-semibold text-slate-50">Review Expense Import</h1>
             <p class="mt-1 text-sm text-slate-400">Batch {{ $batch->batch_number }} · {{ $batch->file_name }}</p>
         </div>
-        <span class="rounded-full px-3 py-1 text-sm {{ $batch->status === 'validated' ? 'bg-emerald-900/60 text-emerald-300' : ($batch->status === 'posted' ? 'bg-blue-900/60 text-blue-300' : 'bg-amber-900/60 text-amber-200') }}">{{ ucfirst(str_replace('_', ' ', $batch->status)) }}</span>
+        <span class="rounded-full px-3 py-1 text-sm {{ $batch->status === 'validated' ? 'bg-emerald-900/60 text-emerald-300' : (in_array($batch->status, ['posted', 'partially_posted'], true) ? 'bg-blue-900/60 text-blue-300' : 'bg-amber-900/60 text-amber-200') }}">{{ ucfirst(str_replace('_', ' ', $batch->status)) }}</span>
     </div>
 
     @if(session('success'))<div class="rounded-lg border border-emerald-800 bg-emerald-950/30 p-3 text-sm text-emerald-200">{{ session('success') }}</div>@endif
@@ -18,6 +18,7 @@
         $readyRows = $batch->stagingRows->where('status', 'validated')->count();
         $heldRows = $batch->stagingRows->where('status', 'unresolved')->count();
         $totalAmount = $batch->stagingRows->sum(fn ($row) => (float) $row->amount);
+        $readyAmount = $batch->stagingRows->where('status', 'validated')->sum(fn ($row) => (float) $row->amount);
         $cashAccounts = $accounts->filter(fn ($account) => in_array($account->category, ['cash', 'bank'], true));
         $offsetAccounts = $accounts->filter(fn ($account) => in_array($account->type, ['expense', 'liability'], true));
     @endphp
@@ -29,7 +30,7 @@
     </div>
 
     <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4 text-sm text-slate-300">
-        Review the source reference and evidence, then choose the cash/bank account and expense offset account for each row. Every posted row will use the original date and amount and create a balanced journal through the existing accounting service. Rows with a closed/missing period, duplicate reference, invalid account or missing evidence remain held.
+        Review the source reference and evidence, then choose the cash/bank account and expense offset account for each row. You can post validated rows while other rows remain held; only the rows marked Validated will post, and held rows will stay in this batch for later review. Each post is transactional and creates a balanced journal through the existing accounting service.
     </div>
 
     <div class="space-y-4">
@@ -92,11 +93,11 @@
                 @csrf
                 <button class="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-100 hover:bg-slate-800">Revalidate batch</button>
             </form>
-            @if($batch->status === 'validated' && $readyRows === $batch->total_rows)
-                <form action="{{ route('admin.cashbook.import-expenses.post', $batch) }}" method="POST" class="flex flex-wrap items-center gap-3" onsubmit="return confirm('Post all {{ $readyRows }} validated expense rows to Cashbook and the General Ledger? This cannot be undone by re-uploading; corrections require reversals.');">
+            @if($readyRows > 0)
+                <form action="{{ route('admin.cashbook.import-expenses.post', $batch) }}" method="POST" class="flex flex-wrap items-center gap-3" onsubmit="return confirm('Post the {{ $readyRows }} currently validated expense row(s), totaling ${{ number_format($readyAmount, 2) }}, to Cashbook and the General Ledger? Held rows will remain in this batch. Posted transactions require reversals for correction.');">
                     @csrf
-                    <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="confirm_reviewed" value="1" required> I reviewed the source rows, amounts and account mappings.</label>
-                    <button class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">Post validated expenses</button>
+                    <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="confirm_reviewed" value="1" required> I reviewed the {{ $readyRows }} ready row(s) and their account mappings.</label>
+                    <button class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">Post {{ $readyRows }} validated expense{{ $readyRows === 1 ? '' : 's' }} · ${{ number_format($readyAmount, 2) }}</button>
                 </form>
             @endif
         </div>
