@@ -8,7 +8,6 @@ use App\Models\AuditLog;
 use App\Models\Cashbook;
 use App\Models\MigrationBatch;
 use App\Models\MigrationStagingRow;
-use App\Models\JournalEntry;
 use App\Models\User;
 use App\Services\AccountingService;
 use Carbon\CarbonImmutable;
@@ -268,7 +267,9 @@ class CashbookExpenseCsvImportService
                     'description' => $row->description,
                     'amount' => $row->amount,
                     'currency' => 'USD',
-                    'balance_after' => $this->balanceAt($cashAccount, $row->accounting_date) - (float) $row->amount,
+                    // Cashbook stores the account's balance at posting time, including
+                    // already-posted entries even when this transaction is backdated.
+                    'balance_after' => (float) $cashAccount->current_balance - (float) $row->amount,
                     'transaction_date' => $row->accounting_date,
                     'reference_number' => $row->reference_number,
                     'voucher_number' => $parsed['voucher_number'] ?? null,
@@ -439,25 +440,6 @@ class CashbookExpenseCsvImportService
         if (! $offset->is_active || ! $offset->is_postable || ! in_array($offset->type, ['expense', 'liability'], true)) {
             throw new RuntimeException('Expense offset must be an active, postable expense or liability account.');
         }
-    }
-
-    private function balanceAt(Account $account, mixed $date): float
-    {
-        $entries = JournalEntry::query()
-            ->where('account_id', $account->id)
-            ->whereHas('batch', fn ($query) => $query
-                ->where('school_id', $account->school_id)
-                ->where('status', 'posted')
-                ->whereDate('transaction_date', '<=', $date))
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE 0 END), 0) AS debits")
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE 0 END), 0) AS credits")
-            ->first();
-
-        $movement = in_array($account->type, ['asset', 'expense'], true)
-            ? ((float) $entries->debits - (float) $entries->credits)
-            : ((float) $entries->credits - (float) $entries->debits);
-
-        return (float) $account->opening_balance + $movement;
     }
 
     private function refreshBatchStatus(MigrationBatch $batch): void
