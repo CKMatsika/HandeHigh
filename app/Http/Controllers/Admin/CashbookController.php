@@ -328,9 +328,10 @@ class CashbookController extends Controller
         $bankAccounts = BankAccount::where('school_id', $school->id)->where('is_active', true)->get();
         $accounts = Account::where('school_id', $school->id)->whereIn('category', ['cash', 'bank'])->where('is_active', true)->get();
         $categories = ['fees', 'salaries', 'supplies', 'maintenance', 'utilities', 'rent', 'opening_balance', 'transfer', 'other'];
+        $transactionTypes = ['income', 'expense', 'transfer'];
         $paymentMethods = ['cash', 'bank_transfer', 'check', 'credit_card', 'mobile_money'];
 
-        return view('admin.cashbook.edit', compact('cashbook', 'bankAccounts', 'accounts', 'categories', 'paymentMethods'));
+        return view('admin.cashbook.edit', compact('cashbook', 'bankAccounts', 'accounts', 'categories', 'transactionTypes', 'paymentMethods'));
     }
 
     public function update(Request $request, Cashbook $cashbook)
