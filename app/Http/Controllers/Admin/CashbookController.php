@@ -67,13 +67,23 @@ class CashbookController extends Controller
             ->orderBy('code')
             ->get();
 
+        $currentBalanceAccounts = $bankAccounts
+            ->when($request->filled('account_id'), fn ($accounts) => $accounts->where('id', (int) $request->account_id))
+            ->map(fn (Account $account) => [
+                'id' => $account->id,
+                'code' => $account->code,
+                'name' => $account->name,
+                'balance' => $account->current_balance,
+            ])
+            ->values();
+
         $projects = Project::where('school_id', $school->id)->orderBy('name')->get();
         $costCenters = Department::where('school_id', $school->id)->orderBy('name')->get();
 
         $categories = ['fees', 'salaries', 'supplies', 'maintenance', 'utilities', 'rent', 'opening_balance', 'transfer', 'other'];
         $transactionTypes = ['income', 'expense', 'transfer'];
 
-        return view('admin.cashbook.index', compact('transactions', 'bankAccounts', 'categories', 'transactionTypes', 'projects', 'costCenters'));
+        return view('admin.cashbook.index', compact('transactions', 'bankAccounts', 'currentBalanceAccounts', 'categories', 'transactionTypes', 'projects', 'costCenters'));
     }
 
     public function importExpenses()

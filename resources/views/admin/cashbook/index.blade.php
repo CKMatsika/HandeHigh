@@ -20,6 +20,23 @@
         </div>
     </div>
 
+    <section class="space-y-3">
+        <div>
+            <h2 class="text-sm font-semibold text-slate-100">Current closing balance</h2>
+            <p class="mt-1 text-xs text-slate-400">Calculated from General Ledger account activity, regardless of transaction date. Row balances below are saved transaction snapshots and may differ for backdated entries.</p>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @forelse($currentBalanceAccounts as $account)
+                <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
+                    <div class="text-xs text-slate-400">{{ $account['code'] }} · {{ $account['name'] }}</div>
+                    <div class="mt-2 text-xl font-semibold {{ $account['balance'] < 0 ? 'text-red-300' : 'text-emerald-300' }}">${{ number_format($account['balance'], 2) }}</div>
+                </div>
+            @empty
+                <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4 text-sm text-slate-400">No active bank account balance is available for this filter.</div>
+            @endforelse
+        </div>
+    </section>
+
     <!-- Filters -->
     <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
         <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -107,7 +124,7 @@
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Account</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Type</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-300">Amount</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-300">Balance</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-300">Balance Snapshot</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-300">Actions</th>
                     </tr>
                 </thead>
