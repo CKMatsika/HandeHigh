@@ -83,6 +83,14 @@
                         @foreach($row->validation_errors as $error)<li>{{ $error }}</li>@endforeach
                     </ul>
                 @endif
+
+                @if($row->status === 'validated' && $batch->status !== 'posted')
+                    <form action="{{ route('admin.cashbook.import-expenses.rows.post', [$batch, $row]) }}" method="POST" class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-800 pt-3" onsubmit="return confirm('Post only this ${{ number_format((float) $row->amount, 2) }} transaction to the Cashbook and General Ledger? This requires a reversal to correct after posting.');">
+                        @csrf
+                        <label class="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" name="confirm_reviewed" value="1" required> I reviewed this transaction and its account mapping.</label>
+                        <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600">Post this transaction · ${{ number_format((float) $row->amount, 2) }}</button>
+                    </form>
+                @endif
             </article>
         @endforeach
     </div>

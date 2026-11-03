@@ -208,19 +208,25 @@ class CashbookExpenseCsvImportService
         return $batch->fresh();
     }
 
-    public function post(MigrationBatch $batch, User $user): array
+    public function post(MigrationBatch $batch, User $user, ?int $onlyRowId = null): array
     {
-        return DB::transaction(function () use ($batch, $user) {
+        return DB::transaction(function () use ($batch, $user, $onlyRowId) {
             $batch = MigrationBatch::whereKey($batch->id)->where('school_id', $user->school_id)->lockForUpdate()->firstOrFail();
             if ($batch->import_type !== self::IMPORT_TYPE || ! in_array($batch->status, ['uploaded', 'validated', 'partially_posted'], true)) {
                 throw new RuntimeException('This Cashbook expense batch is not available for posting.');
             }
 
-            $rows = MigrationStagingRow::where('migration_batch_id', $batch->id)
+            $rowsQuery = MigrationStagingRow::where('migration_batch_id', $batch->id)
                 ->where('status', 'validated')
-                ->orderBy('accounting_date')->orderBy('row_number')->lockForUpdate()->get();
+                ->orderBy('accounting_date')->orderBy('row_number');
+            if ($onlyRowId !== null) {
+                $rowsQuery->whereKey($onlyRowId);
+            }
+            $rows = $rowsQuery->lockForUpdate()->get();
             if ($rows->isEmpty() || $rows->contains(fn ($row) => ! empty($row->validation_errors))) {
-                throw new RuntimeException('There are no validated expense rows ready to post. Resolve and validate at least one row first.');
+                throw new RuntimeException($onlyRowId !== null
+                    ? 'This transaction is not validated and ready to post. Review its mapping and validation messages first.'
+                    : 'There are no validated expense rows ready to post. Resolve and validate at least one row first.');
             }
 
             $posted = 0;

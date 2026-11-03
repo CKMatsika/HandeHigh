@@ -184,6 +184,23 @@ class CashbookController extends Controller
             ->with('success', $result['posted_count'].' expense transaction(s) posted. Journal debits and credits each total $'.number_format($result['debit_cents'] / 100, 2).'.');
     }
 
+    public function postExpenseImportRow(Request $request, MigrationBatch $batch, MigrationStagingRow $row, CashbookExpenseCsvImportService $importer)
+    {
+        $this->authorizeExpenseImport($batch);
+        abort_unless($row->migration_batch_id === $batch->id && $row->school_id === $batch->school_id, 404);
+        $request->validate(['confirm_reviewed' => ['required', 'accepted']]);
+
+        try {
+            $result = $importer->post($batch, auth()->user(), $row->id);
+        } catch (\Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['import' => 'Posting was refused or rolled back: '.$exception->getMessage()]);
+        }
+
+        return redirect()->route('admin.cashbook.import-expenses.show', $result['batch'])
+            ->with('success', 'The selected expense transaction was posted. Journal debits and credits each total $'.number_format($result['debit_cents'] / 100, 2).'. Other rows remain unchanged.');
+    }
+
     private function authorizeExpenseImport(MigrationBatch $batch): void
     {
         abort_unless($batch->school_id === auth()->user()?->school_id, 403);

@@ -610,6 +610,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/cashbook/import-expenses', [App\Http\Controllers\Admin\CashbookController::class, 'storeExpenseImport'])->name('cashbook.import-expenses.store');
             Route::get('/cashbook/import-expenses/{batch}', [App\Http\Controllers\Admin\CashbookController::class, 'showExpenseImport'])->name('cashbook.import-expenses.show');
             Route::post('/cashbook/import-expenses/{batch}/rows/{row}/mapping', [App\Http\Controllers\Admin\CashbookController::class, 'updateExpenseImportMapping'])->name('cashbook.import-expenses.mapping');
+            Route::post('/cashbook/import-expenses/{batch}/rows/{row}/post', [App\Http\Controllers\Admin\CashbookController::class, 'postExpenseImportRow'])->name('cashbook.import-expenses.rows.post');
             Route::post('/cashbook/import-expenses/{batch}/validate', [App\Http\Controllers\Admin\CashbookController::class, 'validateExpenseImport'])->name('cashbook.import-expenses.validate');
             Route::post('/cashbook/import-expenses/{batch}/post', [App\Http\Controllers\Admin\CashbookController::class, 'postExpenseImport'])->name('cashbook.import-expenses.post');
             Route::get('/cashbook/create', [App\Http\Controllers\Admin\CashbookController::class, 'create'])->name('cashbook.create');
